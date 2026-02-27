@@ -2,6 +2,9 @@
 
 > Agente de observabilidade nativo em Go para monitoramento de containers Docker com dashboard interativo, métricas Prometheus e alertas configuráveis.
 
+### ⛰️ Por que "Castle Rock"?
+Inspirado nas torres de vigia medievais erguidas sobre rochedos (Castle Rocks), que ofereciam **visão panorâmica absoluta** de tudo que acontecia ao redor do castelo. Assim como essas torres, este agente fica em um ponto de observação privilegiado (o Docker Socket) para monitorar, vigiar e alertar sobre a saúde de toda a sua infraestrutura de containers.
+
 ---
 
 ## 🧠 Como Funciona — Explicação Simples
@@ -57,24 +60,24 @@ Docker Containers → Castle Rock Agent → Prometheus → Grafana
 ## Arquitetura
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│                    Castle Rock Agent v0.3.0                   │
-│                                                              │
-│  ┌─────────────┐  ┌──────────────┐  ┌────────────────────┐  │
-│  │   TUI        │  │  Prometheus   │  │  Alert Engine      │  │
-│  │  (bubbletea) │  │  HTTP :9110   │  │  (rules + state)   │  │
-│  └──────┬───────┘  └──────┬───────┘  └─────────┬──────────┘  │
-│         │                 │                    │              │
-│         └────────┬────────┴────────────────────┘              │
-│                  ▼                                            │
-│         ┌────────────────┐                                    │
-│         │  Docker Client  │  ← Stats API + Events API         │
-│         │  (SDK oficial)  │     + Logs API + Actions          │
-│         └───────┬────────┘                                    │
-│                 │                                             │
-└─────────────────┼─────────────────────────────────────────────┘
-                  ▼
-         Docker Engine API
+┌────────────────────────────────────────────────────────────────┐
+│                    Castle Rock Agent v0.3.0                    │
+│                                                                │
+│  ┌─────────────┐   ┌──────────────┐   ┌─────────────────────┐  │
+│  │     TUI     │   │  Prometheus  │   │    Alert Engine     │  │
+│  │ (bubbletea) │   │  HTTP :9110  │   │   (rules + state)   │  │
+│  └──────┬──────┘   └──────┬───────┘   └──────────┬──────────┘  │
+│         │                 │                      │             │
+│         └─────────┬───────┴──────────────────────┘             │
+│                   ▼                                            │
+│         ┌──────────────────┐                                   │
+│         │  Docker Client   │ ← Stats API + Events API          │
+│         │  (SDK oficial)   │   + Logs API + Actions            │
+│         └─────────┬────────┘                                   │
+│                   │                                            │
+└───────────────────┼────────────────────────────────────────────┘
+                    ▼
+            Docker Engine API
       (unix:///var/run/docker.sock)
 ```
 
@@ -193,9 +196,9 @@ Ao executar `make run`, o agente abre um dashboard fullscreen:
 
  📋 Eventos
   ╭──────────────────────────────────────────────────────╮
-  │  16:05:32 🟢 start      nginx                        │
-  │  16:05:30 📦 create     nginx                        │
-  │  16:04:15 🔴 die        old-container                │
+  │  16:05:32 🟢 start      nginx                       │
+  │  16:05:30 📦 create     nginx                       │
+  │  16:04:15 🔴 die        old-container               │
   ╰──────────────────────────────────────────────────────╯
 
   ↑↓ navegar │ enter detalhes │ l logs │ s stop │ R restart │ r refresh │ ? ajuda │ q sair
@@ -486,18 +489,19 @@ Variáveis de ambiente têm **prioridade máxima** sobre o arquivo YAML:
 O `docker-compose.yml` levanta 3 serviços:
 
 ```
-┌─────────────────────────────────────────────────────┐
-│              Docker Compose Stack                   │
-│                                                     │
-│  ┌──────────────┐  ┌───────────┐  ┌──────────┐     │
-│  │ Castle Rock   │→│ Prometheus │→│ Grafana    │    │
-│  │ Agent :9110   │  │ :9090      │  │ :3000     │    │
-│  │ (headless)    │  │ (scraping) │  │ (dashboards) │ │
-│  └──────────────┘  └───────────┘  └──────────┘     │
-│         │                                           │
-│         ▼                                           │
-│    Docker Socket (monitoramento)                     │
-└─────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────┐
+│                  Docker Compose Stack                  │
+│                                                        │
+│  ┌──────────────┐   ┌────────────┐   ┌──────────────┐  │
+│  │ Castle Rock  │ → │ Prometheus │ → │   Grafana    │  │
+│  │ Agent :9110  │   │   :9090    │   │    :3000     │  │
+│  │  (headless)  │   │ (scraping) │   │ (dashboards) │  │
+│  └──────┬───────┘   └────────────┘   └──────────────┘  │
+│         │                                              │
+│         ▼                                              │
+│   Docker Socket                                        │
+│  (monitoramento)                                       │
+└────────────────────────────────────────────────────────┘
 ```
 
 ### Docker Socket e Permissões
