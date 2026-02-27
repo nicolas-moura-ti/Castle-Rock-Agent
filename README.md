@@ -242,6 +242,11 @@ Ao pressionar `S` na TUI, você cria um container temporário construído via c�
 
 *O container dura exatamente 30 segundos e se auto-destrói (`AutoRemove: true`), para que você possa ver a curva de disparo dos alertas e, logo em seguida, a recuperação (resolved).*
 
+### ⚠️ Limitações do Stress Test
+- **Máquina Virtual vs Host:** No macOS e Windows (Docker Desktop), a carga máxima apontada pelo agente reflete os limites de recursos da Virtual Machine do Docker alocada, e não a máquina física inteira.
+- **Conectividade Inicial:** Exige acesso à internet na 1ª execução para baixar a imagem oficial `alpine` (apenas ~5MB).
+- **Sem Docker Proxy (Somente Leitura):** O teste não funciona no modo headless acoplado ao `docker-socket-proxy`. O proxy possui a flag `POST=0` travada por segurança (não permite criar containers). Por isso, sugerimos usar a TUI via `make run` diretamente no SO real local para usá-lo com sucesso.
+
 ---
 
 ## 📊 Prometheus — Métricas Exportadas
@@ -685,6 +690,14 @@ Ctrl+C → SIGINT → context cancelado → todas as goroutines encerram
 
 O agente segue o fator III (Config) da [12-Factor App](https://12factor.net/config):
 configuração separada do código, com precedência: defaults → YAML → env vars.
+
+---
+
+## 🚀 Próximos Passos (Roadmap)
+
+Planejamentos futuros para evoluir o Agente de Observabilidade:
+
+- **Modo Cluster (Multi-Host) 🌐:** Adaptar a arquitetura atual para N servidores. Um agente assume o papel de "Leader" e os demais como "Workers" (comunicação via WebSockets ou gRPC). Isso permitiria agregar containers e métricas de múltiplos servidores físicos simultaneamente em um único painel e apenas um arquivo central de configuração de Alertas.
 
 ---
 
