@@ -176,9 +176,10 @@ docker compose down
 | **TUI (dashboard terminal)** | ✅ Sim | ❌ Não (headless) |
 | **Prometheus coletando** | ❌ Não | ✅ Sim |
 | **Grafana com gráficos** | ❌ Não | ✅ Sim |
-| **Para quê** | Desenvolvimento / uso direto | Demo stack completa / portfolio |
+| **Por que usar** | Desenvolvimento e análise rápida | Monitoramento 24/7 e alertas visuais |
 
-> 💡 Você pode rodar os dois ao mesmo tempo — o `make run` mostra a TUI no terminal enquanto o `docker compose up` alimenta o Grafana.
+> 💡 **USO EM PARALELO:** Você pode (e deve!) rodar os dois modos ao mesmo tempo!
+> Deixe o `docker compose up -d` rodando no fundo coletando métricas para o Grafana, e sempre que quiser inspecionar a fundo ou testar cargas ("Stress Test"), abra um terminal e rode `make run`. Um não interfere no outro e ambos monitoram o mesmo ambiente de forma cooperativa.
 
 ---
 
@@ -214,6 +215,7 @@ Ao executar `make run`, o agente abre um dashboard fullscreen:
 | `l` | Toggle logs em tempo real do container selecionado |
 | `s` | **Stop** container (pede confirmação `y`) |
 | `R` | **Restart** container (pede confirmação `y`) |
+| `S` | **Stress Test Mode** (CPU/Memória para simular Noisy Neighbor) |
 | `r` | Refresh manual da lista |
 | `?` | Exibir/ocultar ajuda detalhada |
 | `Esc` | Fechar panels abertos |
@@ -226,6 +228,19 @@ Ao executar `make run`, o agente abre um dashboard fullscreen:
 | 🟢 Verde | Normal (CPU < 40%, MEM < 50%) |
 | 🟡 Amarelo | Atenção (CPU 40-80%, MEM 50-80%) |
 | 🔴 Vermelho | Crítico (CPU > 80%, MEM > 80%) |
+
+---
+
+## ⚡ Stress Test Mode (Noisy Neighbor)
+
+O agente possui uma funcionalidade didática embutida para estressar a máquina e ver as métricas/alertas disparando no Grafana em tempo real.
+
+Ao pressionar `S` na TUI, você cria um container temporário construído via código (`alpine` + `stress-ng` nativo) que injeta carga no host:
+- `c` **CPU:** Stressa 2 cores a 100%
+- `m` **Memória:** Aloca e trava 256MB inteiros (sem queimar CPU)
+- `b` **Ambos:** Aplica carga dupla
+
+*O container dura exatamente 30 segundos e se auto-destrói (`AutoRemove: true`), para que você possa ver a curva de disparo dos alertas e, logo em seguida, a recuperação (resolved).*
 
 ---
 
