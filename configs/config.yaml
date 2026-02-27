@@ -1,0 +1,74 @@
+# ╔══════════════════════════════════════════════════════════════════╗
+# ║            🏰  Castle Rock Agent — Configuração                 ║
+# ╚══════════════════════════════════════════════════════════════════╝
+#
+# Ordem de precedência:
+#   1. Valores padrão (código)
+#   2. Este arquivo YAML (override parcial)
+#   3. Variáveis de ambiente CASTLE_ROCK_* (override final)
+#
+# Todas as durações aceitam o formato Go: "5s", "2m", "1h30m"
+
+# Nível de log: debug, info, warn, error
+# ENV: CASTLE_ROCK_LOG_LEVEL
+log_level: "info"
+
+# ── Prometheus Exporter ──────────────────────────────────────────
+prometheus:
+  # Ativa/desativa o servidor HTTP de métricas
+  # ENV: CASTLE_ROCK_PROMETHEUS_ENABLED
+  enabled: true
+
+  # Porta do servidor HTTP (/metrics e /health)
+  # ENV: CASTLE_ROCK_PROMETHEUS_PORT
+  port: 9110
+
+# ── Coleta de Métricas ───────────────────────────────────────────
+stats:
+  # Intervalo entre coletas de métricas (CPU, memória, rede)
+  # Menor = mais granular, mais CPU. Recomendado: 3s-10s
+  # ENV: CASTLE_ROCK_STATS_INTERVAL
+  interval: 5s
+
+# ── Alertas ──────────────────────────────────────────────────────
+alerts:
+  # Ativa/desativa o sistema de alertas
+  # ENV: CASTLE_ROCK_ALERTS_ENABLED
+  enabled: true
+
+  # Regras de alerta
+  # Campos:
+  #   name:      Nome descritivo
+  #   metric:    cpu_percent | memory_percent
+  #   operator:  > | < | >= | <= | ==
+  #   threshold: Valor limite numérico
+  #   duration:  Tempo que a condição deve persistir
+  #   severity:  info | warning | critical
+  rules:
+    - name: "CPU Crítica"
+      metric: "cpu_percent"
+      operator: ">"
+      threshold: 80.0
+      duration: 2m
+      severity: "critical"
+
+    - name: "Memória Crítica"
+      metric: "memory_percent"
+      operator: ">"
+      threshold: 85.0
+      duration: 2m
+      severity: "critical"
+
+    - name: "CPU Alta"
+      metric: "cpu_percent"
+      operator: ">"
+      threshold: 50.0
+      duration: 5m
+      severity: "warning"
+
+    - name: "Memória Alta"
+      metric: "memory_percent"
+      operator: ">"
+      threshold: 70.0
+      duration: 5m
+      severity: "warning"

@@ -1,0 +1,435 @@
+{
+    "annotations": {
+        "list": []
+    },
+    "editable": true,
+    "graphTooltip": 2,
+    "panels": [
+        {
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 0
+            },
+            "id": 100,
+            "title": "💾 Resumo de Memória",
+            "type": "row"
+        },
+        {
+            "datasource": {
+                "type": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "unit": "decbytes",
+                    "thresholds": {
+                        "steps": [
+                            {
+                                "color": "#06B6D4",
+                                "value": null
+                            },
+                            {
+                                "color": "#EAB308",
+                                "value": 2147483648
+                            },
+                            {
+                                "color": "#EF4444",
+                                "value": 4294967296
+                            }
+                        ]
+                    }
+                }
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 0,
+                "y": 1
+            },
+            "id": 1,
+            "title": "RAM Total Usada",
+            "type": "stat",
+            "targets": [
+                {
+                    "expr": "sum(castle_rock_container_memory_usage_bytes)",
+                    "instant": true
+                }
+            ],
+            "options": {
+                "colorMode": "background_solid",
+                "graphMode": "area",
+                "textMode": "value"
+            }
+        },
+        {
+            "datasource": {
+                "type": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "unit": "decbytes",
+                    "thresholds": {
+                        "steps": [
+                            {
+                                "color": "#6B7280",
+                                "value": null
+                            }
+                        ]
+                    }
+                }
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 6,
+                "y": 1
+            },
+            "id": 2,
+            "title": "RAM Total Limite",
+            "type": "stat",
+            "targets": [
+                {
+                    "expr": "sum(castle_rock_container_memory_limit_bytes)",
+                    "instant": true
+                }
+            ],
+            "options": {
+                "colorMode": "background_solid",
+                "graphMode": "none",
+                "textMode": "value"
+            }
+        },
+        {
+            "datasource": {
+                "type": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "unit": "percent",
+                    "thresholds": {
+                        "steps": [
+                            {
+                                "color": "#22C55E",
+                                "value": null
+                            },
+                            {
+                                "color": "#EAB308",
+                                "value": 50
+                            },
+                            {
+                                "color": "#EF4444",
+                                "value": 85
+                            }
+                        ]
+                    }
+                }
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 12,
+                "y": 1
+            },
+            "id": 3,
+            "title": "Média Memória %",
+            "type": "stat",
+            "targets": [
+                {
+                    "expr": "avg(castle_rock_container_memory_percent)",
+                    "instant": true
+                }
+            ],
+            "options": {
+                "colorMode": "background_solid",
+                "graphMode": "area",
+                "textMode": "value"
+            }
+        },
+        {
+            "datasource": {
+                "type": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "unit": "percent",
+                    "thresholds": {
+                        "steps": [
+                            {
+                                "color": "#22C55E",
+                                "value": null
+                            },
+                            {
+                                "color": "#EAB308",
+                                "value": 70
+                            },
+                            {
+                                "color": "#EF4444",
+                                "value": 90
+                            }
+                        ]
+                    }
+                }
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 18,
+                "y": 1
+            },
+            "id": 4,
+            "title": "Max Memória %",
+            "type": "stat",
+            "targets": [
+                {
+                    "expr": "max(castle_rock_container_memory_percent)",
+                    "instant": true
+                }
+            ],
+            "options": {
+                "colorMode": "background_solid",
+                "graphMode": "area",
+                "textMode": "value"
+            }
+        },
+        {
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 5
+            },
+            "id": 101,
+            "title": "📊 Percentual de Memória por Container",
+            "type": "row"
+        },
+        {
+            "datasource": {
+                "type": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "lineWidth": 2,
+                        "fillOpacity": 25,
+                        "showPoints": "never",
+                        "lineInterpolation": "smooth",
+                        "gradientMode": "scheme",
+                        "thresholdsStyle": {
+                            "mode": "line"
+                        }
+                    },
+                    "unit": "percent",
+                    "min": 0,
+                    "max": 100,
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "transparent",
+                                "value": null
+                            },
+                            {
+                                "color": "rgba(234,179,8,0.4)",
+                                "value": 50
+                            },
+                            {
+                                "color": "rgba(239,68,68,0.4)",
+                                "value": 85
+                            }
+                        ]
+                    }
+                }
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 24,
+                "x": 0,
+                "y": 6
+            },
+            "id": 10,
+            "title": "Memória % — Todos os Containers",
+            "type": "timeseries",
+            "targets": [
+                {
+                    "expr": "castle_rock_container_memory_percent",
+                    "legendFormat": "{{container_name}}"
+                }
+            ],
+            "options": {
+                "tooltip": {
+                    "mode": "multi",
+                    "sort": "desc"
+                }
+            }
+        },
+        {
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 14
+            },
+            "id": 102,
+            "title": "📦 Uso Absoluto de Memória",
+            "type": "row"
+        },
+        {
+            "datasource": {
+                "type": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "lineWidth": 2,
+                        "fillOpacity": 20,
+                        "showPoints": "never",
+                        "lineInterpolation": "smooth",
+                        "stacking": {
+                            "mode": "normal",
+                            "group": "A"
+                        }
+                    },
+                    "unit": "decbytes"
+                }
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 16,
+                "x": 0,
+                "y": 15
+            },
+            "id": 20,
+            "title": "Uso de Memória Empilhado",
+            "description": "Mostra quanto da RAM total está sendo usada por cada container",
+            "type": "timeseries",
+            "targets": [
+                {
+                    "expr": "castle_rock_container_memory_usage_bytes",
+                    "legendFormat": "{{container_name}}"
+                }
+            ]
+        },
+        {
+            "datasource": {
+                "type": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "continuous-GrYlRd"
+                    },
+                    "custom": {
+                        "fillOpacity": 80
+                    },
+                    "unit": "percent",
+                    "min": 0,
+                    "max": 100
+                }
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 8,
+                "x": 16,
+                "y": 15
+            },
+            "id": 21,
+            "title": "Ranking — Memória %",
+            "type": "bargauge",
+            "targets": [
+                {
+                    "expr": "sort_desc(castle_rock_container_memory_percent)",
+                    "legendFormat": "{{container_name}}",
+                    "instant": true
+                }
+            ],
+            "options": {
+                "orientation": "horizontal",
+                "displayMode": "gradient",
+                "showUnfilled": true
+            }
+        },
+        {
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 23
+            },
+            "id": 103,
+            "title": "⚖️ Uso vs Limite por Container",
+            "type": "row"
+        },
+        {
+            "datasource": {
+                "type": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "lineWidth": 2,
+                        "fillOpacity": 15,
+                        "showPoints": "never",
+                        "lineInterpolation": "smooth"
+                    },
+                    "unit": "decbytes"
+                }
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 24,
+                "x": 0,
+                "y": 24
+            },
+            "id": 30,
+            "title": "Memória Uso vs Limite — Todos os Containers",
+            "description": "Compare o uso real com o limite configurado. Linhas próximas indicam containers que podem sofrer OOM kill.",
+            "type": "timeseries",
+            "targets": [
+                {
+                    "expr": "castle_rock_container_memory_usage_bytes",
+                    "legendFormat": "{{container_name}} (uso)"
+                },
+                {
+                    "expr": "castle_rock_container_memory_limit_bytes",
+                    "legendFormat": "{{container_name}} (limite)"
+                }
+            ]
+        }
+    ],
+    "schemaVersion": 39,
+    "tags": [
+        "docker",
+        "castle-rock",
+        "memory"
+    ],
+    "time": {
+        "from": "now-30m",
+        "to": "now"
+    },
+    "refresh": "5s",
+    "title": "Castle Rock — Memory Deep Dive",
+    "uid": "castle-rock-memory",
+    "version": 1
+}

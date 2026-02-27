@@ -1,0 +1,13 @@
+# Grafana dashboard provisioning — auto-importa dashboards do diretório
+apiVersion: 1
+
+providers:
+  - name: 'Castle Rock'
+    orgId: 1
+    folder: 'Castle Rock Agent'
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /etc/grafana/provisioning/dashboards
+      foldersFromFilesStructure: false

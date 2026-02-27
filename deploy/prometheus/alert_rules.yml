@@ -1,0 +1,45 @@
+# Prometheus Alert Rules for Castle Rock Agent
+# Estas regras são avaliadas pelo Prometheus a cada evaluation_interval (5s)
+
+groups:
+  - name: castle_rock_container_alerts
+    rules:
+      # CPU crítica — qualquer container com CPU > 80% por 2 minutos
+      - alert: ContainerHighCPU
+        expr: castle_rock_container_cpu_percent > 80
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "CPU alta no container {{ $labels.container_name }}"
+          description: "Container {{ $labels.container_name }} está usando {{ $value }}% de CPU há mais de 2 minutos."
+
+      # Memória crítica — qualquer container com memória > 85% por 2 minutos
+      - alert: ContainerHighMemory
+        expr: castle_rock_container_memory_percent > 85
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Memória alta no container {{ $labels.container_name }}"
+          description: "Container {{ $labels.container_name }} está usando {{ $value }}% de memória há mais de 2 minutos."
+
+      # CPU warning — container com CPU > 50% por 5 minutos
+      - alert: ContainerMediumCPU
+        expr: castle_rock_container_cpu_percent > 50
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "CPU moderada no container {{ $labels.container_name }}"
+          description: "Container {{ $labels.container_name }} está usando {{ $value }}% de CPU há mais de 5 minutos."
+
+      # Nenhum container rodando
+      - alert: NoContainersRunning
+        expr: count(castle_rock_container_info) == 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Nenhum container em execução"
+          description: "O Castle Rock Agent não detectou nenhum container rodando há mais de 1 minuto."

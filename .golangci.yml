@@ -1,0 +1,83 @@
+# ╔══════════════════════════════════════════════════════════════════╗
+# ║            golangci-lint — Configuração                        ║
+# ╚══════════════════════════════════════════════════════════════════╝
+#
+# golangci-lint é o meta-linter oficial da comunidade Go.
+# Ele agrega 50+ linters individuais em uma única ferramenta:
+#   - govet (analisa bugs comuns)
+#   - errcheck (verifica erros não tratados)
+#   - staticcheck (análise estática avançada)
+#   - gosimple (simplificações de código)
+#   - ineffassign (atribuições ineficientes)
+#   - unused (código morto)
+#   - e muitos outros
+#
+# INSTALAR:
+#   brew install golangci-lint
+#   ou: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+#
+# EXECUTAR:
+#   golangci-lint run ./...
+#
+# Docs: https://golangci-lint.run/
+
+run:
+  # Timeout para análise (projetos grandes podem demorar)
+  timeout: 5m
+
+  # Analisa todos os pacotes
+  tests: true
+
+linters:
+  # Desabilita todos e habilita apenas os que queremos
+  disable-all: true
+  enable:
+    # ── Bugs e Correção ──
+    - govet          # Análise oficial do Go team (bugs comuns)
+    - errcheck       # Verifica se erros são tratados
+    - staticcheck    # Análise estática avançada (substitui megacheck)
+    - typecheck      # Verificação de tipos
+
+    # ── Estilo e Qualidade ──
+    - gosimple       # Sugere simplificações de código
+    - ineffassign    # Detecta atribuições ineficientes
+    - unused         # Detecta código morto (variáveis, funções)
+    - misspell       # Typos em comentários e strings
+
+    # ── Performance ──
+    - prealloc       # Sugere pré-alocação de slices
+    - bodyclose      # Verifica se HTTP response bodies são fechados
+
+    # ── Segurança ──
+    - gosec          # Detecta problemas de segurança
+
+linters-settings:
+  govet:
+    enable-all: true
+    disable:
+      - shadow       # Muitos falsos positivos com err := ...
+      - fieldalignment # Otimização prematura
+
+  errcheck:
+    # Ignora erros de fmt.Print* (intencionalmente não tratados)
+    exclude-functions:
+      - fmt.Fprintf
+      - fmt.Printf
+      - fmt.Println
+
+  gosec:
+    excludes:
+      - G104  # Ignora "errors unhandled" (coberto pelo errcheck)
+
+  misspell:
+    locale: US
+
+issues:
+  # Mostra no máximo 10 issues por linter
+  max-issues-per-linter: 10
+
+  # Mostra no máximo 3 instâncias do mesmo issue
+  max-same-issues: 3
+
+  # Não ignora issues em código gerado
+  exclude-generated: strict

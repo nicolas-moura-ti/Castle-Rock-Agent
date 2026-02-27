@@ -1,0 +1,546 @@
+{
+    "annotations": {
+        "list": []
+    },
+    "editable": true,
+    "graphTooltip": 2,
+    "panels": [
+        {
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 0
+            },
+            "id": 100,
+            "title": "🚨 Status dos Alertas",
+            "type": "row"
+        },
+        {
+            "datasource": {
+                "type": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "thresholds": {
+                        "steps": [
+                            {
+                                "color": "#22C55E",
+                                "value": null
+                            },
+                            {
+                                "color": "#EF4444",
+                                "value": 1
+                            }
+                        ]
+                    }
+                }
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 0,
+                "y": 1
+            },
+            "id": 1,
+            "title": "Containers com CPU > 80%",
+            "type": "stat",
+            "targets": [
+                {
+                    "expr": "count(castle_rock_container_cpu_percent > 80) or vector(0)",
+                    "instant": true
+                }
+            ],
+            "options": {
+                "colorMode": "background_solid",
+                "graphMode": "none",
+                "textMode": "value"
+            }
+        },
+        {
+            "datasource": {
+                "type": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "thresholds": {
+                        "steps": [
+                            {
+                                "color": "#22C55E",
+                                "value": null
+                            },
+                            {
+                                "color": "#EF4444",
+                                "value": 1
+                            }
+                        ]
+                    }
+                }
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 6,
+                "y": 1
+            },
+            "id": 2,
+            "title": "Containers com MEM > 85%",
+            "type": "stat",
+            "targets": [
+                {
+                    "expr": "count(castle_rock_container_memory_percent > 85) or vector(0)",
+                    "instant": true
+                }
+            ],
+            "options": {
+                "colorMode": "background_solid",
+                "graphMode": "none",
+                "textMode": "value"
+            }
+        },
+        {
+            "datasource": {
+                "type": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "thresholds": {
+                        "steps": [
+                            {
+                                "color": "#22C55E",
+                                "value": null
+                            },
+                            {
+                                "color": "#EAB308",
+                                "value": 1
+                            }
+                        ]
+                    }
+                }
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 12,
+                "y": 1
+            },
+            "id": 3,
+            "title": "Containers com CPU > 50%",
+            "type": "stat",
+            "targets": [
+                {
+                    "expr": "count(castle_rock_container_cpu_percent > 50) or vector(0)",
+                    "instant": true
+                }
+            ],
+            "options": {
+                "colorMode": "background_solid",
+                "graphMode": "none",
+                "textMode": "value"
+            }
+        },
+        {
+            "datasource": {
+                "type": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "thresholds": {
+                        "steps": [
+                            {
+                                "color": "#22C55E",
+                                "value": null
+                            }
+                        ]
+                    }
+                }
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 18,
+                "y": 1
+            },
+            "id": 4,
+            "title": "Containers Saudáveis",
+            "type": "stat",
+            "targets": [
+                {
+                    "expr": "count(castle_rock_container_cpu_percent <= 50 and castle_rock_container_memory_percent <= 50) or vector(0)",
+                    "instant": true
+                }
+            ],
+            "options": {
+                "colorMode": "background_solid",
+                "graphMode": "none",
+                "textMode": "value"
+            }
+        },
+        {
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 5
+            },
+            "id": 101,
+            "title": "🔥 Containers Críticos (CPU > 50% ou MEM > 50%)",
+            "type": "row"
+        },
+        {
+            "datasource": {
+                "type": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "continuous-RdYlGr"
+                    },
+                    "custom": {
+                        "fillOpacity": 80
+                    },
+                    "unit": "percent",
+                    "min": 0,
+                    "max": 100,
+                    "thresholds": {
+                        "steps": [
+                            {
+                                "color": "#22C55E",
+                                "value": null
+                            },
+                            {
+                                "color": "#EAB308",
+                                "value": 50
+                            },
+                            {
+                                "color": "#EF4444",
+                                "value": 80
+                            }
+                        ]
+                    }
+                }
+            },
+            "gridPos": {
+                "h": 6,
+                "w": 12,
+                "x": 0,
+                "y": 6
+            },
+            "id": 10,
+            "title": "CPU % — Ranking (Maior → Menor)",
+            "type": "bargauge",
+            "targets": [
+                {
+                    "expr": "sort_desc(castle_rock_container_cpu_percent)",
+                    "legendFormat": "{{container_name}}",
+                    "instant": true
+                }
+            ],
+            "options": {
+                "orientation": "horizontal",
+                "displayMode": "gradient",
+                "showUnfilled": true
+            }
+        },
+        {
+            "datasource": {
+                "type": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "continuous-RdYlGr"
+                    },
+                    "custom": {
+                        "fillOpacity": 80
+                    },
+                    "unit": "percent",
+                    "min": 0,
+                    "max": 100,
+                    "thresholds": {
+                        "steps": [
+                            {
+                                "color": "#22C55E",
+                                "value": null
+                            },
+                            {
+                                "color": "#EAB308",
+                                "value": 50
+                            },
+                            {
+                                "color": "#EF4444",
+                                "value": 85
+                            }
+                        ]
+                    }
+                }
+            },
+            "gridPos": {
+                "h": 6,
+                "w": 12,
+                "x": 12,
+                "y": 6
+            },
+            "id": 11,
+            "title": "Memória % — Ranking (Maior → Menor)",
+            "type": "bargauge",
+            "targets": [
+                {
+                    "expr": "sort_desc(castle_rock_container_memory_percent)",
+                    "legendFormat": "{{container_name}}",
+                    "instant": true
+                }
+            ],
+            "options": {
+                "orientation": "horizontal",
+                "displayMode": "gradient",
+                "showUnfilled": true
+            }
+        },
+        {
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 12
+            },
+            "id": 102,
+            "title": "📈 Tendências de Alerta",
+            "type": "row"
+        },
+        {
+            "datasource": {
+                "type": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "fixedColor": "#EF4444",
+                        "mode": "fixed"
+                    },
+                    "custom": {
+                        "lineWidth": 3,
+                        "fillOpacity": 30,
+                        "showPoints": "never",
+                        "lineInterpolation": "smooth",
+                        "gradientMode": "opacity",
+                        "thresholdsStyle": {
+                            "mode": "line+area"
+                        }
+                    },
+                    "unit": "percent",
+                    "min": 0,
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "transparent",
+                                "value": null
+                            },
+                            {
+                                "color": "rgba(234,179,8,0.2)",
+                                "value": 50
+                            },
+                            {
+                                "color": "rgba(239,68,68,0.2)",
+                                "value": 80
+                            }
+                        ]
+                    }
+                }
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 13
+            },
+            "id": 20,
+            "title": "CPU Máxima ao longo do tempo",
+            "description": "O pico de CPU entre todos os containers. Útil para ver se algum container está saturando.",
+            "type": "timeseries",
+            "targets": [
+                {
+                    "expr": "max(castle_rock_container_cpu_percent)",
+                    "legendFormat": "CPU Máxima"
+                }
+            ]
+        },
+        {
+            "datasource": {
+                "type": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "fixedColor": "#7C3AED",
+                        "mode": "fixed"
+                    },
+                    "custom": {
+                        "lineWidth": 3,
+                        "fillOpacity": 30,
+                        "showPoints": "never",
+                        "lineInterpolation": "smooth",
+                        "gradientMode": "opacity",
+                        "thresholdsStyle": {
+                            "mode": "line+area"
+                        }
+                    },
+                    "unit": "percent",
+                    "min": 0,
+                    "max": 100,
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "transparent",
+                                "value": null
+                            },
+                            {
+                                "color": "rgba(234,179,8,0.2)",
+                                "value": 50
+                            },
+                            {
+                                "color": "rgba(239,68,68,0.2)",
+                                "value": 85
+                            }
+                        ]
+                    }
+                }
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 13
+            },
+            "id": 21,
+            "title": "Memória Máxima ao longo do tempo",
+            "description": "O pico de memória entre todos os containers. Quando chega a 100%, o Docker faz OOM kill.",
+            "type": "timeseries",
+            "targets": [
+                {
+                    "expr": "max(castle_rock_container_memory_percent)",
+                    "legendFormat": "Memória Máxima"
+                }
+            ]
+        },
+        {
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 21
+            },
+            "id": 103,
+            "title": "🏥 Saúde Geral",
+            "type": "row"
+        },
+        {
+            "datasource": {
+                "type": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "lineWidth": 2,
+                        "fillOpacity": 15,
+                        "showPoints": "never",
+                        "lineInterpolation": "smooth"
+                    },
+                    "unit": "percent",
+                    "min": 0
+                }
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 22
+            },
+            "id": 30,
+            "title": "CPU Média vs Máxima",
+            "type": "timeseries",
+            "targets": [
+                {
+                    "expr": "avg(castle_rock_container_cpu_percent)",
+                    "legendFormat": "CPU Média"
+                },
+                {
+                    "expr": "max(castle_rock_container_cpu_percent)",
+                    "legendFormat": "CPU Máxima"
+                }
+            ]
+        },
+        {
+            "datasource": {
+                "type": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "lineWidth": 2,
+                        "fillOpacity": 15,
+                        "showPoints": "never",
+                        "lineInterpolation": "smooth"
+                    },
+                    "unit": "percent",
+                    "min": 0,
+                    "max": 100
+                }
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 22
+            },
+            "id": 31,
+            "title": "Memória Média vs Máxima",
+            "type": "timeseries",
+            "targets": [
+                {
+                    "expr": "avg(castle_rock_container_memory_percent)",
+                    "legendFormat": "Memória Média"
+                },
+                {
+                    "expr": "max(castle_rock_container_memory_percent)",
+                    "legendFormat": "Memória Máxima"
+                }
+            ]
+        }
+    ],
+    "schemaVersion": 39,
+    "tags": [
+        "docker",
+        "castle-rock",
+        "alerts",
+        "health"
+    ],
+    "time": {
+        "from": "now-1h",
+        "to": "now"
+    },
+    "refresh": "10s",
+    "title": "Castle Rock — Alerts & Health",
+    "uid": "castle-rock-alerts",
+    "version": 1
+}

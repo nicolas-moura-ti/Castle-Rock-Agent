@@ -1,0 +1,164 @@
+# ╔══════════════════════════════════════════════════════════════════╗
+# ║    🏰 Castle Rock Agent — Docker Compose Stack Completo        ║
+# ╚══════════════════════════════════════════════════════════════════╝
+#
+# Este arquivo levanta toda a stack de observabilidade:
+#   1. Docker Socket Proxy — proxy seguro para o Docker socket
+#   2. Castle Rock Agent — coleta métricas e expõe /metrics
+#   3. Prometheus — faz scraping das métricas a cada 5s
+#   4. Grafana — dashboards para visualização
+#
+# COMO USAR:
+#   docker compose up -d
+#   Abra http://localhost:3000 (Grafana: admin/castlerock)
+#   Abra http://localhost:9090 (Prometheus UI)
+#
+# PARAR:
+#   docker compose down
+
+services:
+  # ── Docker Socket Proxy ──────────────────────────────────────────
+  # Em vez de montar o Docker socket diretamente no agente (dando
+  # acesso root total ao Docker), usamos um proxy que filtra quais
+  # endpoints da API são acessíveis.
+  #
+  # SEGURANÇA:
+  #   O Docker socket tem poder equivalente a root no host.
+  #   O proxy permite acesso SOMENTE a endpoints de leitura
+  #   (containers, events, version), bloqueando operações perigosas
+  #   como criar/deletar containers ou acessar o filesystem do host.
+  #
+  # Projeto: https://github.com/Tecnativa/docker-socket-proxy
+  socket-proxy:
+    image: tecnativa/docker-socket-proxy:latest
+    container_name: docker-socket-proxy
+    restart: unless-stopped
+    environment:
+      # Endpoints permitidos (1 = habilitado, 0 = bloqueado)
+      - CONTAINERS=1 # Listar e inspecionar containers ✅
+      - EVENTS=1 # Receber eventos Docker em tempo real ✅
+      - VERSION=1 # Obter versão do Docker ✅
+      - INFO=1 # Obter info do sistema Docker ✅
+      - NETWORKS=0 # Criar/deletar redes ❌
+      - VOLUMES=0 # Criar/deletar volumes ❌
+      - IMAGES=0 # Listar/deletar imagens ❌
+      - EXEC=0 # Executar comandos em containers ❌
+      - POST=0 # Bloqueia TODAS as operações de escrita ❌
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - monitoring
+    # Resource limits para o proxy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 64M
+        reservations:
+          memory: 32M
+
+  # ── Castle Rock Agent ────────────────────────────────────────────
+  agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: castle-rock-agent
+    restart: unless-stopped
+    # NÃO precisa mais de user:root! O socket-proxy roda como root
+    # e nós nos conectamos via TCP, não pelo socket Unix.
+    environment:
+      - CASTLE_ROCK_MODE=headless
+      - CASTLE_ROCK_LOG_LEVEL=info
+      - CASTLE_ROCK_PROMETHEUS_PORT=9110
+      - CASTLE_ROCK_STATS_INTERVAL=5s
+      # Aponta para o proxy em vez do socket direto
+      - DOCKER_HOST=tcp://socket-proxy:2375
+    ports:
+      - "9110:9110" # Prometheus metrics
+    networks:
+      - monitoring
+    depends_on:
+      socket-proxy:
+        condition: service_started
+    # Health check usa o endpoint /health do agente
+    healthcheck:
+      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9110/health" ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    # Resource limits — o agente é leve por design
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 128M
+        reservations:
+          cpus: '0.10'
+          memory: 64M
+
+  # ── Prometheus ───────────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: unless-stopped
+    volumes:
+      - ./deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./deploy/prometheus/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090" # Prometheus UI
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=7d'
+      - '--web.enable-lifecycle'
+    networks:
+      - monitoring
+    depends_on:
+      agent:
+        condition: service_healthy
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 256M
+        reservations:
+          memory: 128M
+
+  # ── Grafana ──────────────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: unless-stopped
+    volumes:
+      - ./deploy/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana_data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=castlerock
+      - GF_USERS_ALLOW_SIGN_UP=false
+    ports:
+      - "3000:3000" # Grafana UI
+    networks:
+      - monitoring
+    depends_on:
+      - prometheus
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 256M
+        reservations:
+          memory: 128M
+
+volumes:
+  prometheus_data:
+  grafana_data:
+
+
+networks:
+  monitoring:
+    driver: bridge

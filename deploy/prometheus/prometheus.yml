@@ -1,0 +1,25 @@
+# Prometheus configuration for Castle Rock Agent
+# Docs: https://prometheus.io/docs/prometheus/latest/configuration/
+
+global:
+  scrape_interval: 5s      # Coleta métricas a cada 5 segundos
+  evaluation_interval: 5s  # Avalia regras de alerta a cada 5 segundos
+
+# Regras de alerta Prometheus
+rule_files:
+  - "alert_rules.yml"
+
+# Endpoints de scraping
+scrape_configs:
+  # Métricas do Castle Rock Agent
+  - job_name: 'castle-rock-agent'
+    static_configs:
+      - targets: ['agent:9110']
+        labels:
+          instance: 'castle-rock'
+          env: 'local'
+
+  # Auto-monitoramento do Prometheus
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
