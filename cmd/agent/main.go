@@ -22,6 +22,8 @@ import (
 	"github.com/nicolas-moura-ti/castle-rock-agent/internal/docker"
 	"github.com/nicolas-moura-ti/castle-rock-agent/internal/logger"
 	"github.com/nicolas-moura-ti/castle-rock-agent/internal/metrics"
+	"github.com/nicolas-moura-ti/castle-rock-agent/internal/prune"
+	"github.com/nicolas-moura-ti/castle-rock-agent/internal/storage"
 	"github.com/nicolas-moura-ti/castle-rock-agent/internal/tui"
 )
 
@@ -139,9 +141,24 @@ func main() {
 		return
 	}
 
+	// Storage (SQLite)
+	store, err := storage.NewSQLiteStore("castle-rock-events.db")
+	if err != nil {
+		log.Error("Aviso: Falha ao iniciar SQLite Histórico", slog.String("error", err.Error()))
+	} else {
+		defer store.Close()
+	}
+
+	// Auto Pruner (Garbage Collector)
+	if cfg.Prune.Enabled {
+		pruner := prune.NewAutoPruner(dockerClient, store, cfg.Prune.TriggerDiskPercent)
+		go pruner.Start(ctx)
+		log.Info("AutoPrune ativado", slog.Float64("threshold_pct", cfg.Prune.TriggerDiskPercent))
+	}
+
 	// Modo TUI
 	log.Info("Iniciando dashboard interativo...")
-	if err := tui.Run(dockerClient, receiver, ctx, sysInfo, Version, cfg); err != nil {
+	if err := tui.Run(dockerClient, receiver, ctx, sysInfo, Version, cfg, store); err != nil {
 		log.Error("Erro na TUI", slog.String("error", err.Error()))
 		return
 	}

@@ -21,11 +21,11 @@ import (
 	"time"
 
 	// SDK oficial do Docker — esta é a biblioteca mantida pela Docker Inc.
-	// para interagir programaticamente com a Docker Engine API.
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
+	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 
 	"github.com/nicolas-moura-ti/castle-rock-agent/internal/logger"
@@ -118,6 +118,57 @@ func (c *Client) RestartContainer(ctx context.Context, containerID string) error
 		return fmt.Errorf("docker.RestartContainer: %w", err)
 	}
 	return nil
+}
+
+// InspectContainer retorna informações detalhadas sobre um container,
+// incluindo configurações de segurança, rede e volumes.
+func (c *Client) InspectContainer(ctx context.Context, containerID string) (types.ContainerJSON, error) {
+	inspectJSON, err := c.cli.ContainerInspect(ctx, containerID)
+	if err != nil {
+		return types.ContainerJSON{}, fmt.Errorf("docker.InspectContainer: %w", err)
+	}
+	return inspectJSON, nil
+}
+
+// PruneSystem executa uma limpeza de segurança (Garbage Collection):
+// Remove containers parados, redes vazias e imagens pendentes (danglings).
+func (c *Client) PruneSystem(ctx context.Context) (uint64, error) {
+	var totalReclaimed uint64
+
+	// Prune Containers (exited)
+	containersPrune, err := c.cli.ContainersPrune(ctx, filters.Args{})
+	if err == nil {
+		totalReclaimed += containersPrune.SpaceReclaimed
+	}
+
+	// Prune Networks
+	_, _ = c.cli.NetworksPrune(ctx, filters.Args{})
+
+	// Prune Images (dangling by default)
+	imagesPrune, err := c.cli.ImagesPrune(ctx, filters.Args{})
+	if err == nil {
+		totalReclaimed += imagesPrune.SpaceReclaimed
+	}
+
+	return totalReclaimed, nil
+}
+
+// ListNetworks lista informações detalhadas de conectividade do Docker
+func (c *Client) ListNetworks(ctx context.Context) ([]network.Inspect, error) {
+	nets, err := c.cli.NetworkList(ctx, network.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("docker.ListNetworks: %w", err)
+	}
+
+	var results []network.Inspect
+	for _, n := range nets {
+		// Inspeciona caso a caso para pegar os containers engajados dinamicamente
+		insp, err := c.cli.NetworkInspect(ctx, n.ID, network.InspectOptions{})
+		if err == nil {
+			results = append(results, insp)
+		}
+	}
+	return results, nil
 }
 
 // StreamContainerLogs retorna um channel com as últimas linhas de log

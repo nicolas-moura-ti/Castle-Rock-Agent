@@ -29,6 +29,9 @@ import (
 	"github.com/nicolas-moura-ti/castle-rock-agent/internal/config"
 	"github.com/nicolas-moura-ti/castle-rock-agent/internal/docker"
 	"github.com/nicolas-moura-ti/castle-rock-agent/internal/logger"
+	"github.com/nicolas-moura-ti/castle-rock-agent/internal/security"
+	"github.com/nicolas-moura-ti/castle-rock-agent/internal/storage"
+	"github.com/nicolas-moura-ti/castle-rock-agent/internal/topology"
 	"github.com/nicolas-moura-ti/castle-rock-agent/pkg/models"
 )
 
@@ -109,8 +112,10 @@ type Model struct {
 	sysInfo    map[string]string
 
 	// Alerts
-	alertEngine  *alerts.Engine
-	activeAlerts []alerts.Alert
+	alertEngine    *alerts.Engine
+	activeAlerts   []alerts.Alert
+	securityAlerts []alerts.Alert
+	auditor        *security.Auditor
 
 	// Logs
 	logLines     []string
@@ -122,6 +127,11 @@ type Model struct {
 
 	// Stress test
 	showStress bool // mostra o menu de stress test
+
+	// Service Map
+	showMap bool
+	mapData []topology.NetworkEdge
+	mapper  *topology.Mapper
 
 	// UI state
 	cursor     int
@@ -135,6 +145,7 @@ type Model struct {
 	version      string
 	dockerClient *docker.Client
 	receiver     *cluster.Receiver
+	store        *storage.SQLiteStore
 	ctx          context.Context
 	cfg          config.Config
 	eventCount   int
@@ -142,27 +153,30 @@ type Model struct {
 	quitting     bool
 }
 
-func NewModel(dockerClient *docker.Client, receiver *cluster.Receiver, ctx context.Context, sysInfo map[string]string, version string, cfg config.Config) Model {
+func NewModel(dockerClient *docker.Client, receiver *cluster.Receiver, ctx context.Context, sysInfo map[string]string, version string, cfg config.Config, store *storage.SQLiteStore) Model {
 	var engine *alerts.Engine
 	if cfg.Alerts.Enabled {
 		engine = alerts.NewEngine(cfg.Alerts.Rules)
 	}
 
 	return Model{
-		containers:   []logger.ContainerDisplay{},
-		stats:        make(map[string]models.ContainerMetrics),
-		events:       []EventLogEntry{},
-		sysInfo:      sysInfo,
-		alertEngine:  engine,
-		activeAlerts: []alerts.Alert{},
-		logLines:     []string{},
-		startTime:    time.Now(),
-		version:      version,
-		dockerClient: dockerClient,
-		receiver:     receiver,
-		ctx:          ctx,
-		cfg:          cfg,
-		lastUpdate:   time.Now(),
+		containers:     []logger.ContainerDisplay{},
+		stats:          make(map[string]models.ContainerMetrics),
+		events:         []EventLogEntry{},
+		sysInfo:        sysInfo,
+		alertEngine:    engine,
+		activeAlerts:   []alerts.Alert{},
+		securityAlerts: []alerts.Alert{},
+		auditor:        security.NewAuditor(dockerClient),
+		mapper:         topology.NewMapper(dockerClient),
+		logLines:       []string{},
+		startTime:      time.Now(),
+		version:        version,
+		dockerClient:   dockerClient,
+		receiver:       receiver,
+		ctx:            ctx,
+		cfg:            cfg,
+		lastUpdate:     time.Now(),
 	}
 }
 
@@ -276,6 +290,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "S":
 			// Abre menu de stress test
 			m.showStress = true
+		case "m", "M":
+			// Toggle Service Map (Redes)
+			m.showMap = !m.showMap
+			if m.showMap {
+				edges, err := m.mapper.BuildMap(m.ctx)
+				if err == nil {
+					m.mapData = edges
+				}
+			}
 		}
 
 	case tea.WindowSizeMsg:
@@ -287,6 +310,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.lastUpdate = time.Now()
 		if m.cursor >= len(m.containers) && len(m.containers) > 0 {
 			m.cursor = len(m.containers) - 1
+		}
+		if m.auditor != nil {
+			oldAlertsCount := len(m.securityAlerts)
+			m.securityAlerts = m.auditor.Audit(m.ctx, m.containers)
+
+			// Simple notification logic if new alerts appeared (just an event log entry)
+			if len(m.securityAlerts) > oldAlertsCount {
+				m.events = append([]EventLogEntry{{
+					Time:   time.Now(),
+					Icon:   "🛡️ ",
+					Action: "SEC-AUDIT",
+					Name:   fmt.Sprintf("%d issues found", len(m.securityAlerts)),
+				}}, m.events...)
+			}
 		}
 
 	case statsMsg:
@@ -331,6 +368,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.events = append([]EventLogEntry{{
 			Time: time.Now(), Icon: icon, Action: msg.event.Action, Name: msg.event.ContainerName,
 		}}, m.events...)
+		if m.store != nil {
+			m.store.SaveEvent(m.ctx, msg.event.Action, msg.event.ContainerName, "")
+		}
 		if len(m.events) > 50 {
 			m.events = m.events[:50]
 		}
@@ -417,6 +457,29 @@ func (m Model) View() string {
 				m.confirmAction, c.Name),
 		))
 		b.WriteString("\n")
+		return b.String()
+	}
+
+	// Menu Service Map (Topologia)
+	if m.showMap {
+		b.WriteString(m.renderHeader())
+		b.WriteString("\n\n")
+		b.WriteString(titleStyle.Render(" 🕸️  Mapa de Serviços e Redes "))
+		b.WriteString("\n\n")
+
+		if len(m.mapData) == 0 {
+			b.WriteString("  Nenhuma rede customizada detectada.\n")
+		} else {
+			for _, net := range m.mapData {
+				b.WriteString(headerStyle.Render(fmt.Sprintf("  🌐 %s (%s)", net.NetworkName, net.Driver)) + "\n")
+				for _, node := range net.Nodes {
+					b.WriteString(fmt.Sprintf("     ├─ %-25s [%s]\n", node.ContainerName, node.IPv4Address))
+				}
+				b.WriteString("\n")
+			}
+		}
+
+		b.WriteString("\n  [M / Esc] Voltar ao Dashboard\n")
 		return b.String()
 	}
 
@@ -527,6 +590,19 @@ func (m Model) renderContainerTable() string {
 				break
 			}
 		}
+		// Indicador de segurança caso ainda não tenha critical
+		if alertMark != " 🚨" {
+			for _, sa := range m.securityAlerts {
+				if sa.ContainerID == c.ID {
+					if sa.Severity == "critical" {
+						alertMark = " 🛡️ 🚨"
+					} else if alertMark == "" {
+						alertMark = " 🛡️ ⚠️"
+					}
+					break
+				}
+			}
+		}
 
 		hostID := truncate(c.HostID, 6)
 		if hostID == "" {
@@ -625,9 +701,19 @@ func (m Model) renderLogPanel() string {
 
 func (m Model) renderAlerts() string {
 	var b strings.Builder
-	for _, a := range m.activeAlerts {
-		msg := fmt.Sprintf(" %s: %s %.1f%% > %.1f%% [%s] ",
-			a.RuleName, a.ContainerName, a.CurrentValue, a.Threshold, a.Severity)
+
+	allAlerts := append([]alerts.Alert{}, m.activeAlerts...)
+	allAlerts = append(allAlerts, m.securityAlerts...)
+
+	for _, a := range allAlerts {
+		msg := ""
+		if strings.HasPrefix(a.RuleName, "Sec:") {
+			msg = fmt.Sprintf(" %s: %s [%s] ", a.RuleName, a.ContainerName, a.Severity)
+		} else {
+			msg = fmt.Sprintf(" %s: %s %.1f%% > %.1f%% [%s] ",
+				a.RuleName, a.ContainerName, a.CurrentValue, a.Threshold, a.Severity)
+		}
+
 		if a.Severity == "critical" {
 			b.WriteString("  " + alertCritStyle.Render("🚨"+msg) + "\n")
 		} else {
@@ -674,14 +760,14 @@ func (m Model) renderHelpBar() string {
 		return lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).BorderForeground(primaryColor).
 			Padding(0, 1).MarginLeft(2).
-			Render("  ↑/k Subir │ ↓/j Descer │ Enter Detalhes │ l Logs │ s Stop │ R Restart │ S Stress Test │ r Refresh │ ? Help │ q Sair  ") + "\n"
+			Render("  ↑/k Subir │ ↓/j Descer │ Enter Detalhes │ l Logs │ s Stop │ R Restart │ S Stress Test │ M Service Map │ r Refresh │ ? Help │ q Sair  ") + "\n"
 	}
 	promInfo := ""
 	if m.cfg.Prometheus.Enabled {
 		promInfo = fmt.Sprintf(" │ prometheus :%d", m.cfg.Prometheus.Port)
 	}
 	return helpStyle.MarginLeft(2).Render(
-		fmt.Sprintf("  ↑↓ navegar │ enter detalhes │ l logs │ s stop │ R restart │ S stress │ r refresh │ ? ajuda │ q sair%s", promInfo),
+		fmt.Sprintf("  ↑↓ navegar │ enter detalhes │ l logs │ s stop │ R restart │ S stress │ M map │ r refresh │ ? ajuda │ q sair%s", promInfo),
 	) + "\n"
 }
 
@@ -893,8 +979,8 @@ func min(a, b int) int {
 
 // ─── Run ─────────────────────────────────────────────────────────────────────
 
-func Run(dockerClient *docker.Client, receiver *cluster.Receiver, ctx context.Context, sysInfo map[string]string, version string, cfg config.Config) error {
-	model := NewModel(dockerClient, receiver, ctx, sysInfo, version, cfg)
+func Run(dockerClient *docker.Client, receiver *cluster.Receiver, ctx context.Context, sysInfo map[string]string, version string, cfg config.Config, store *storage.SQLiteStore) error {
+	model := NewModel(dockerClient, receiver, ctx, sysInfo, version, cfg, store)
 	p := tea.NewProgram(model, tea.WithAltScreen(), tea.WithMouseCellMotion())
 	_, err := p.Run()
 	return err

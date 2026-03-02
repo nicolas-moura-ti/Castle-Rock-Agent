@@ -50,6 +50,15 @@ type Config struct {
 
 	// Alerts contém regras de alerta.
 	Alerts AlertsConfig `yaml:"alerts"`
+
+	// Prune contém configurações do Garbage Collector Automático.
+	Prune PruneConfig `yaml:"prune"`
+}
+
+// PruneConfig configura as automatizações de limpeza.
+type PruneConfig struct {
+	Enabled            bool    `yaml:"enabled"`
+	TriggerDiskPercent float64 `yaml:"trigger_disk_percent"`
 }
 
 // PrometheusConfig configura o servidor HTTP de métricas.
@@ -164,6 +173,10 @@ func DefaultConfig() Config {
 				},
 			},
 		},
+		Prune: PruneConfig{
+			Enabled:            false, // Default off to be safe
+			TriggerDiskPercent: 85.0,
+		},
 	}
 }
 
@@ -261,5 +274,15 @@ func applyEnvOverrides(cfg *Config) {
 
 	if v := os.Getenv("CASTLE_ROCK_ALERTS_ENABLED"); v != "" {
 		cfg.Alerts.Enabled = v == "true" || v == "1"
+	}
+
+	if v := os.Getenv("CASTLE_ROCK_PRUNE_ENABLED"); v != "" {
+		cfg.Prune.Enabled = v == "true" || v == "1"
+	}
+
+	if v := os.Getenv("CASTLE_ROCK_PRUNE_DISK_TRIGGER"); v != "" {
+		if th, err := strconv.ParseFloat(v, 64); err == nil {
+			cfg.Prune.TriggerDiskPercent = th
+		}
 	}
 }

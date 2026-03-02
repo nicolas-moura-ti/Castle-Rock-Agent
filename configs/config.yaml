@@ -84,3 +84,14 @@ alerts:
       threshold: 70.0
       duration: 5m
       severity: "warning"
+
+# ── Gerenciador de Limpeza (Auto Prune) ──────────────────────────
+prune:
+  # Ativa rotina que acionará o Docker Prune (removendo containers parados,
+  # imagens não utilizadas, etc.) se o disco raiz atingir o threshold.
+  # ENV: CASTLE_ROCK_PRUNE_ENABLED
+  enabled: false
+
+  # Limite (%) de uso do disco (ex: 85.0)
+  # ENV: CASTLE_ROCK_PRUNE_DISK_TRIGGER
+  trigger_disk_percent: 85.0
