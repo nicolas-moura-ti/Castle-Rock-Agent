@@ -87,7 +87,6 @@ type dockerErrorMsg struct{ err error }
 type statsMsg struct {
 	stats map[string]models.ContainerMetrics
 }
-type alertsMsg struct{ alerts []alerts.Alert }
 type logLineMsg struct {
 	container string
 	line      string
@@ -934,6 +933,54 @@ func (m Model) renderContainerDetail() string {
 		}
 	}
 
+	// Entrypoint / Command
+	if c.Entrypoint != "" {
+		b.WriteString(lipgloss.NewStyle().Bold(true).Foreground(secondaryColor).Render("\n ⚙️  Command") + "\n")
+		b.WriteString(lipgloss.NewStyle().Foreground(primaryColor).Render(
+			fmt.Sprintf("   %s", c.Entrypoint)) + "\n")
+	}
+
+	// Volumes & Bind Mounts
+	if len(c.Mounts) > 0 {
+		b.WriteString(lipgloss.NewStyle().Bold(true).Foreground(secondaryColor).Render("\n 📂 Volumes / Mounts") + "\n")
+		for i, mt := range c.Mounts {
+			if i >= 8 {
+				b.WriteString(lipgloss.NewStyle().Foreground(mutedColor).Render(
+					fmt.Sprintf("   ... +%d more", len(c.Mounts)-8)) + "\n")
+				break
+			}
+			b.WriteString(lipgloss.NewStyle().Foreground(mutedColor).Render(
+				fmt.Sprintf("   %s", mt)) + "\n")
+		}
+	}
+
+	// Restart Policy & Count
+	if c.RestartPolicy != "" {
+		b.WriteString(lipgloss.NewStyle().Bold(true).Foreground(secondaryColor).Render("\n 🔄 Restart Policy") + "\n")
+		policyStr := c.RestartPolicy
+		if c.RestartCount > 0 {
+			policyStr += lipgloss.NewStyle().Foreground(lipgloss.Color("#BF616A")).Render(
+				fmt.Sprintf("  (crashed %dx)", c.RestartCount))
+		}
+		b.WriteString(fmt.Sprintf("   %s\n", policyStr))
+	}
+
+	// Resource Limits
+	{
+		cpuLabel := lipgloss.NewStyle().Foreground(lipgloss.Color("#BF616A")).Render("unlimited ⚠")
+		memLabel := lipgloss.NewStyle().Foreground(lipgloss.Color("#BF616A")).Render("unlimited ⚠")
+		if c.CPULimit > 0 {
+			cpuLabel = lipgloss.NewStyle().Foreground(lipgloss.Color("#A3BE8C")).Render(
+				fmt.Sprintf("%.1f cores", c.CPULimit))
+		}
+		if c.MemoryLimit > 0 {
+			memLabel = lipgloss.NewStyle().Foreground(lipgloss.Color("#A3BE8C")).Render(
+				formatBytes(uint64(c.MemoryLimit)))
+		}
+		b.WriteString(lipgloss.NewStyle().Bold(true).Foreground(secondaryColor).Render("\n 🚧 Resource Limits") + "\n")
+		b.WriteString(fmt.Sprintf("   CPU: %s   MEM: %s\n", cpuLabel, memLabel))
+	}
+
 	// Health Check Status
 	if c.HealthStatus != "" {
 		healthIcon := "✅"
@@ -1341,9 +1388,10 @@ func (m Model) runPrune(target string) tea.Cmd {
 	return func() tea.Msg {
 		var reclaimed uint64
 		var err error
-		if target == "images" {
+		switch target {
+		case "images":
 			reclaimed, err = m.dockerClient.PruneImages(m.ctx)
-		} else if target == "volumes" {
+		case "volumes":
 			reclaimed, err = m.dockerClient.PruneVolumes(m.ctx)
 		}
 		return pruneResultMsg{reclaimed: reclaimed, target: target, err: err}

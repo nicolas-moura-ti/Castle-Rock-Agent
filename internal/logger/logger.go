@@ -60,8 +60,6 @@ const (
 	// Cores de foreground
 	colorRed     = "\033[31m"
 	colorGreen   = "\033[32m"
-	colorYellow  = "\033[33m"
-	colorBlue    = "\033[34m"
 	colorMagenta = "\033[35m"
 	colorCyan    = "\033[36m"
 	colorWhite   = "\033[37m"
@@ -73,12 +71,6 @@ const (
 	colorBrightBlue   = "\033[94m"
 	colorBrightCyan   = "\033[96m"
 	colorBrightWhite  = "\033[97m"
-
-	// Background colors
-	colorBgRed    = "\033[41m"
-	colorBgGreen  = "\033[42m"
-	colorBgYellow = "\033[43m"
-	colorBgBlue   = "\033[44m"
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -495,19 +487,25 @@ func PrintUptime(startTime time.Time) {
 // ContainerDisplay é um DTO usado pelo logger para exibição detalhada.
 // Separado de models.ContainerInfo para manter o model limpo.
 type ContainerDisplay struct {
-	HostID       string
-	ID           string
-	Name         string
-	Image        string
-	Status       string
-	State        string
-	Command      string
-	Ports        string
-	Created      string
-	Networks     []string
-	Labels       map[string]string
-	SizeRw       string
-	Env          []string
-	HealthStatus string
-	HealthLog    string
+	HostID        string
+	ID            string
+	Name          string
+	Image         string
+	Status        string
+	State         string
+	Command       string
+	Ports         string
+	Created       string
+	Networks      []string
+	Labels        map[string]string
+	SizeRw        string
+	Env           []string
+	HealthStatus  string
+	HealthLog     string
+	Mounts        []string
+	RestartPolicy string
+	RestartCount  int
+	CPULimit      float64
+	MemoryLimit   int64
+	Entrypoint    string
 }

@@ -340,6 +340,18 @@ Containers que implementam a diretiva `HEALTHCHECK` no Dockerfile agora ganham u
 
 Além de aparecer na tabela, ao apertar `Enter` nos detalhes, você consegue ler exatamente o **Output Original (Stdout/Stderr)** do último Health Check que falhou. Assim você sabe imediatamente o que quebrou sem precisar digitar um longo comando `docker inspect`.
 
+### 3. ⚙️ Entrypoint / Command
+Exibe o comando exato sendo executado pelo container (ex: `node server.js`, `postgres -c shared_buffers=256MB`). Nunca mais adivinhe o que o processo está realmente fazendo.
+
+### 4. 📂 Volumes & Bind Mounts
+Lista todos os volumes e bind mounts no formato `origem → destino (tipo)`. Descubra instantaneamente volumes não montados ou caminhos errados — a causa #1 de "meus dados sumiram".
+
+### 5. 🔄 Restart Policy & Crash Count
+Mostra a política de restart (`always`, `on-failure:5`, `no`) e quantas vezes o container crashou. Um alerta vermelho `(crashed 3x)` torna impossível ignorar restart loops.
+
+### 6. 🚧 Resource Limits
+Exibe limites de CPU e Memória configurados. **Containers sem limite mostram `unlimited ⚠` em vermelho**, facilitando a identificação de containers que podem derrubar o host inteiro.
+
 ---
 
 ## �📊 Prometheus — Métricas Exportadas

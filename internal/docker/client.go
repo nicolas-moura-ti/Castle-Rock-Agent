@@ -665,6 +665,21 @@ func (c *Client) ListRunningContainersDetailed(ctx context.Context) ([]logger.Co
 			// Env vars
 			if inspect.Config != nil {
 				cd.Env = inspect.Config.Env
+
+				// Entrypoint / Cmd
+				if len(inspect.Config.Entrypoint) > 0 {
+					cd.Entrypoint = strings.Join(inspect.Config.Entrypoint, " ")
+				}
+				if len(inspect.Config.Cmd) > 0 {
+					if cd.Entrypoint != "" {
+						cd.Entrypoint += " " + strings.Join(inspect.Config.Cmd, " ")
+					} else {
+						cd.Entrypoint = strings.Join(inspect.Config.Cmd, " ")
+					}
+				}
+				if len(cd.Entrypoint) > 80 {
+					cd.Entrypoint = cd.Entrypoint[:77] + "..."
+				}
 			}
 
 			// Health Check
@@ -676,6 +691,38 @@ func (c *Client) ListRunningContainersDetailed(ctx context.Context) ([]logger.Co
 					if len(cd.HealthLog) > 120 {
 						cd.HealthLog = cd.HealthLog[:117] + "..."
 					}
+				}
+			}
+
+			// Restart Policy & Count
+			if inspect.HostConfig != nil {
+				cd.RestartPolicy = string(inspect.HostConfig.RestartPolicy.Name)
+				if inspect.HostConfig.RestartPolicy.MaximumRetryCount > 0 {
+					cd.RestartPolicy += fmt.Sprintf(":%d", inspect.HostConfig.RestartPolicy.MaximumRetryCount)
+				}
+
+				// Resource Limits
+				if inspect.HostConfig.NanoCPUs > 0 {
+					cd.CPULimit = float64(inspect.HostConfig.NanoCPUs) / 1e9
+				}
+				if inspect.HostConfig.Memory > 0 {
+					cd.MemoryLimit = inspect.HostConfig.Memory
+				}
+			}
+
+			// Restart Count
+			if inspect.RestartCount > 0 {
+				cd.RestartCount = inspect.RestartCount
+			}
+
+			// Mounts / Bind Volumes
+			if len(inspect.Mounts) > 0 {
+				for _, mt := range inspect.Mounts {
+					label := fmt.Sprintf("%s → %s (%s)", mt.Source, mt.Destination, mt.Type)
+					if len(label) > 80 {
+						label = label[:77] + "..."
+					}
+					cd.Mounts = append(cd.Mounts, label)
 				}
 			}
 		}

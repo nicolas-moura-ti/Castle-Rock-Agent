@@ -340,6 +340,18 @@ Containers that define a `HEALTHCHECK` in their Dockerfile now show a health bad
 
 In the detail panel, you also see the **last health check output** (stdout), making it easy to understand *why* a container is unhealthy without running `docker inspect` manually.
 
+### 3. ⚙️ Entrypoint / Command
+Shows the exact command being executed by the container (e.g., `node server.js`, `postgres -c shared_buffers=256MB`). No more guessing what the process is actually doing.
+
+### 4. 📂 Volumes & Bind Mounts
+Lists all mounted volumes and bind paths in the format `source → destination (type)`. Instantly spot missing mounts or wrong paths — the #1 cause of "my data disappeared" incidents.
+
+### 5. 🔄 Restart Policy & Crash Count
+Shows the restart policy (`always`, `on-failure:5`, `no`) and how many times the container has crashed. A red `(crashed 3x)` alert makes restart loops impossible to miss.
+
+### 6. 🚧 Resource Limits
+Displays CPU and Memory limits. **Containers with no limits show a red `unlimited ⚠` warning**, making it trivial to identify containers that could take down the entire host.
+
 ## 📊 Prometheus — Exported Metrics
 
 The agent exposes metrics in Prometheus format at `http://localhost:9110/metrics`.
