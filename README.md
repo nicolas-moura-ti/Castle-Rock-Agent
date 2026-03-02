@@ -806,15 +806,6 @@ configuration separated from code, with precedence: defaults → YAML → env va
 
 ---
 
-## 🚀 Next Steps (Roadmap)
-
-Future plans to evolve the Observability Agent:
-
-- **WebSockets / gRPC for the Cluster:** Replace the current HTTP REST Worker->Leader requests with persistent bidirectional connections, reducing latency in massive clusters.
-- **Node Auto-Discovery:** Local discovery service for workers and leaders to find each other via multicast/DNS.
-
----
-
 ## License
 
 MIT

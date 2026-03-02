@@ -808,15 +808,6 @@ configuração separada do código, com precedência: defaults → YAML → env 
 
 ---
 
-## 🚀 Próximos Passos (Roadmap)
-
-Planejamentos futuros para evoluir o Agente de Observabilidade:
-
-- **WebSockets / gRPC para o Cluster:** Substituir as requisições HTTP REST do Worker->Leader atuais por conexões persistentes bidirecionais, reduzindo latência em clusters massivos.
-- **Auto-Discovery de nós:** Serviço de descoberta local para workers e leaders se acharem via multicast/DNS.
-
----
-
 ## Licença
 
 MIT
