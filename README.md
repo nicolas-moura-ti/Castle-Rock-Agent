@@ -1,5 +1,9 @@
 # 🏰 Castle Rock Agent
 
+[![Go Report Card](https://goreportcard.com/badge/github.com/nicolas-moura-ti/castle-rock-agent)](https://goreportcard.com/report/github.com/nicolas-moura-ti/castle-rock-agent)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/nicolas-moura-ti/castle-rock-agent)](https://github.com/nicolas-moura-ti/castle-rock-agent)
+
 *Read this in other languages: [English](README.md), [Português](README.pt-BR.md).*
 
 > A Go-native observability agent for monitoring Docker containers with an interactive dashboard, Prometheus metrics, and configurable alerts.
