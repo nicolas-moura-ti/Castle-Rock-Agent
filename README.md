@@ -636,6 +636,13 @@ If Xcode is not installed: `xcode-select --install`
 - **Linux**: `sudo systemctl start docker`
 - **Verify**: `docker info`
 
+### ❌ `unable to get image [...]: Cannot connect to the Docker daemon`
+
+This common error (especially on macOS) means the tool couldn't find the Docker socket at the expected path (e.g., `~/.docker/run/docker.sock`).
+- Verify if **Docker Desktop** (or OrbStack/Colima) is open and fully loaded.
+- In Docker Desktop, go to `Settings` > `Advanced` and check **"Allow the default Docker socket to be used"** (may require password).
+- If using **OrbStack**, run in your terminal: `export DOCKER_HOST="unix://$HOME/.orbstack/run/docker.sock"`
+
 ### ❌ `permission denied` on Docker socket
 
 **On host (Linux):**

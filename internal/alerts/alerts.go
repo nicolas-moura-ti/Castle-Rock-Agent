@@ -161,16 +161,47 @@ func (e *Engine) Evaluate(stats map[string]models.ContainerMetrics) []Alert {
 	return newAlerts
 }
 
-// GetActiveAlerts retorna todos os alertas atualmente ativos.
+// GetActiveAlerts retorna todos os alertas atualmente ativos,
+// filtrando para manter apenas o de maior severidade por container e métrica.
 func (e *Engine) GetActiveAlerts() []Alert {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	result := make([]Alert, 0, len(e.activeAlerts))
+	// Agrupa por ContainerID + Metric para deduzir alertas duplicados
+	// (ex: Warning e Critical de Memória ao mesmo tempo)
+	bestAlerts := make(map[string]Alert)
+
 	for _, a := range e.activeAlerts {
+		key := a.ContainerID + ":" + a.Metric
+		existing, ok := bestAlerts[key]
+		if !ok {
+			bestAlerts[key] = a
+		} else {
+			if severityWeight(a.Severity) > severityWeight(existing.Severity) {
+				bestAlerts[key] = a
+			}
+		}
+	}
+
+	result := make([]Alert, 0, len(bestAlerts))
+	for _, a := range bestAlerts {
 		result = append(result, a)
 	}
 	return result
+}
+
+// severityWeight retorna um peso numérico para priorização de alertas
+func severityWeight(severity string) int {
+	switch severity {
+	case "critical":
+		return 3
+	case "warning":
+		return 2
+	case "info":
+		return 1
+	default:
+		return 0
+	}
 }
 
 // GetPendingConditions retorna contagem de condições em avaliação
