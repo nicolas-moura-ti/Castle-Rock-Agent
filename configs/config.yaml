@@ -13,6 +13,10 @@
 # ENV: CASTLE_ROCK_LOG_LEVEL
 log_level: "info"
 
+# Idioma da interface (en, pt)
+# ENV: CASTLE_ROCK_LANGUAGE
+language: "en"
+
 # ── Prometheus Exporter ──────────────────────────────────────────
 prometheus:
   # Ativa/desativa o servidor HTTP de métricas

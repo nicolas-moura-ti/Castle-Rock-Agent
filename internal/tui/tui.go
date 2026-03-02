@@ -28,6 +28,7 @@ import (
 	"github.com/nicolas-moura-ti/castle-rock-agent/internal/cluster"
 	"github.com/nicolas-moura-ti/castle-rock-agent/internal/config"
 	"github.com/nicolas-moura-ti/castle-rock-agent/internal/docker"
+	"github.com/nicolas-moura-ti/castle-rock-agent/internal/i18n"
 	"github.com/nicolas-moura-ti/castle-rock-agent/internal/logger"
 	"github.com/nicolas-moura-ti/castle-rock-agent/internal/security"
 	"github.com/nicolas-moura-ti/castle-rock-agent/internal/storage"
@@ -151,6 +152,7 @@ type Model struct {
 	eventCount   int
 	lastUpdate   time.Time
 	quitting     bool
+	msg          i18n.Messages
 }
 
 func NewModel(dockerClient *docker.Client, receiver *cluster.Receiver, ctx context.Context, sysInfo map[string]string, version string, cfg config.Config, store *storage.SQLiteStore) Model {
@@ -177,6 +179,7 @@ func NewModel(dockerClient *docker.Client, receiver *cluster.Receiver, ctx conte
 		ctx:            ctx,
 		cfg:            cfg,
 		lastUpdate:     time.Now(),
+		msg:            i18n.Get(cfg.Language),
 	}
 }
 
@@ -266,6 +269,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.logLines = nil
 			m.confirmAction = ""
 			m.showStress = false
+			m.showMap = false
 		case "l":
 			// Toggle logs do container selecionado
 			if m.showLogs {
@@ -429,7 +433,7 @@ func (m Model) View() string {
 	var b strings.Builder
 
 	if m.width < 60 {
-		b.WriteString("\n  ⚠️  Terminal muito pequeno (min 60 cols).\n")
+		b.WriteString("\n  ⚠️  " + m.msg.ErrorSmallTerminal + "\n")
 		return b.String()
 	}
 
@@ -437,13 +441,9 @@ func (m Model) View() string {
 	if m.showStress {
 		b.WriteString(m.renderHeader())
 		b.WriteString("\n\n")
-		b.WriteString(stressStyle.Render("  ⚡ Stress Test — Criar container de stress (30s)  "))
+		b.WriteString(stressStyle.Render("  ⚡ " + m.msg.StressTestTitle + "  "))
 		b.WriteString("\n\n")
-		b.WriteString(lipgloss.NewStyle().MarginLeft(4).Render(
-			"  [c] CPU (2 cores a 100%)\n" +
-				"  [m] Memória (256MB)\n" +
-				"  [b] Ambos (CPU + Memória)\n" +
-				"  [Esc] Cancelar\n"))
+		b.WriteString(lipgloss.NewStyle().MarginLeft(4).Render(m.msg.StressTestMenu + "\n"))
 		return b.String()
 	}
 
@@ -464,11 +464,11 @@ func (m Model) View() string {
 	if m.showMap {
 		b.WriteString(m.renderHeader())
 		b.WriteString("\n\n")
-		b.WriteString(titleStyle.Render(" 🕸️  Mapa de Serviços e Redes "))
+		b.WriteString(titleStyle.Render(" 🕸️  " + m.msg.ServiceMapTitle + " "))
 		b.WriteString("\n\n")
 
 		if len(m.mapData) == 0 {
-			b.WriteString("  Nenhuma rede customizada detectada.\n")
+			b.WriteString("  " + m.msg.ServiceMapNoCustom + "\n")
 		} else {
 			for _, net := range m.mapData {
 				b.WriteString(headerStyle.Render(fmt.Sprintf("  🌐 %s (%s)", net.NetworkName, net.Driver)) + "\n")
@@ -479,7 +479,7 @@ func (m Model) View() string {
 			}
 		}
 
-		b.WriteString("\n  [M / Esc] Voltar ao Dashboard\n")
+		b.WriteString("\n  " + m.msg.ServiceMapBack + "\n")
 		return b.String()
 	}
 
@@ -538,12 +538,12 @@ func (m Model) renderHeader() string {
 func (m Model) renderContainerTable() string {
 	if len(m.containers) == 0 {
 		return lipgloss.NewStyle().Foreground(mutedColor).Padding(1, 2).
-			Render("📭 Nenhum container em execução\n")
+			Render("📭 " + m.msg.NoContainers + "\n")
 	}
 
 	var b strings.Builder
 	header := fmt.Sprintf("  %-3s %-6s %-12s %-20s %-7s %-7s %-9s %-10s %s",
-		"", "HOST", "ID", "NOME", "CPU%", "MEM%", "MEM", "NET ↓/↑", "ESTADO")
+		"", m.msg.TableHost, "ID", m.msg.TableName, "CPU%", "MEM%", "MEM", "NET", m.msg.TableState)
 	b.WriteString(headerStyle.Render(header))
 	b.WriteString("\n")
 
@@ -642,27 +642,69 @@ func (m Model) renderContainerDetail() string {
 
 	var b strings.Builder
 	b.WriteString(fmt.Sprintf(" %s  %s\n",
-		lipgloss.NewStyle().Bold(true).Foreground(primaryColor).Render("Details"),
+		lipgloss.NewStyle().Bold(true).Foreground(primaryColor).Render(m.msg.DetailsTitle),
 		lipgloss.NewStyle().Foreground(mutedColor).Render(c.ID)))
-	b.WriteString(fmt.Sprintf(" Nome:    %s\n", c.Name))
-	b.WriteString(fmt.Sprintf(" Imagem:  %s\n", c.Image))
-	b.WriteString(fmt.Sprintf(" Status:  %s\n", c.Status))
-	b.WriteString(fmt.Sprintf(" Comando: %s\n", c.Command))
-	b.WriteString(fmt.Sprintf(" Criado:  %s\n", c.Created))
+	b.WriteString(fmt.Sprintf(" %-9s %s\n", m.msg.Name, c.Name))
+	b.WriteString(fmt.Sprintf(" %-9s %s\n", m.msg.Image, c.Image))
+	b.WriteString(fmt.Sprintf(" %-9s %s\n", m.msg.Status, c.Status))
+	b.WriteString(fmt.Sprintf(" %-9s %s\n", m.msg.Command, c.Command))
+	b.WriteString(fmt.Sprintf(" %-9s %s\n", m.msg.Created, c.Created))
 	if len(c.Ports) > 0 {
-		b.WriteString(fmt.Sprintf(" Portas:  %s\n", c.Ports))
+		b.WriteString(fmt.Sprintf(" %-9s %s\n", m.msg.Ports, c.Ports))
 	}
 	if len(c.Networks) > 0 {
-		b.WriteString(fmt.Sprintf(" Redes:   %s\n", strings.Join(c.Networks, ", ")))
+		b.WriteString(fmt.Sprintf(" %-9s %s\n", m.msg.Networks, strings.Join(c.Networks, ", ")))
+	}
+
+	var cSecAlerts []alerts.Alert
+	for _, a := range m.securityAlerts {
+		if a.ContainerID == c.ID {
+			cSecAlerts = append(cSecAlerts, a)
+		}
+	}
+
+	if len(cSecAlerts) > 0 {
+		b.WriteString(lipgloss.NewStyle().Bold(true).Foreground(warningColor).Render("\n 🛡️ "+m.msg.SecurityAudit) + "\n")
+		for _, a := range cSecAlerts {
+			icon := "⚠️"
+			style := alertWarnStyle
+			if a.Severity == "critical" {
+				icon = "🚨"
+				style = alertCritStyle
+			}
+			desc := a.RuleName
+			switch a.RuleName {
+			case "Sec: Privileged Mode":
+				desc = m.msg.SecPrivileged
+			case "Sec: Root User":
+				desc = m.msg.SecRootUser
+			case "Sec: DB Port Exposed globally":
+				desc = m.msg.SecDBPort
+			case "Sec: Sensitive CAP_ADD":
+				desc = m.msg.SecSensitiveCap
+			case "Sec: No Resource Quotas":
+				desc = m.msg.SecNoResourceQuotas
+			case "Sec: Writable RootFS":
+				desc = m.msg.SecWritableRootFS
+			case "Sec: Insecure Port Exposed":
+				desc = m.msg.SecInsecurePort
+			case "Sec: Missing No-New-Privileges":
+				desc = m.msg.SecMissingNoNewPrivs
+			case "Sec: Host Networking Mode":
+				desc = m.msg.SecHostNetwork
+			}
+			wrappedStyle := style.Copy().Width(maxW - 4)
+			b.WriteString(wrappedStyle.Render(fmt.Sprintf(" %s %s", icon, desc)) + "\n")
+		}
 	}
 
 	if stats, ok := m.stats[c.ID]; ok {
-		b.WriteString(lipgloss.NewStyle().Bold(true).Foreground(secondaryColor).Render("\n 📊 Métricas") + "\n")
-		b.WriteString(fmt.Sprintf(" CPU:     %s\n", formatCPU(stats.CPUPercent)))
-		b.WriteString(fmt.Sprintf(" Memória: %s / %s (%s)\n",
-			formatBytes(stats.MemoryUsage), formatBytes(stats.MemoryLimit), formatMemPercent(stats.MemoryPercent)))
-		b.WriteString(fmt.Sprintf(" Rede ↓:  %s   Rede ↑:  %s\n",
-			formatBytes(stats.NetworkRx), formatBytes(stats.NetworkTx)))
+		b.WriteString(lipgloss.NewStyle().Bold(true).Foreground(secondaryColor).Render("\n 📊 "+m.msg.Metrics) + "\n")
+		b.WriteString(fmt.Sprintf(" CPU:      %s\n", formatCPU(stats.CPUPercent)))
+		b.WriteString(fmt.Sprintf(" %-9s %s / %s (%s)\n",
+			m.msg.Memory, formatBytes(stats.MemoryUsage), formatBytes(stats.MemoryLimit), formatMemPercent(stats.MemoryPercent)))
+		b.WriteString(fmt.Sprintf(" %-9s %-12s %-9s %s\n",
+			m.msg.NetworkDown, formatBytes(stats.NetworkRx), m.msg.NetworkUp, formatBytes(stats.NetworkTx)))
 	}
 
 	return detail.Render(b.String()) + "\n"
@@ -670,7 +712,7 @@ func (m Model) renderContainerDetail() string {
 
 func (m Model) renderLogPanel() string {
 	title := lipgloss.NewStyle().Bold(true).Foreground(secondaryColor).MarginLeft(2).
-		Render(fmt.Sprintf("📜 Logs: %s", m.logContainer))
+		Render(fmt.Sprintf("📜 "+m.msg.LogsTitle, m.logContainer))
 
 	maxLines := 10
 	if m.height > 50 {
@@ -725,11 +767,11 @@ func (m Model) renderAlerts() string {
 
 func (m Model) renderEventLog() string {
 	title := lipgloss.NewStyle().Bold(true).Foreground(secondaryColor).MarginLeft(2).
-		Render("📋 Eventos")
+		Render("📋 " + m.msg.EventsTitle)
 
 	if len(m.events) == 0 {
 		return title + "\n" + lipgloss.NewStyle().Foreground(mutedColor).MarginLeft(4).
-			Render("Aguardando eventos...\n")
+			Render(m.msg.WaitingEvents+"\n")
 	}
 
 	count := min(5, len(m.events))
@@ -760,14 +802,15 @@ func (m Model) renderHelpBar() string {
 		return lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).BorderForeground(primaryColor).
 			Padding(0, 1).MarginLeft(2).
-			Render("  ↑/k Subir │ ↓/j Descer │ Enter Detalhes │ l Logs │ s Stop │ R Restart │ S Stress Test │ M Service Map │ r Refresh │ ? Help │ q Sair  ") + "\n"
+			Render(m.msg.HelpBar) + "\n"
 	}
 	promInfo := ""
 	if m.cfg.Prometheus.Enabled {
 		promInfo = fmt.Sprintf(" │ prometheus :%d", m.cfg.Prometheus.Port)
 	}
+	// Usamos uma versão encurtada do HelpBar normal ou o próprio HelpBar truncado
 	return helpStyle.MarginLeft(2).Render(
-		fmt.Sprintf("  ↑↓ navegar │ enter detalhes │ l logs │ s stop │ R restart │ S stress │ M map │ r refresh │ ? ajuda │ q sair%s", promInfo),
+		m.msg.HelpBar+promInfo,
 	) + "\n"
 }
 

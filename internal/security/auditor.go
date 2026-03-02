@@ -149,6 +149,98 @@ func (a *Auditor) Audit(ctx context.Context, containers []logger.ContainerDispla
 			}
 		}
 
+		// 5. Sem limites de Memória ou CPU (Resource Quota)
+		if inspectJSON.HostConfig != nil {
+			if inspectJSON.HostConfig.Memory == 0 || inspectJSON.HostConfig.NanoCPUs == 0 {
+				secAlerts = append(secAlerts, alerts.Alert{
+					RuleName:      "Sec: No Resource Quotas",
+					ContainerID:   c.ID,
+					ContainerName: c.Name,
+					Metric:        "security_no_quotas",
+					CurrentValue:  1,
+					Threshold:     0,
+					Severity:      "warning",
+					ActiveSince:   now,
+					FiredAt:       now,
+				})
+			}
+		}
+
+		// 6. Read-Only Root Filesystem desativado
+		if inspectJSON.HostConfig != nil && !inspectJSON.HostConfig.ReadonlyRootfs {
+			secAlerts = append(secAlerts, alerts.Alert{
+				RuleName:      "Sec: Writable RootFS",
+				ContainerID:   c.ID,
+				ContainerName: c.Name,
+				Metric:        "security_writable_rootfs",
+				CurrentValue:  1,
+				Threshold:     0,
+				Severity:      "warning",
+				ActiveSince:   now,
+				FiredAt:       now,
+			})
+		}
+
+		// 7. Porta SSH ou Telnet exposta
+		if inspectJSON.NetworkSettings != nil {
+			for port := range inspectJSON.NetworkSettings.Ports {
+				portStr := string(port)
+				if strings.HasPrefix(portStr, "22/") || strings.HasPrefix(portStr, "23/") {
+					secAlerts = append(secAlerts, alerts.Alert{
+						RuleName:      "Sec: Insecure Port Exposed",
+						ContainerID:   c.ID,
+						ContainerName: c.Name,
+						Metric:        "security_insecure_port",
+						CurrentValue:  1,
+						Threshold:     0,
+						Severity:      "critical",
+						ActiveSince:   now,
+						FiredAt:       now,
+					})
+					break
+				}
+			}
+		}
+
+		// 8. No-New-Privileges
+		hasNoNewPrivs := false
+		if inspectJSON.HostConfig != nil {
+			for _, opt := range inspectJSON.HostConfig.SecurityOpt {
+				if strings.Contains(opt, "no-new-privileges:true") || strings.Contains(opt, "no-new-privileges") {
+					hasNoNewPrivs = true
+					break
+				}
+			}
+			if !hasNoNewPrivs {
+				secAlerts = append(secAlerts, alerts.Alert{
+					RuleName:      "Sec: Missing No-New-Privileges",
+					ContainerID:   c.ID,
+					ContainerName: c.Name,
+					Metric:        "security_no_new_privs",
+					CurrentValue:  1,
+					Threshold:     0,
+					Severity:      "warning",
+					ActiveSince:   now,
+					FiredAt:       now,
+				})
+			}
+		}
+
+		// 9. Host Networking Mode
+		if inspectJSON.HostConfig != nil && string(inspectJSON.HostConfig.NetworkMode) == "host" {
+			secAlerts = append(secAlerts, alerts.Alert{
+				RuleName:      "Sec: Host Networking Mode",
+				ContainerID:   c.ID,
+				ContainerName: c.Name,
+				Metric:        "security_host_network",
+				CurrentValue:  1,
+				Threshold:     0,
+				Severity:      "critical",
+				ActiveSince:   now,
+				FiredAt:       now,
+			})
+		}
+
 		a.cache[c.ID] = secAlerts
 		activeAlerts = append(activeAlerts, secAlerts...)
 	}

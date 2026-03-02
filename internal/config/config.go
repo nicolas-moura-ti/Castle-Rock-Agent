@@ -39,6 +39,9 @@ type Config struct {
 	// LogLevel define o nível mínimo de log (debug, info, warn, error).
 	LogLevel string `yaml:"log_level"`
 
+	// Language define o idioma (en, pt).
+	Language string `yaml:"language"`
+
 	// Prometheus contém configurações do exportador de métricas.
 	Prometheus PrometheusConfig `yaml:"prometheus"`
 
@@ -132,6 +135,7 @@ type AlertRule struct {
 func DefaultConfig() Config {
 	return Config{
 		LogLevel: "info",
+		Language: "en",
 		Prometheus: PrometheusConfig{
 			Enabled: true,
 			Port:    9110,
@@ -242,6 +246,10 @@ func Load(path string) (Config, error) {
 func applyEnvOverrides(cfg *Config) {
 	if v := os.Getenv("CASTLE_ROCK_LOG_LEVEL"); v != "" {
 		cfg.LogLevel = v
+	}
+
+	if v := os.Getenv("CASTLE_ROCK_LANGUAGE"); v != "" {
+		cfg.Language = v
 	}
 
 	if v := os.Getenv("CASTLE_ROCK_PROMETHEUS_PORT"); v != "" {

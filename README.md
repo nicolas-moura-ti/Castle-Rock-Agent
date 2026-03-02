@@ -56,6 +56,11 @@ Docker Containers → Castle Rock Agent → Prometheus → Grafana
 | **Streaming Logs** | View real-time container logs (like `docker logs -f`) |
 | **Docker Events** | Lifecycle events (start, stop, die) with icons and colors |
 | **Cluster Mode 🌐** | Multi-Host Architecture (Leader/Worker) to aggregate metrics from multiple servers |
+| **SQLite Historian 🗄️** | Pure-Go SQLite local database to persist historical events and alerts (because your memory shouldn't be as volatile as RAM). |
+| **Auto Prune 🧹** | Built-in smart garbage collector for Docker. It watches your host disk and natively calls `docker system prune` before your server goes boom. |
+| **Service Map 🕸️** | Press `M` to visually inspect your Docker Network topology and see who is talking to whom. |
+| **Security Auditing 🛡️** | Real-time Shift-Left security scanning. Detects 9 critical anti-patterns (e.g. root user, privileged mode, wildcard DB ports) right from the `docker inspect` data. |
+| **i18n & Localization 🌍** | The agent natively speaks English (`en`) and Portuguese (`pt`). Change it via `config.yaml` or `CASTLE_ROCK_LANGUAGE=pt`. |
 | **Config YAML + ENV** | Configuration via `config.yaml` with environment variable overrides |
 
 ---
