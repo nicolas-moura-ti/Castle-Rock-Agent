@@ -21,6 +21,9 @@ package models
 //   - Tags JSON para controlar os nomes no output serializado
 //   - Documentação em cada campo para auto-documentação da API
 type ContainerInfo struct {
+	// HostID identifica em qual máquina o container está rodando.
+	HostID string `json:"host_id,omitempty"`
+
 	// ID é o identificador único do container (short ID, 12 caracteres).
 	ID string `json:"id"`
 
@@ -46,6 +49,9 @@ type ContainerInfo struct {
 // A separação entre ContainerInfo e ContainerMetrics segue o princípio
 // de responsabilidade única: info é estático, metrics é dinâmico.
 type ContainerMetrics struct {
+	// HostID identifica de qual máquina vieram as métricas.
+	HostID string `json:"host_id,omitempty"`
+
 	// ContainerID identifica o container ao qual estas métricas pertencem.
 	ContainerID string `json:"container_id"`
 
@@ -78,4 +84,12 @@ type ContainerMetrics struct {
 
 	// BlockWrite é o total de bytes escritos no disco.
 	BlockWrite uint64 `json:"block_write"`
+}
+
+// PushPayload é o pacote de dados enviado pelo Worker ao Leader.
+// Ele agrupa o estado de todos os containers de uma vez (snapshot).
+type PushPayload struct {
+	HostID     string             `json:"host_id"`
+	Containers []ContainerInfo    `json:"containers"`
+	Metrics    []ContainerMetrics `json:"metrics"`
 }

@@ -17,6 +17,7 @@ import (
 	"runtime"
 	"syscall"
 
+	"github.com/nicolas-moura-ti/castle-rock-agent/internal/cluster"
 	"github.com/nicolas-moura-ti/castle-rock-agent/internal/config"
 	"github.com/nicolas-moura-ti/castle-rock-agent/internal/docker"
 	"github.com/nicolas-moura-ti/castle-rock-agent/internal/logger"
@@ -83,10 +84,19 @@ func main() {
 	}
 
 	// ─────────────────────────────────────────────────────────────────────
+	// CLUSTER RECEIVER (LEADER MODE)
+	// ─────────────────────────────────────────────────────────────────────
+	var receiver *cluster.Receiver
+	if cfg.Cluster.Mode == "leader" {
+		receiver = cluster.NewReceiver(log)
+		log.Info("Cluster Receiver ativo", slog.String("host_id", cfg.Cluster.HostID))
+	}
+
+	// ─────────────────────────────────────────────────────────────────────
 	// PROMETHEUS EXPORTER
 	// ─────────────────────────────────────────────────────────────────────
 	if cfg.Prometheus.Enabled {
-		exporter := metrics.NewExporter(dockerClient, cfg.Stats.Interval, cfg.Prometheus.Port, log)
+		exporter := metrics.NewExporter(dockerClient, receiver, cfg.Cluster.HostID, cfg.Stats.Interval, cfg.Prometheus.Port, log)
 		exporter.Start(ctx)
 		log.Info("Prometheus exporter ativo",
 			slog.Int("port", cfg.Prometheus.Port),
@@ -105,19 +115,33 @@ func main() {
 	// Modo padrão:
 	//   TUI interativa com dashboard completo.
 	mode := os.Getenv("CASTLE_ROCK_MODE")
-	if mode == "headless" {
-		log.Info("Modo headless — aguardando scraping Prometheus",
+
+	// Override pela nova config de cluster se estiver ativada
+	if cfg.Cluster.Mode == "worker" {
+		log.Info("Iniciando em modo Worker",
+			slog.String("leader_url", cfg.Cluster.LeaderURL),
+		)
+		go cluster.StartSender(ctx, dockerClient, cfg, log)
+
+		// Bloqueia até receber sinal de shutdown
+		<-ctx.Done()
+		log.Info("Castle Rock Agent encerrado (worker)")
+		return
+	}
+
+	if mode == "headless" || cfg.Cluster.Mode == "leader" {
+		log.Info("Modo headless/leader — aguardando conexões e scraping",
 			slog.Int("port", cfg.Prometheus.Port),
 		)
 		// Bloqueia até receber sinal de shutdown
 		<-ctx.Done()
-		log.Info("Castle Rock Agent encerrado (headless)")
+		log.Info("Castle Rock Agent encerrado (headless/leader)")
 		return
 	}
 
 	// Modo TUI
 	log.Info("Iniciando dashboard interativo...")
-	if err := tui.Run(dockerClient, ctx, sysInfo, Version, cfg); err != nil {
+	if err := tui.Run(dockerClient, receiver, ctx, sysInfo, Version, cfg); err != nil {
 		log.Error("Erro na TUI", slog.String("error", err.Error()))
 		return
 	}

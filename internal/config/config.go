@@ -45,6 +45,9 @@ type Config struct {
 	// Stats contém configurações da coleta de métricas.
 	Stats StatsConfig `yaml:"stats"`
 
+	// Cluster contém as configurações de modo Multi-Host.
+	Cluster ClusterConfig `yaml:"cluster"`
+
 	// Alerts contém regras de alerta.
 	Alerts AlertsConfig `yaml:"alerts"`
 }
@@ -62,6 +65,13 @@ type PrometheusConfig struct {
 type StatsConfig struct {
 	// Interval é o intervalo entre coletas (ex: "5s", "10s", "1m").
 	Interval time.Duration `yaml:"interval"`
+}
+
+// ClusterConfig gerencia o modo distribuído (Leader/Worker).
+type ClusterConfig struct {
+	Mode      string `yaml:"mode"`       // "standalone", "leader", "worker"
+	LeaderURL string `yaml:"leader_url"` // Endpoint HTTP para envio de métricas (modo worker)
+	HostID    string `yaml:"host_id"`    // Identificador único deste nó
 }
 
 // AlertsConfig configura o sistema de alertas.
@@ -119,6 +129,11 @@ func DefaultConfig() Config {
 		},
 		Stats: StatsConfig{
 			Interval: 5 * time.Second,
+		},
+		Cluster: ClusterConfig{
+			Mode:      "standalone",
+			LeaderURL: "http://127.0.0.1:9110/api/v1/push",
+			HostID:    "", // Se vazio, usa os.Hostname() em runtime
 		},
 		Alerts: AlertsConfig{
 			Enabled: true,
@@ -184,6 +199,16 @@ func Load(path string) (Config, error) {
 	// Aplica overrides de variáveis de ambiente (maior precedência)
 	applyEnvOverrides(&cfg)
 
+	// Se HostID não foi definido nem no config.yaml nem por env var, use o hostname
+	if cfg.Cluster.HostID == "" {
+		hostname, err := os.Hostname()
+		if err == nil {
+			cfg.Cluster.HostID = hostname
+		} else {
+			cfg.Cluster.HostID = "unknown_host"
+		}
+	}
+
 	return cfg, nil
 }
 
@@ -220,6 +245,18 @@ func applyEnvOverrides(cfg *Config) {
 		if d, err := time.ParseDuration(v); err == nil {
 			cfg.Stats.Interval = d
 		}
+	}
+
+	if v := os.Getenv("CASTLE_ROCK_CLUSTER_MODE"); v != "" {
+		cfg.Cluster.Mode = v
+	}
+
+	if v := os.Getenv("CASTLE_ROCK_CLUSTER_LEADER_URL"); v != "" {
+		cfg.Cluster.LeaderURL = v
+	}
+
+	if v := os.Getenv("CASTLE_ROCK_CLUSTER_HOST_ID"); v != "" {
+		cfg.Cluster.HostID = v
 	}
 
 	if v := os.Getenv("CASTLE_ROCK_ALERTS_ENABLED"); v != "" {

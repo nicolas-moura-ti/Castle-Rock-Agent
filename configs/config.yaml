@@ -30,6 +30,18 @@ stats:
   # ENV: CASTLE_ROCK_STATS_INTERVAL
   interval: 5s
 
+# ── Cluster (Multi-Host) ─────────────────────────────────────────
+cluster:
+  # Modos disponíveis: "standalone" (padrão), "leader", "worker"
+  # ENV: CASTLE_ROCK_CLUSTER_MODE
+  mode: "standalone"
+  # URL do lider (usado apenas no modo worker)
+  # ENV: CASTLE_ROCK_CLUSTER_LEADER_URL
+  leader_url: "http://127.0.0.1:9110/api/v1/push"
+  # ID/Hostname desta máquina
+  # ENV: CASTLE_ROCK_CLUSTER_HOST_ID
+  host_id: ""
+
 # ── Alertas ──────────────────────────────────────────────────────
 alerts:
   # Ativa/desativa o sistema de alertas

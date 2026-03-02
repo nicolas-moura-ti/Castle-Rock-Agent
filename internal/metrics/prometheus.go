@@ -30,6 +30,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
+	"github.com/nicolas-moura-ti/castle-rock-agent/internal/cluster"
 	"github.com/nicolas-moura-ti/castle-rock-agent/internal/docker"
 	"github.com/nicolas-moura-ti/castle-rock-agent/pkg/models"
 )
@@ -46,6 +47,12 @@ type Exporter struct {
 	interval     time.Duration
 	port         int
 	log          *slog.Logger
+
+	// receiver (opcional) traz dados de outros nós do cluster em modo Leader
+	receiver *cluster.Receiver
+
+	// hostID é o nome desta própria máquina
+	hostID string
 
 	// Métricas Prometheus
 	// GaugeVec permite múltiplas séries com labels diferentes.
@@ -73,7 +80,7 @@ type Exporter struct {
 // Exemplo de query PromQL:
 //
 //	castle_rock_container_cpu_percent{container_name="postgres"}
-var containerLabels = []string{"container_id", "container_name", "image"}
+var containerLabels = []string{"host_id", "container_id", "container_name", "image"}
 
 // NewExporter cria um novo exportador Prometheus.
 //
@@ -82,12 +89,14 @@ var containerLabels = []string{"container_id", "container_name", "image"}
 //   - Sufixo: unidade (_bytes, _percent, _total)
 //   - Snake_case sempre
 //   - Referência: https://prometheus.io/docs/practices/naming/
-func NewExporter(dockerClient *docker.Client, interval time.Duration, port int, log *slog.Logger) *Exporter {
+func NewExporter(dockerClient *docker.Client, receiver *cluster.Receiver, hostID string, interval time.Duration, port int, log *slog.Logger) *Exporter {
 	e := &Exporter{
 		dockerClient: dockerClient,
 		interval:     interval,
 		port:         port,
 		log:          log,
+		receiver:     receiver,
+		hostID:       hostID,
 		lastStats:    make(map[string]models.ContainerMetrics),
 
 		cpuPercent: prometheus.NewGaugeVec(prometheus.GaugeOpts{
@@ -191,6 +200,11 @@ func (e *Exporter) Start(ctx context.Context) {
 			fmt.Fprintf(w, `{"status":"ok"}`)
 		})
 
+		// Monta o Receiver (modo Leader) no mesmo servidor HTTP do Prometheus
+		if e.receiver != nil {
+			mux.Handle("/api/v1/push", e.receiver)
+		}
+
 		addr := fmt.Sprintf(":%d", e.port)
 		server := &http.Server{Addr: addr, Handler: mux}
 
@@ -254,9 +268,30 @@ func (e *Exporter) collect(ctx context.Context) {
 	e.blockWrite.Reset()
 	e.containerInfo.Reset()
 
-	// Atualiza métricas para cada container
+	// Prepara a lista total de métricas (Locais + Remotas do Cluster)
+	var allStats []models.ContainerMetrics
+
+	// Formata stats locais adicionando o HostID
 	for _, s := range stats {
+		s.HostID = e.hostID
+		allStats = append(allStats, s)
+	}
+
+	// Anexa stats remotas caso exista um receiver (Modo Leader)
+	if e.receiver != nil {
+		allStats = append(allStats, e.receiver.GetAllMetrics()...)
+	}
+
+	// Atualiza métricas para cada container (locais e remotos combinados)
+	for _, s := range allStats {
+		// Fallback amigável
+		hid := s.HostID
+		if hid == "" {
+			hid = "unknown"
+		}
+
 		labels := prometheus.Labels{
+			"host_id":        hid,
 			"container_id":   s.ContainerID,
 			"container_name": s.ContainerName,
 			"image":          s.Image,

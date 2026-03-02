@@ -25,6 +25,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/nicolas-moura-ti/castle-rock-agent/internal/alerts"
+	"github.com/nicolas-moura-ti/castle-rock-agent/internal/cluster"
 	"github.com/nicolas-moura-ti/castle-rock-agent/internal/config"
 	"github.com/nicolas-moura-ti/castle-rock-agent/internal/docker"
 	"github.com/nicolas-moura-ti/castle-rock-agent/internal/logger"
@@ -133,6 +134,7 @@ type Model struct {
 	startTime    time.Time
 	version      string
 	dockerClient *docker.Client
+	receiver     *cluster.Receiver
 	ctx          context.Context
 	cfg          config.Config
 	eventCount   int
@@ -140,7 +142,7 @@ type Model struct {
 	quitting     bool
 }
 
-func NewModel(dockerClient *docker.Client, ctx context.Context, sysInfo map[string]string, version string, cfg config.Config) Model {
+func NewModel(dockerClient *docker.Client, receiver *cluster.Receiver, ctx context.Context, sysInfo map[string]string, version string, cfg config.Config) Model {
 	var engine *alerts.Engine
 	if cfg.Alerts.Enabled {
 		engine = alerts.NewEngine(cfg.Alerts.Rules)
@@ -157,6 +159,7 @@ func NewModel(dockerClient *docker.Client, ctx context.Context, sysInfo map[stri
 		startTime:    time.Now(),
 		version:      version,
 		dockerClient: dockerClient,
+		receiver:     receiver,
 		ctx:          ctx,
 		cfg:          cfg,
 		lastUpdate:   time.Now(),
@@ -476,8 +479,8 @@ func (m Model) renderContainerTable() string {
 	}
 
 	var b strings.Builder
-	header := fmt.Sprintf("  %-3s %-14s %-20s %-7s %-7s %-9s %-10s %s",
-		"", "ID", "NOME", "CPU%", "MEM%", "MEM", "NET ↓/↑", "ESTADO")
+	header := fmt.Sprintf("  %-3s %-6s %-12s %-20s %-7s %-7s %-9s %-10s %s",
+		"", "HOST", "ID", "NOME", "CPU%", "MEM%", "MEM", "NET ↓/↑", "ESTADO")
 	b.WriteString(headerStyle.Render(header))
 	b.WriteString("\n")
 
@@ -525,9 +528,19 @@ func (m Model) renderContainerTable() string {
 			}
 		}
 
+		hostID := truncate(c.HostID, 6)
+		if hostID == "" {
+			hostID = "local"
+		}
+
 		name := truncate(c.Name, 18)
-		line := fmt.Sprintf("%s%-14s %-20s %-7s %-7s %-9s %-10s %s%s",
-			cursor, c.ID, name, cpuStr, memPctStr, memUseStr, netStr, state, alertMark)
+		id := c.ID
+		if len(id) > 12 {
+			id = id[:12]
+		}
+
+		line := fmt.Sprintf("%s%-6s %-12s %-20s %-7s %-7s %-9s %-10s %s%s",
+			cursor, hostID, id, name, cpuStr, memPctStr, memUseStr, netStr, state, alertMark)
 
 		b.WriteString(style.Render(line))
 		b.WriteString("\n")
@@ -680,6 +693,31 @@ func (m Model) fetchContainers() tea.Cmd {
 		if err != nil {
 			return dockerErrorMsg{err: err}
 		}
+
+		// Adiciona HostID local
+		for i := range containers {
+			containers[i].HostID = m.cfg.Cluster.HostID
+			if containers[i].HostID == "" {
+				containers[i].HostID = "local"
+			}
+		}
+
+		// Funde com containers remotos do Receiver
+		if m.receiver != nil {
+			remotes := m.receiver.GetAllContainers()
+			for _, r := range remotes {
+				containers = append(containers, logger.ContainerDisplay{
+					HostID: r.HostID,
+					ID:     r.ID,
+					Name:   r.Name,
+					Image:  r.Image,
+					Status: r.Status,
+					State:  r.State,
+					Ports:  r.Ports,
+				})
+			}
+		}
+
 		return containerListMsg{containers: containers}
 	}
 }
@@ -690,6 +728,15 @@ func (m Model) fetchStats() tea.Cmd {
 		if err != nil {
 			return dockerErrorMsg{err: err}
 		}
+
+		// Funde com stats remotos do Receiver
+		if m.receiver != nil {
+			remoteStats := m.receiver.GetAllMetrics()
+			for _, rs := range remoteStats {
+				stats[rs.ContainerID] = rs
+			}
+		}
+
 		return statsMsg{stats: stats}
 	}
 }
@@ -846,8 +893,8 @@ func min(a, b int) int {
 
 // ─── Run ─────────────────────────────────────────────────────────────────────
 
-func Run(dockerClient *docker.Client, ctx context.Context, sysInfo map[string]string, version string, cfg config.Config) error {
-	model := NewModel(dockerClient, ctx, sysInfo, version, cfg)
+func Run(dockerClient *docker.Client, receiver *cluster.Receiver, ctx context.Context, sysInfo map[string]string, version string, cfg config.Config) error {
+	model := NewModel(dockerClient, receiver, ctx, sysInfo, version, cfg)
 	p := tea.NewProgram(model, tea.WithAltScreen(), tea.WithMouseCellMotion())
 	_, err := p.Run()
 	return err
