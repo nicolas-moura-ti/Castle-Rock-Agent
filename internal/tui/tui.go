@@ -369,12 +369,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Export Logs to /tmp/castle-rock-logs-<container>.txt
 			if m.showLogs && len(m.logLines) > 0 {
 				var content strings.Builder
+				lineCount := 0
 				for _, entry := range m.logLines {
 					if m.logSearch == "" || strings.Contains(strings.ToLower(entry.Text), strings.ToLower(m.logSearch)) {
 						if len(m.logContainers) > 1 {
 							content.WriteString("[" + entry.Container + "] ")
 						}
 						content.WriteString(entry.Text + "\n")
+						lineCount++
 					}
 				}
 				fileName := "/tmp/castle-rock-logs"
@@ -385,9 +387,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				fileName += fmt.Sprintf("-%d.txt", time.Now().Unix())
 
-				_ = os.WriteFile(fileName, []byte(content.String()), 0644)
-
-				// Opcionalmente podemos lançar uma mensagem de sucesso, TUI é bem stateful.
+				err := os.WriteFile(fileName, []byte(content.String()), 0644)
+				if err != nil {
+					m.events = append([]EventLogEntry{{
+						Time: time.Now(), Icon: "❌", Action: "export fail", Name: err.Error(),
+					}}, m.events...)
+				} else {
+					m.events = append([]EventLogEntry{{
+						Time: time.Now(), Icon: "📤", Action: "export", Name: fmt.Sprintf("%d linhas → %s", lineCount, fileName),
+					}}, m.events...)
+				}
 			}
 		case "L":
 			// Multi-Tailing logs
@@ -1119,20 +1128,37 @@ func (m Model) renderEventLog() string {
 }
 
 func (m Model) renderHelpBar() string {
+	var bar string
+
+	switch {
+	case m.showLogs:
+		bar = "  ↑↓ scroll │ / grep │ f tail │ E export │ Esc back"
+	case m.showCleanup:
+		bar = "  [i] images │ [v] volumes │ Esc back"
+	case m.showMap:
+		bar = "  M / Esc back"
+	case m.showStress:
+		bar = "  [c] CPU │ [m] mem │ [b] both │ Esc cancel"
+	case m.showDetail:
+		bar = "  x shell │ l log │ s stop │ R restart │ Esc back"
+	case m.confirmAction != "":
+		bar = "  y confirm │ Esc cancel"
+	default:
+		bar = "  ↑↓ nav │ space select │ enter details │ l log 1 │ L log N │ x shell │ C prune │ s stop │ R restart │ S stress │ M map │ ? help │ q quit"
+	}
+
 	if m.showHelp {
 		return lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).BorderForeground(primaryColor).
 			Padding(0, 1).MarginLeft(2).
-			Render(m.msg.HelpBar) + "\n"
+			Render(bar) + "\n"
 	}
+
 	promInfo := ""
 	if m.cfg.Prometheus.Enabled {
 		promInfo = fmt.Sprintf(" │ prometheus :%d", m.cfg.Prometheus.Port)
 	}
-	// Usamos uma versão encurtada do HelpBar normal ou o próprio HelpBar truncado
-	return helpStyle.MarginLeft(2).Render(
-		m.msg.HelpBar+promInfo,
-	) + "\n"
+	return helpStyle.MarginLeft(2).Render(bar+promInfo) + "\n"
 }
 
 // ─── Render Cleanup ─────────────────────────────────────────────────────────

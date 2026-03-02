@@ -231,8 +231,10 @@ Ao executar `make run`, o agente abre um dashboard fullscreen:
   │  16:04:15 🔴 die        old-container               │
   ╰──────────────────────────────────────────────────────╯
 
-  ↑↓ navegar │ enter detalhes │ l logs │ s stop │ R restart │ r refresh │ ? ajuda │ q sair
+  ↑↓ nav │ space select │ enter details │ l log 1 │ L log N │ x shell │ C prune │ s stop │ R restart │ S stress │ M map │ ? help │ q quit
 ```
+
+> 💡 **Barra de Ajuda Contextual:** A barra inferior muda automaticamente conforme a tela ativa. Por exemplo, ao visualizar logs ela mostra `↑↓ scroll │ / grep │ f tail │ E export │ Esc back`. Na Dashboard de Prune: `[i] images │ [v] volumes │ Esc back`.
 
 ### Atalhos de Teclado
 
@@ -302,7 +304,9 @@ A TUI inclui um **Visualizador Avançado de Logs** nativo, carregado com recurso
 3. **⏪ Paginação Histórica:** Use as setas `↑` e `↓` (ou `k` e `j`) para rolar o histórico e vasculhar o passado. O auto-scroll entra em colapso e pausa enquanto você explora. Pressione `f` para reatar o Tail ao vivo.
 4. **🎨 JSON Highlighting:** O motor detecta automaticamente níveis de log comuns (`error`, `warn`, `info`) em outputs JSON estruturados e os colore de forma vibrante (ex: azul claro para info, vermelho para erro).
 5. **⏱️ Timestamps Nativos:** O Agente consome a API do Docker com a flag `Timestamps: true` ativada, colorindo a minutagem padrão do docker (ISO8601) em cinza. Ideal pra você correlacionar com picos nos gráficos de CPU.
-6. **📤 Exportação Rápida (Dump):** Pressione `E` enquanto estiver na tela de logs para salvar um arquivo no estado atual (aplicando qualquer filtro Grep ativo) direto para o disco em `/tmp/castle-rock-logs-[nome]-[timestamp].txt`.
+6. **📤 Exportação Rápida (Dump):** Pressione `E` enquanto estiver na tela de logs para salvar um arquivo no estado atual (aplicando qualquer filtro Grep ativo) direto para o disco em `/tmp/castle-rock-logs-[nome]-[timestamp].txt`. Um evento de confirmação (`📤 export`) aparece no painel de Eventos com o caminho exato do arquivo.
+
+> ⚠️ **Importante:** O atalho `E` só funciona quando você está **dentro da tela de logs** (após apertar `l` ou `L`). Não funciona no dashboard principal porque não há logs na tela para exportar. Passos: `l` (abrir logs) → `E` (exportar) → checar pasta `/tmp/`.
 
 ---
 

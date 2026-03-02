@@ -231,8 +231,10 @@ When running `make run`, the agent opens a fullscreen dashboard:
   │  16:04:15 🔴 die        old-container               │
   ╰──────────────────────────────────────────────────────╯
 
-  ↑↓ navigate │ enter details │ l logs │ s stop │ R restart │ r refresh │ ? help │ q quit
+  ↑↓ nav │ space select │ enter details │ l log 1 │ L log N │ x shell │ C prune │ s stop │ R restart │ S stress │ M map │ ? help │ q quit
 ```
+
+> 💡 **Context-Sensitive Help Bar:** The bottom bar automatically changes its shortcuts depending on the current screen. For example, when viewing logs it shows `↑↓ scroll │ / grep │ f tail │ E export │ Esc back`. When on the Prune Dashboard it shows `[i] images │ [v] volumes │ Esc back`.
 
 ### Keyboard Shortcuts
 
@@ -302,7 +304,9 @@ The TUI includes a native **Advanced Logs Viewer** packed with modern CLI featur
 3. **⏪ History Pagination:** Use the `↑` and `↓` (or `k` and `j`) keys to scroll back in the log history without losing the context of new incoming logs. Press `f` to resume live tailing.
 4. **🎨 JSON Highlighting:** The viewer automatically detects common log levels (`error`, `warn`, `info`) in structured JSON outputs and colorizes them (e.g., bright red for `error`).
 5. **⏱️ Timestamps:** It requests logs from the Docker API with the `Timestamps: true` flag enabled, rendering exact ISO8601 timestamps in muted gray to help you align metrics spikes with log events.
-6. **📤 Quick Export:** Press `E` while viewing a log panel to save a snapshot of the current view (including any active Grep filters) directly to `/tmp/castle-rock-logs-[name]-[timestamp].txt`.
+6. **📤 Quick Export:** Press `E` while viewing a log panel to save a snapshot of the current view (including any active Grep filters) directly to `/tmp/castle-rock-logs-[name]-[timestamp].txt`. A confirmation event (`📤 export`) appears in the Events panel showing the exact file path.
+
+> ⚠️ **Important:** The `E` shortcut only works when you are **inside the log view** (after pressing `l` or `L`). It does not work from the main dashboard — there are no logs on screen to export. Steps: `l` (open logs) → `E` (export) → check `/tmp/` folder.
 
 ---
 
