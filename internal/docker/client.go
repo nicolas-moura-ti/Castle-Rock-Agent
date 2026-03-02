@@ -248,6 +248,57 @@ func cleanLogLine(line string) string {
 	return strings.TrimSpace(line)
 }
 
+// SystemDiskUsage representa um resumo simplificado de consumo do Docker no host.
+type SystemDiskUsage struct {
+	ImagesReclaimable  int64
+	VolumesReclaimable int64
+}
+
+// GetDiskUsage retorna o uso de disco do Docker (equivalente a docker system df).
+func (c *Client) GetDiskUsage(ctx context.Context) (SystemDiskUsage, error) {
+	du, err := c.cli.DiskUsage(ctx, types.DiskUsageOptions{})
+	if err != nil {
+		return SystemDiskUsage{}, fmt.Errorf("docker.GetDiskUsage: %w", err)
+	}
+
+	var imgReclaim, volReclaim int64
+
+	for _, img := range du.Images {
+		if img.Containers == 0 { // Imagem não está sendo usada por nenhum container
+			imgReclaim += img.SharedSize + (img.Size - img.SharedSize)
+		}
+	}
+
+	for _, vol := range du.Volumes {
+		if vol.UsageData != nil && vol.UsageData.RefCount == 0 {
+			volReclaim += vol.UsageData.Size
+		}
+	}
+
+	return SystemDiskUsage{
+		ImagesReclaimable:  imgReclaim,
+		VolumesReclaimable: volReclaim,
+	}, nil
+}
+
+// PruneImages apaga todas as imagens órfãs (dangling = true)
+func (c *Client) PruneImages(ctx context.Context) (uint64, error) {
+	report, err := c.cli.ImagesPrune(ctx, filters.NewArgs(filters.Arg("dangling", "true")))
+	if err != nil {
+		return 0, err
+	}
+	return report.SpaceReclaimed, nil
+}
+
+// PruneVolumes apaga volumes locais que não estão atrelados a nenhum container
+func (c *Client) PruneVolumes(ctx context.Context) (uint64, error) {
+	report, err := c.cli.VolumesPrune(ctx, filters.NewArgs())
+	if err != nil {
+		return 0, err
+	}
+	return report.SpaceReclaimed, nil
+}
+
 // DockerEvent representa um evento de lifecycle de container.
 //
 // Eventos Docker são o mecanismo nativo para monitoramento em tempo real.
@@ -605,8 +656,31 @@ func (c *Client) ListRunningContainersDetailed(ctx context.Context) ([]logger.Co
 
 	result := make([]logger.ContainerDisplay, 0, len(containers))
 
-	for _, c := range containers {
-		result = append(result, toContainerDisplay(c))
+	for _, ct := range containers {
+		cd := toContainerDisplay(ct)
+
+		// Enriquece com dados do Inspect (Env, Health)
+		inspect, err := c.cli.ContainerInspect(ctx, ct.ID)
+		if err == nil {
+			// Env vars
+			if inspect.Config != nil {
+				cd.Env = inspect.Config.Env
+			}
+
+			// Health Check
+			if inspect.State != nil && inspect.State.Health != nil {
+				cd.HealthStatus = string(inspect.State.Health.Status)
+				if len(inspect.State.Health.Log) > 0 {
+					last := inspect.State.Health.Log[len(inspect.State.Health.Log)-1]
+					cd.HealthLog = strings.TrimSpace(last.Output)
+					if len(cd.HealthLog) > 120 {
+						cd.HealthLog = cd.HealthLog[:117] + "..."
+					}
+				}
+			}
+		}
+
+		result = append(result, cd)
 	}
 
 	return result, nil

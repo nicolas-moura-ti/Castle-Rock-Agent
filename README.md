@@ -238,13 +238,21 @@ When running `make run`, the agent opens a fullscreen dashboard:
 
 | Key | Action |
 |---|---|
-| `↑` / `k` | Navigate up |
-| `↓` / `j` | Navigate down |
+| `↑` / `k` | Navigate up (or scroll up logs) |
+| `↓` / `j` | Navigate down (or scroll down logs) |
 | `Enter` | Expand container details (metrics, labels, networks, ports) |
-| `l` | Toggle real-time logs for the selected container |
+| `l` | Toggle real-time logs for the **selected** container |
+| `Space` | Select/Deselect container for Multi-Tailing |
+| `Shift+L` | Toggle aggregated logs for **all selected** containers |
+| `/` | Apply Live Grep (filter) while viewing logs |
+| `f` | Return to auto-tailing at the bottom of the logs |
+| `E` | Export current log view to `/tmp/castle-rock-logs-*.txt` |
+| `x` | Open Interactive Shell inside container (`/bin/sh` or `/bin/bash`) |
+| `C` | Open Interactive Prune Dashboard (Cleanup images/volumes) |
 | `s` | **Stop** container (asks for `y` confirmation) |
 | `R` | **Restart** container (asks for `y` confirmation) |
 | `S` | **Stress Test Mode** (CPU/Memory to simulate Noisy Neighbor) |
+| `M` | **Service Map** (Visual network topology) |
 | `r` | Manual list refresh |
 | `?` | Show/hide detailed help |
 | `Esc` | Close open panels |
@@ -277,6 +285,56 @@ By pressing `S` in the TUI, you create a temporary container built via code (`al
 - **No Docker Proxy (Read-Only):** The test does not work in headless mode attached to `docker-socket-proxy`. The proxy has the `POST=0` flag locked for security (doesn't allow creating containers). Because of this, we suggest using the TUI via `make run` directly on the local real OS for success.
 
 ---
+
+## 📜 Advanced Logs Viewer
+
+The TUI includes a native **Advanced Logs Viewer** packed with modern CLI features, reducing the need to leave the dashboard to inspect container output.
+
+### 📖 How to read the Logs (`l`, `L`, `f`)
+
+- **`l` (Log 1):** Use the arrow keys to place the `▸` cursor over a single container and press `l` (lowercase L) to tail its logs.
+- **`L` (Log N / Multi-Tailing):** Navigate the table and press `Space` on multiple containers to select them. Then press `Shift+L`. The agent will aggregate their streams in real-time, placing colored `[container-name]` tags on each line.
+- **`f` (Follow):** When a log screen is open, the view automatically scrolls (tails) to the bottom. If you press `↑` (Up), the scrolling pauses so you can read a stack trace. When you are done investigating, press `f` to collapse the view back to the live tail edge.
+
+### Key Features
+1. **🔍 Live Grep (Fuzzy Search):** Press `/` to open the search bar. The view will instantly filter logs as you type, matching case-insensitively. Press `Enter` or `Esc` to close the search.
+2. **🔀 Multi-Tailing (Aggregated Logs):** Aggregate logs side-by-side using `Space` and `Shift+L`.
+3. **⏪ History Pagination:** Use the `↑` and `↓` (or `k` and `j`) keys to scroll back in the log history without losing the context of new incoming logs. Press `f` to resume live tailing.
+4. **🎨 JSON Highlighting:** The viewer automatically detects common log levels (`error`, `warn`, `info`) in structured JSON outputs and colorizes them (e.g., bright red for `error`).
+5. **⏱️ Timestamps:** It requests logs from the Docker API with the `Timestamps: true` flag enabled, rendering exact ISO8601 timestamps in muted gray to help you align metrics spikes with log events.
+6. **📤 Quick Export:** Press `E` while viewing a log panel to save a snapshot of the current view (including any active Grep filters) directly to `/tmp/castle-rock-logs-[name]-[timestamp].txt`.
+
+---
+
+## 💼 Enterprise UX Tools
+
+For advanced debugging and operations, the agent includes **Enterprise UX Tools** designed to feel like a high-end command line dashboard.
+
+### 1. 🖥️ Host Health Metrics
+The agent automatically reports the physical **Node / Host Operating System** CPU and Memory percentage in the top status bar. Instead of guessing why a cluster is struggling due to pure Docker usage, you can see physical RAM limits right from the Agent.
+
+### 2. 💻 Interactive Shell (Exec)
+If you spot an error in the logs, selecting a container and pressing `x` suspends the Agent's UI and drops you directly into an **Interactive TTY Shell** (`/bin/sh` or `/bin/bash`) running inside the container. After typing `exit`, you smoothly return to the TUI exactly where you left off.
+
+### 3. 🧹 Interactive Prune Dashboard
+Running low on disk space? Press **`C`** (Cleanup) to open the interactive prune dashboard. The engine analyzes `docker system df` metrics and displays precisely how much memory dangling images and idle local volumes are occupying. Press `i` to prune images or `v` to prune volumes, and instantly view the reclaimed space.
+
+---
+
+## 🔎 Debug & Diagnostics
+
+The container detail panel (`Enter`) now includes two powerful diagnostic tools:
+
+### 1. 🔎 Environment Variables Inspector
+When you press `Enter` on a container, the detail panel now displays all environment variables configured inside it. Keys are color-coded for readability, and values longer than 50 characters are truncated. Up to 15 variables are shown, with a `+N more` indicator if there are additional ones. This is invaluable for catching misconfigurations like a wrong `DATABASE_URL` or an incorrect `NODE_ENV`.
+
+### 2. 🏥 Health Check Status
+Containers that define a `HEALTHCHECK` in their Dockerfile now show a health badge directly in the main table:
+- ❤️ **healthy** — the container’s health check is passing
+- 🩺 **unhealthy** — the health check is failing (investigate immediately!)
+- ⏳ **starting** — the container is still initializing
+
+In the detail panel, you also see the **last health check output** (stdout), making it easy to understand *why* a container is unhealthy without running `docker inspect` manually.
 
 ## 📊 Prometheus — Exported Metrics
 

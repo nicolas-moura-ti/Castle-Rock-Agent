@@ -495,16 +495,19 @@ func PrintUptime(startTime time.Time) {
 // ContainerDisplay é um DTO usado pelo logger para exibição detalhada.
 // Separado de models.ContainerInfo para manter o model limpo.
 type ContainerDisplay struct {
-	HostID   string
-	ID       string
-	Name     string
-	Image    string
-	Status   string
-	State    string
-	Command  string
-	Ports    string
-	Created  string
-	Networks []string
-	Labels   map[string]string
-	SizeRw   string
+	HostID       string
+	ID           string
+	Name         string
+	Image        string
+	Status       string
+	State        string
+	Command      string
+	Ports        string
+	Created      string
+	Networks     []string
+	Labels       map[string]string
+	SizeRw       string
+	Env          []string
+	HealthStatus string
+	HealthLog    string
 }

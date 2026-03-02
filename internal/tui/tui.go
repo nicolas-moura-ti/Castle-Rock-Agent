@@ -18,8 +18,13 @@ package tui
 import (
 	"context"
 	"fmt"
+	"os"
+	"os/exec"
 	"strings"
 	"time"
+
+	"github.com/shirou/gopsutil/v3/cpu"
+	"github.com/shirou/gopsutil/v3/mem"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -83,7 +88,15 @@ type statsMsg struct {
 	stats map[string]models.ContainerMetrics
 }
 type alertsMsg struct{ alerts []alerts.Alert }
-type logLineMsg struct{ line string }
+type logLineMsg struct {
+	container string
+	line      string
+	nextCh    <-chan string
+}
+type LogEntry struct {
+	Container string
+	Text      string
+}
 type actionResultMsg struct {
 	success   bool
 	action    string
@@ -119,15 +132,25 @@ type Model struct {
 	auditor        *security.Auditor
 
 	// Logs
-	logLines     []string
-	showLogs     bool
-	logContainer string // container cujos logs estão sendo exibidos
+	logLines      []LogEntry
+	showLogs      bool
+	logContainers []string        // lista de nomes sendo exibidos
+	logOffset     int             // distancia do fim (0 = tail)
+	logSearch     string          // grep filter
+	searchMode    bool            // digitando a busca
+	selectedIDs   map[string]bool // containers selecionados (space)
 
 	// Container actions
 	confirmAction string // "stop" ou "restart" — vazio = sem confirmação pendente
 
 	// Stress test
 	showStress bool // mostra o menu de stress test
+
+	// Cleanup / Prune
+	showCleanup   bool
+	diskUsage     docker.SystemDiskUsage
+	pruning       bool
+	pruneFeedback string
 
 	// Service Map
 	showMap bool
@@ -153,6 +176,8 @@ type Model struct {
 	lastUpdate   time.Time
 	quitting     bool
 	msg          i18n.Messages
+	hostCPU      float64
+	hostMem      float64
 }
 
 func NewModel(dockerClient *docker.Client, receiver *cluster.Receiver, ctx context.Context, sysInfo map[string]string, version string, cfg config.Config, store *storage.SQLiteStore) Model {
@@ -171,7 +196,8 @@ func NewModel(dockerClient *docker.Client, receiver *cluster.Receiver, ctx conte
 		securityAlerts: []alerts.Alert{},
 		auditor:        security.NewAuditor(dockerClient),
 		mapper:         topology.NewMapper(dockerClient),
-		logLines:       []string{},
+		logLines:       []LogEntry{},
+		selectedIDs:    make(map[string]bool),
 		startTime:      time.Now(),
 		version:        version,
 		dockerClient:   dockerClient,
@@ -189,6 +215,7 @@ func (m Model) Init() tea.Cmd {
 	return tea.Batch(
 		m.fetchContainers(),
 		m.fetchStats(),
+		m.fetchHostStats(),
 		m.watchDockerEvents(),
 		m.tickCmd(),
 	)
@@ -220,18 +247,55 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Menu de stress test
 		if m.showStress {
 			switch msg.String() {
-			case "c":
+			case "c", "m", "b":
 				m.showStress = false
-				return m, m.executeStress("cpu")
-			case "m":
-				m.showStress = false
-				return m, m.executeStress("memory")
-			case "b":
-				m.showStress = false
-				return m, m.executeStress("both")
+				mode := "both"
+				if msg.String() == "c" {
+					mode = "cpu"
+				} else if msg.String() == "m" {
+					mode = "memory"
+				}
+				return m, m.executeStress(mode)
 			default:
-				// Qualquer outra tecla cancela
 				m.showStress = false
+			}
+			return m, nil
+		}
+
+		// Se está no modo de Cleanup (Prune Dashboard)
+		if m.showCleanup {
+			switch msg.String() {
+			case "esc", "c", "C":
+				m.showCleanup = false
+				m.pruneFeedback = ""
+			case "i":
+				// prune imagens
+				m.pruning = true
+				m.pruneFeedback = ""
+				return m, m.runPrune("images")
+			case "v":
+				// prune volumes
+				m.pruning = true
+				m.pruneFeedback = ""
+				return m, m.runPrune("volumes")
+			}
+			return m, nil
+		}
+
+		// Se está no modo de busca do Live Grep
+		if m.searchMode {
+			switch msg.String() {
+			case "esc", "enter":
+				m.searchMode = false
+			case "backspace":
+				if len(m.logSearch) > 0 {
+					m.logSearch = m.logSearch[:len(m.logSearch)-1]
+				}
+			default:
+				// Append printable characters (rough approximation for simple TUI)
+				if len(msg.String()) == 1 {
+					m.logSearch += msg.String()
+				}
 			}
 			return m, nil
 		}
@@ -240,21 +304,41 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "q", "ctrl+c":
 			m.quitting = true
 			return m, tea.Quit
-		case "up", "k":
-			if m.cursor > 0 {
-				m.cursor--
-			}
+		case "/":
 			if m.showLogs {
-				m.showLogs = false
-				m.logLines = nil
+				m.searchMode = true
+				return m, nil
+			}
+		case "up", "k":
+			if m.showLogs {
+				m.logOffset++
+			} else {
+				if m.cursor > 0 {
+					m.cursor--
+				}
 			}
 		case "down", "j":
-			if m.cursor < len(m.containers)-1 {
-				m.cursor++
-			}
 			if m.showLogs {
-				m.showLogs = false
-				m.logLines = nil
+				if m.logOffset > 0 {
+					m.logOffset--
+				}
+			} else {
+				if m.cursor < len(m.containers)-1 {
+					m.cursor++
+				}
+			}
+		case "f":
+			if m.showLogs {
+				m.logOffset = 0 // back to real-time tail
+			}
+		case " ":
+			if !m.showLogs && !m.showDetail && !m.showMap && m.cursor < len(m.containers) {
+				id := m.containers[m.cursor].ID
+				if m.selectedIDs[id] {
+					delete(m.selectedIDs, id)
+				} else {
+					m.selectedIDs[id] = true
+				}
 			}
 		case "r":
 			return m, tea.Batch(m.fetchContainers(), m.fetchStats())
@@ -267,19 +351,80 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.showHelp = false
 			m.showLogs = false
 			m.logLines = nil
+			m.searchMode = false
+			m.logSearch = ""
 			m.confirmAction = ""
 			m.showStress = false
 			m.showMap = false
+			m.showCleanup = false
+		case "C":
+			// Toggle Interactive Prune Dashboard
+			if !m.showLogs && !m.showDetail && !m.showMap {
+				m.showCleanup = !m.showCleanup
+				if m.showCleanup {
+					return m, m.fetchDiskUsage()
+				}
+			}
+		case "E":
+			// Export Logs to /tmp/castle-rock-logs-<container>.txt
+			if m.showLogs && len(m.logLines) > 0 {
+				var content strings.Builder
+				for _, entry := range m.logLines {
+					if m.logSearch == "" || strings.Contains(strings.ToLower(entry.Text), strings.ToLower(m.logSearch)) {
+						if len(m.logContainers) > 1 {
+							content.WriteString("[" + entry.Container + "] ")
+						}
+						content.WriteString(entry.Text + "\n")
+					}
+				}
+				fileName := "/tmp/castle-rock-logs"
+				if len(m.logContainers) == 1 {
+					fileName += "-" + m.logContainers[0]
+				} else {
+					fileName += "-multi"
+				}
+				fileName += fmt.Sprintf("-%d.txt", time.Now().Unix())
+
+				_ = os.WriteFile(fileName, []byte(content.String()), 0644)
+
+				// Opcionalmente podemos lançar uma mensagem de sucesso, TUI é bem stateful.
+			}
+		case "L":
+			// Multi-Tailing logs
+			if !m.showLogs && len(m.selectedIDs) > 0 {
+				m.showLogs = true
+				m.logOffset = 0
+				m.logLines = []LogEntry{{Container: "System", Text: "Carregando aggregate logs..."}}
+				var names []string
+				var cmds []tea.Cmd
+				for _, c := range m.containers {
+					if m.selectedIDs[c.ID] {
+						names = append(names, c.Name)
+						logCh, err := m.dockerClient.StreamContainerLogs(m.ctx, c.ID)
+						if err == nil {
+							cmds = append(cmds, m.waitForNextLog(c.Name, logCh))
+						}
+					}
+				}
+				m.logContainers = names
+				return m, tea.Batch(cmds...)
+			}
 		case "l":
 			// Toggle logs do container selecionado
 			if m.showLogs {
 				m.showLogs = false
 				m.logLines = nil
 			} else if m.cursor < len(m.containers) {
+				c := m.containers[m.cursor]
 				m.showLogs = true
-				m.logLines = []string{"Carregando logs..."}
-				m.logContainer = m.containers[m.cursor].Name
-				return m, m.streamLogs(m.containers[m.cursor].ID)
+				m.logOffset = 0
+				m.logLines = []LogEntry{{Container: c.Name, Text: "Carregando logs..."}}
+				m.logContainers = []string{c.Name}
+
+				logCh, err := m.dockerClient.StreamContainerLogs(m.ctx, c.ID)
+				if err == nil {
+					return m, m.waitForNextLog(c.Name, logCh)
+				}
 			}
 		case "s":
 			// Stop container — pede confirmação
@@ -290,6 +435,31 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Restart container — pede confirmação (R maiúsculo)
 			if m.cursor < len(m.containers) {
 				m.confirmAction = "restart"
+			}
+		case "x":
+			// Interactive Shell (Exec)
+			if !m.showLogs && !m.showDetail && !m.showMap && m.cursor < len(m.containers) {
+				c := m.containers[m.cursor]
+
+				// O comando docker cli puro cuida de alocar TTY corretamemte, diferentemente
+				// da sdk local do daemon. Envolvemos num ExecProcess do bubbletea para pausar.
+				cmd := exec.Command("docker", "exec", "-it", c.Name, "/bin/sh")
+
+				return m, tea.ExecProcess(cmd, func(err error) tea.Msg {
+					// Se o /bin/sh falhar por não existir (ex ubuntu), tentar fallback pro bash?
+					// Para simplificar, retornamos erro caso o alpine/busybox não tenha `sh`.
+					if err != nil {
+						// Tentar bash se sh deu erro. (Muito rápido, mas pro TUI é limpo)
+						cmdBash := exec.Command("docker", "exec", "-it", c.Name, "/bin/bash")
+						return tea.ExecProcess(cmdBash, func(err2 error) tea.Msg {
+							if err2 != nil {
+								return dockerErrorMsg{err: fmt.Errorf("Shell Exec Falhou (sh/bash): %v", err2)}
+							}
+							return nil
+						})()
+					}
+					return nil
+				})
 			}
 		case "S":
 			// Abre menu de stress test
@@ -386,9 +556,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}}, m.events...)
 
 	case logLineMsg:
-		m.logLines = append(m.logLines, msg.line)
-		if len(m.logLines) > 200 {
-			m.logLines = m.logLines[len(m.logLines)-200:]
+		m.logLines = append(m.logLines, LogEntry{Container: msg.container, Text: msg.line})
+		if len(m.logLines) > 1000 {
+			m.logLines = m.logLines[len(m.logLines)-1000:]
+		}
+		if msg.nextCh != nil {
+			return m, m.waitForNextLog(msg.container, msg.nextCh)
 		}
 
 	case actionResultMsg:
@@ -416,8 +589,42 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}}, m.events...)
 		return m, tea.Batch(m.fetchContainers(), m.fetchStats())
 
+	case diskUsageMsg:
+		m.diskUsage = msg.usage
+
+	case pruneResultMsg:
+		m.pruning = false
+		icon := "🧹 "
+		if msg.err != nil {
+			m.pruneFeedback = fmt.Sprintf("❌ Erro ao limpar %s: %s", msg.target, msg.err.Error())
+			m.events = append([]EventLogEntry{{
+				Time: time.Now(), Icon: "❌", Action: "prune fail", Name: msg.err.Error(),
+			}}, m.events...)
+		} else {
+			reclaimedStr := formatBytes(msg.reclaimed)
+			m.pruneFeedback = fmt.Sprintf("✅ Faxina Concluída! Você recuperou %s de espaço livre.", reclaimedStr)
+			m.events = append([]EventLogEntry{{
+				Time: time.Now(), Icon: icon, Action: "prune " + msg.target, Name: fmt.Sprintf("Liberou %s", reclaimedStr),
+			}}, m.events...)
+		}
+		// Atualiza o dashboard logo após prune
+		return m, m.fetchDiskUsage()
+
+	case hostStatsMsg:
+		m.hostCPU = msg.cpu
+		m.hostMem = msg.mem
+
 	case tickMsg:
-		return m, tea.Batch(m.tickCmd(), m.fetchStats())
+		m.lastUpdate = time.Time(msg)
+		if !m.showLogs && !m.showMap && m.confirmAction == "" {
+			return m, tea.Batch(
+				m.fetchContainers(),
+				m.fetchStats(),
+				m.fetchHostStats(),
+				m.tickCmd(),
+			)
+		}
+		return m, m.tickCmd()
 	}
 
 	return m, nil
@@ -444,6 +651,14 @@ func (m Model) View() string {
 		b.WriteString(stressStyle.Render("  ⚡ " + m.msg.StressTestTitle + "  "))
 		b.WriteString("\n\n")
 		b.WriteString(lipgloss.NewStyle().MarginLeft(4).Render(m.msg.StressTestMenu + "\n"))
+		return b.String()
+	}
+
+	// Interactive Prune Dashboard
+	if m.showCleanup {
+		b.WriteString(m.renderHeader())
+		b.WriteString("\n\n")
+		b.WriteString(m.renderCleanupPanel())
 		return b.String()
 	}
 
@@ -604,6 +819,18 @@ func (m Model) renderContainerTable() string {
 			}
 		}
 
+		// Indicador de Health Check
+		healthMark := ""
+		switch c.HealthStatus {
+		case "healthy":
+			healthMark = " ❤️"
+		case "unhealthy":
+			healthMark = " 🩺"
+		case "starting":
+			healthMark = " ⏳"
+		}
+		alertMark += healthMark
+
 		hostID := truncate(c.HostID, 6)
 		if hostID == "" {
 			hostID = "local"
@@ -698,6 +925,50 @@ func (m Model) renderContainerDetail() string {
 		}
 	}
 
+	// Health Check Status
+	if c.HealthStatus != "" {
+		healthIcon := "✅"
+		healthColor := lipgloss.Color("#A3BE8C")
+		switch c.HealthStatus {
+		case "unhealthy":
+			healthIcon = "⚠️ "
+			healthColor = lipgloss.Color("#BF616A")
+		case "starting":
+			healthIcon = "⏳"
+			healthColor = lipgloss.Color("#EBCB8B")
+		}
+		b.WriteString(lipgloss.NewStyle().Bold(true).Foreground(healthColor).Render(
+			fmt.Sprintf("\n %s Health: %s", healthIcon, c.HealthStatus)) + "\n")
+		if c.HealthLog != "" {
+			b.WriteString(lipgloss.NewStyle().Foreground(mutedColor).Render(
+				fmt.Sprintf("   Last check: %s", c.HealthLog)) + "\n")
+		}
+	}
+
+	// Environment Variables
+	if len(c.Env) > 0 {
+		b.WriteString(lipgloss.NewStyle().Bold(true).Foreground(secondaryColor).Render("\n 🔎 Env Variables") + "\n")
+		for i, env := range c.Env {
+			if i >= 15 {
+				b.WriteString(lipgloss.NewStyle().Foreground(mutedColor).Render(
+					fmt.Sprintf("   ... +%d more", len(c.Env)-15)) + "\n")
+				break
+			}
+			// Colore KEY=VALUE de forma distinta
+			parts := strings.SplitN(env, "=", 2)
+			if len(parts) == 2 {
+				key := lipgloss.NewStyle().Foreground(primaryColor).Render(parts[0])
+				val := parts[1]
+				if len(val) > 50 {
+					val = val[:47] + "..."
+				}
+				b.WriteString(fmt.Sprintf("   %s=%s\n", key, val))
+			} else {
+				b.WriteString(fmt.Sprintf("   %s\n", env))
+			}
+		}
+	}
+
 	if stats, ok := m.stats[c.ID]; ok {
 		b.WriteString(lipgloss.NewStyle().Bold(true).Foreground(secondaryColor).Render("\n 📊 "+m.msg.Metrics) + "\n")
 		b.WriteString(fmt.Sprintf(" CPU:      %s\n", formatCPU(stats.CPUPercent)))
@@ -711,34 +982,84 @@ func (m Model) renderContainerDetail() string {
 }
 
 func (m Model) renderLogPanel() string {
+	names := strings.Join(m.logContainers, ", ")
 	title := lipgloss.NewStyle().Bold(true).Foreground(secondaryColor).MarginLeft(2).
-		Render(fmt.Sprintf("📜 "+m.msg.LogsTitle, m.logContainer))
+		Render(fmt.Sprintf("📜 "+m.msg.LogsTitle, names))
 
 	maxLines := 10
 	if m.height > 50 {
 		maxLines = 15
 	}
 
+	var filtered []LogEntry
+	for _, entry := range m.logLines {
+		if m.logSearch == "" || strings.Contains(strings.ToLower(entry.Text), strings.ToLower(m.logSearch)) {
+			// Regex simples para formatar Timestamps (ISO8601 do Docker) e colorir JSON
+			text := entry.Text
+
+			// Color Timestamp se existir
+			if len(text) > 30 && text[4] == '-' && text[7] == '-' && text[10] == 'T' {
+				ts := text[:30]
+				rest := text[30:]
+				text = lipgloss.NewStyle().Foreground(lipgloss.Color("#5C6370")).Render(ts) + rest
+			}
+
+			// Tenta highlight de chaves JSON bem simples para logs
+			if strings.Contains(text, `":`) {
+				text = strings.ReplaceAll(text, `"level":"error"`, lipgloss.NewStyle().Foreground(lipgloss.Color("#E06C75")).Render(`"level":"error"`))
+				text = strings.ReplaceAll(text, `"level":"warn"`, lipgloss.NewStyle().Foreground(lipgloss.Color("#E5C07B")).Render(`"level":"warn"`))
+				text = strings.ReplaceAll(text, `"level":"info"`, lipgloss.NewStyle().Foreground(lipgloss.Color("#61AFEF")).Render(`"level":"info"`))
+			}
+
+			filtered = append(filtered, LogEntry{Container: entry.Container, Text: text})
+		}
+	}
+
 	start := 0
-	if len(m.logLines) > maxLines {
-		start = len(m.logLines) - maxLines
+	if len(filtered) > maxLines+m.logOffset {
+		start = len(filtered) - maxLines - m.logOffset
+	}
+
+	end := start + maxLines
+	if end > len(filtered) {
+		end = len(filtered)
 	}
 
 	var b strings.Builder
-	for _, line := range m.logLines[start:] {
-		truncated := line
-		if len(truncated) > m.width-10 {
-			truncated = truncated[:m.width-13] + "..."
+	for _, entry := range filtered[start:end] {
+		truncated := entry.Text
+		// TUI width limit approx
+		if len(truncated) > m.width+50 { // tolerance for ANSI codes
+			truncated = truncated[:m.width+50] + "..."
 		}
-		b.WriteString("  " + lipgloss.NewStyle().Foreground(lipgloss.Color("#A0AEC0")).Render(truncated) + "\n")
+
+		// Se houver mais de um container sendo exibido, prefixa com o nome
+		prefix := ""
+		if len(m.logContainers) > 1 {
+			prefix = lipgloss.NewStyle().Foreground(primaryColor).Render(fmt.Sprintf("[%s] ", entry.Container))
+		}
+
+		b.WriteString("  " + prefix + lipgloss.NewStyle().Foreground(lipgloss.Color("#A0AEC0")).Render(truncated) + "\n")
 	}
 
 	maxW := min(m.width-4, 90)
 	if maxW < 40 {
 		maxW = 40
 	}
+
+	footer := ""
+	if m.searchMode {
+		footer = "\n  " + lipgloss.NewStyle().Foreground(primaryColor).Render("🔍 Buscar: "+m.logSearch+"█")
+	} else if m.logSearch != "" {
+		footer = "\n  " + lipgloss.NewStyle().Foreground(mutedColor).Render("Filtro ativo: "+m.logSearch)
+	}
+
+	if m.logOffset > 0 {
+		footer += lipgloss.NewStyle().Foreground(warningColor).Render(fmt.Sprintf("  [Histórico offset: %d]", m.logOffset))
+	}
+
 	panel := logPanelStyle.Width(maxW).MarginLeft(2)
-	return title + "\n" + panel.Render(b.String())
+	return title + "\n" + panel.Render(b.String()) + footer
 }
 
 func (m Model) renderAlerts() string {
@@ -812,6 +1133,62 @@ func (m Model) renderHelpBar() string {
 	return helpStyle.MarginLeft(2).Render(
 		m.msg.HelpBar+promInfo,
 	) + "\n"
+}
+
+// ─── Render Cleanup ─────────────────────────────────────────────────────────
+
+func (m Model) renderCleanupPanel() string {
+	var b strings.Builder
+
+	b.WriteString(titleStyle.Render(" 🧹 Interactive Prune Dashboard "))
+	b.WriteString("\n\n")
+
+	if m.pruning {
+		b.WriteString(lipgloss.NewStyle().Foreground(mutedColor).MarginLeft(4).Render("⏳ Processando faxina no Docker daemon... aguarde."))
+		b.WriteString("\n")
+		return b.String()
+	}
+
+	if m.pruneFeedback != "" {
+		b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#A3BE8C")).Bold(true).MarginLeft(4).Render(m.pruneFeedback))
+		b.WriteString("\n\n")
+	}
+
+	imgColor := lipgloss.Color("#A3BE8C")              // verde
+	if m.diskUsage.ImagesReclaimable > 1024*1024*500 { // >500MB
+		imgColor = lipgloss.Color("#EBCB8B") // amarelo
+	}
+	if m.diskUsage.ImagesReclaimable > 1024*1024*1024*2 { // >2GB
+		imgColor = lipgloss.Color("#BF616A") // vermelho
+	}
+
+	volColor := lipgloss.Color("#A3BE8C") // verde
+	if m.diskUsage.VolumesReclaimable > 1024*1024*500 {
+		volColor = lipgloss.Color("#EBCB8B")
+	}
+	if m.diskUsage.VolumesReclaimable > 1024*1024*1024*2 {
+		volColor = lipgloss.Color("#BF616A")
+	}
+
+	b.WriteString("    📦 ")
+	b.WriteString(lipgloss.NewStyle().Bold(true).Render("Imagens Órfãs (Dangling): "))
+	b.WriteString(lipgloss.NewStyle().Foreground(imgColor).Render(formatBytes(uint64(m.diskUsage.ImagesReclaimable))))
+	b.WriteString("\n")
+	b.WriteString(lipgloss.NewStyle().Foreground(mutedColor).MarginLeft(7).Render("Imagens sem tag que não estão sendo usadas por nenhum container."))
+	b.WriteString("\n\n")
+
+	b.WriteString("    💾 ")
+	b.WriteString(lipgloss.NewStyle().Bold(true).Render("Volumes Locais Ociosos:   "))
+	b.WriteString(lipgloss.NewStyle().Foreground(volColor).Render(formatBytes(uint64(m.diskUsage.VolumesReclaimable))))
+	b.WriteString("\n")
+	b.WriteString(lipgloss.NewStyle().Foreground(mutedColor).MarginLeft(7).Render("Volumes persistentes criados pelo Docker que não estão atrelados a containers."))
+	b.WriteString("\n\n\n")
+
+	b.WriteString("    " + lipgloss.NewStyle().Background(lipgloss.Color("#4C566A")).Foreground(lipgloss.Color("#ECEFF4")).Padding(0, 1).Render(" Ações: "))
+	b.WriteString("  [i] Limpar Imagens  │  [v] Limpar Volumes  │  [ESC] Voltar")
+	b.WriteString("\n")
+
+	return b.String()
 }
 
 // ─── Comandos (tea.Cmd) ──────────────────────────────────────────────────────
@@ -891,32 +1268,79 @@ func (m Model) watchNextDockerEvent() tea.Cmd {
 	return m.watchDockerEvents()
 }
 
+type hostStatsMsg struct {
+	cpu float64
+	mem float64
+}
+
+func (m Model) fetchHostStats() tea.Cmd {
+	return func() tea.Msg {
+		c, _ := cpu.Percent(0, false)
+		var cpuVal float64
+		if len(c) > 0 {
+			cpuVal = c[0]
+		}
+
+		v, _ := mem.VirtualMemory()
+		var memVal float64
+		if v != nil {
+			memVal = v.UsedPercent
+		}
+
+		return hostStatsMsg{cpu: cpuVal, mem: memVal}
+	}
+}
+
+type diskUsageMsg struct {
+	usage docker.SystemDiskUsage
+}
+
+type pruneResultMsg struct {
+	reclaimed uint64
+	target    string
+	err       error
+}
+
+func (m Model) fetchDiskUsage() tea.Cmd {
+	return func() tea.Msg {
+		du, err := m.dockerClient.GetDiskUsage(m.ctx)
+		if err != nil {
+			return dockerErrorMsg{err: err}
+		}
+		return diskUsageMsg{usage: du}
+	}
+}
+
+func (m Model) runPrune(target string) tea.Cmd {
+	return func() tea.Msg {
+		var reclaimed uint64
+		var err error
+		if target == "images" {
+			reclaimed, err = m.dockerClient.PruneImages(m.ctx)
+		} else if target == "volumes" {
+			reclaimed, err = m.dockerClient.PruneVolumes(m.ctx)
+		}
+		return pruneResultMsg{reclaimed: reclaimed, target: target, err: err}
+	}
+}
+
 func (m Model) tickCmd() tea.Cmd {
 	return tea.Tick(2*time.Second, func(t time.Time) tea.Msg {
 		return tickMsg(t)
 	})
 }
 
-func (m Model) streamLogs(containerID string) tea.Cmd {
+func (m Model) waitForNextLog(containerName string, logCh <-chan string) tea.Cmd {
 	return func() tea.Msg {
-		logCh, err := m.dockerClient.StreamContainerLogs(m.ctx, containerID)
-		if err != nil {
-			return dockerErrorMsg{err: err}
-		}
-		// Lê a primeira linha para iniciar o stream
 		line, ok := <-logCh
 		if !ok {
-			return logLineMsg{line: "(sem logs)"}
+			return nil // stream fechado
 		}
-
-		// Continua lendo em background
-		go func() {
-			for l := range logCh {
-				_ = l // As próximas linhas serão lidas via polling
-			}
-		}()
-
-		return logLineMsg{line: line}
+		return logLineMsg{
+			container: containerName,
+			line:      line,
+			nextCh:    logCh,
+		}
 	}
 }
 

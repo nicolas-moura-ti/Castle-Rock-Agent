@@ -242,9 +242,17 @@ Ao executar `make run`, o agente abre um dashboard fullscreen:
 | `↓` / `j` | Navegar para baixo |
 | `Enter` | Expandir detalhes do container (métricas, labels, redes, portas) |
 | `l` | Toggle logs em tempo real do container selecionado |
+| `Espaço` | Selecionar/Deselecionar container para Multi-Tailing |
+| `Shift+L` | Toggle logs agregados para **todos os selecionados** |
+| `/` | Aplicar Filtro (Live Grep) enquanto visualiza logs |
+| `f` | Voltar a seguir (tail) o final dos logs em tempo real |
+| `E` | Exportar logs atuais (com filtro aplicado) para `/tmp/castle-rock-logs-*.txt` |
+| `x` | Entrar no Shell Interativo do container (`/bin/sh` ou `/bin/bash`) |
+| `C` | Abrir Dashboard de Prune Interativo (Limpar imagens/volumes) |
 | `s` | **Stop** container (pede confirmação `y`) |
 | `R` | **Restart** container (pede confirmação `y`) |
 | `S` | **Stress Test Mode** (CPU/Memória para simular Noisy Neighbor) |
+| `M` | **Service Map** (Topologia visual de redes) |
 | `r` | Refresh manual da lista |
 | `?` | Exibir/ocultar ajuda detalhada |
 | `Esc` | Fechar panels abertos |
@@ -278,7 +286,59 @@ Ao pressionar `S` na TUI, você cria um container temporário construído via c�
 
 ---
 
-## 📊 Prometheus — Métricas Exportadas
+## 📜 Visualizador Avançado de Logs (Advanced Logs Viewer)
+
+A TUI inclui um **Visualizador Avançado de Logs** nativo, carregado com recursos modernos de CLI, reduzindo a necessidade de sair do painel para inspecionar os outputs dos seus containers.
+
+### 📖 Como ler os Logs (`l`, `L`, `f`)
+
+- **`l` (Log 1 - Simples):** Use as setas para colocar o cursor `▸` sobre um único container (ex: `postgres`) e aperte `l` minúsculo para abrir o tail.
+- **`L` (Log N - Multi-Tailing):** Navegue na tabela e aperte `Espaço` em múltiplos containers para selecioná-los. Depois aperte `Shift + L` (L maiúsculo). O agente vai cruzar os logs de todos eles ao mesmo tempo, adicionando uma tag colorida `[nome-do-container]` na frente.
+- **`f` (Follow):** Ao abrir um log, ele rola para baixo automaticamente. Se você apertar a `Seta para Cima`, a rolagem pausa (congela) para você ler um erro. Quando terminar, aperte a letra `f` para que a tela volte a "seguir" as mensagens mais recentes em tempo real.
+
+### Principais Funcionalidades
+1. **🔍 Live Grep (Filtro em Tempo Real):** Pressione `/` para abrir a barra de busca. A interface filtra os logs instantaneamente enquanto você digita (ignorando maiúsculas e minúsculas). Pressione `Enter` ou `Esc` para fechar a busca.
+2. **🔀 Multi-Tailing (Agregação Híbrida):** Agrupe vários containers lado a lado usando `Espaço` e `Shift+L`.
+3. **⏪ Paginação Histórica:** Use as setas `↑` e `↓` (ou `k` e `j`) para rolar o histórico e vasculhar o passado. O auto-scroll entra em colapso e pausa enquanto você explora. Pressione `f` para reatar o Tail ao vivo.
+4. **🎨 JSON Highlighting:** O motor detecta automaticamente níveis de log comuns (`error`, `warn`, `info`) em outputs JSON estruturados e os colore de forma vibrante (ex: azul claro para info, vermelho para erro).
+5. **⏱️ Timestamps Nativos:** O Agente consome a API do Docker com a flag `Timestamps: true` ativada, colorindo a minutagem padrão do docker (ISO8601) em cinza. Ideal pra você correlacionar com picos nos gráficos de CPU.
+6. **📤 Exportação Rápida (Dump):** Pressione `E` enquanto estiver na tela de logs para salvar um arquivo no estado atual (aplicando qualquer filtro Grep ativo) direto para o disco em `/tmp/castle-rock-logs-[nome]-[timestamp].txt`.
+
+---
+
+## 💼 Ferramentas Enterprise (UX Tools)
+
+Voltado para a rotina caótica dos SysAdmins, este canivete vem equipado com poderosos utilitários de interação e resgate em tempo real:
+
+### 1. 🖥️ Host Health Metrics (Métricas do Servidor Físico)
+O topo da TUI monitora constantemente o **Uso Real do Hardware Hospedeiro** por baixo dos panos (CPU Total e Memória RAM global). Ao invés de supor por que os microserviços estão falhando baseados em CPU Shares de containers, você sabe exatamente se a máquina virtual ou bare-metal alcançou seu limite físico. 
+
+### 2. 💻 Shell Interativo (Exec)
+Se encontrou uma violação no painel de auditoria, navegue com o cursor sobre o container e pressione `x`. O Castle Rock Agent vai se auto-suspender e transportar todo o STDIN/STDOUT e Controle TTY da sua tela para dentro de um `bash` ou `sh` rodando ao vivo naquele container. Ao rodar `exit`, a TUI retoma o controle suavemente como se nada tivesse acontecido.
+
+### 3. 🧹 Interactive Prune Dashboard (Faxina)
+Servidor pedindo socorro por disco lotado? Pressione tecla **`C`** (maiúsculo) para abrir a dashboard de Prune interativo. O motor consome a API de uso em disco do Docker e lista exatamente quantos Terabytes ou Megabytes estão pendurados silenciosamente em Imagens Órfãs ou Volumes Ociosos. Pressione `i` para limpar o lixo de imagens ou `v` para limpar os discos montados fantasmas, resgatando GBs na hora.
+
+---
+
+## 🔎 Debug & Diagnostics
+
+O painel de detalhes do container (acessado com `Enter`) agora inclui duas ferramentas formidáveis de diagnóstico em tempo real:
+
+### 1. 🔎 Environment Variables Inspector (Inspetor de Variáveis)
+Ao inspecionar um container (`Enter`), o painel inferior agora extrai e exibe todas as variáveis de ambiente setadas lá dentro. As chaves (Keys) são coloridas em destaque. Valores muito longos são truncados, mostrando até 15 variáveis por vez. É a ferramenta definitiva para descobrir em 2 segundos se o container subiu com a string errada de conexão de banco de dados (`DATABASE_URL`) ou se está no `NODE_ENV` errado.
+
+### 2. 🏥 Health Check Status (Status de Saúde do Container)
+Containers que implementam a diretiva `HEALTHCHECK` no Dockerfile agora ganham um badge visual direto na tabela principal do Castle Rock:
+- ❤️ **healthy** — Container está 100% saudável.
+- 🩺 **unhealthy** — Falha nos testes de saúde (investigue urgente!)
+- ⏳ **starting** — Container ainda subindo ou rodando os primeiros testes.
+
+Além de aparecer na tabela, ao apertar `Enter` nos detalhes, você consegue ler exatamente o **Output Original (Stdout/Stderr)** do último Health Check que falhou. Assim você sabe imediatamente o que quebrou sem precisar digitar um longo comando `docker inspect`.
+
+---
+
+## �📊 Prometheus — Métricas Exportadas
 
 O agente expõe métricas no formato Prometheus em `http://localhost:9110/metrics`.
 
