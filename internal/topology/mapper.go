@@ -7,14 +7,14 @@ import (
 	"github.com/nicolas-moura-ti/castle-rock-agent/internal/docker"
 )
 
-// NetworkNode representa um nó na topologia
+// NetworkNode represents a node in the topology.
 type NetworkNode struct {
 	ContainerName string `json:"container_name"`
 	ContainerID   string `json:"container_id"`
 	IPv4Address   string `json:"ipv4_address"`
 }
 
-// NetworkEdge representa uma conexão ou rede
+// NetworkEdge represents a connection or network.
 type NetworkEdge struct {
 	NetworkName string        `json:"network_name"`
 	NetworkID   string        `json:"network_id"`
@@ -22,17 +22,17 @@ type NetworkEdge struct {
 	Nodes       []NetworkNode `json:"nodes"`
 }
 
-// Mapper é o extrator da topologia visual de containers
+// Mapper is the visual container topology extractor.
 type Mapper struct {
 	dockerClient *docker.Client
 }
 
-// NewMapper inicia o serviço de topologia
+// NewMapper initializes the topology service.
 func NewMapper(client *docker.Client) *Mapper {
 	return &Mapper{dockerClient: client}
 }
 
-// BuildMap gera o agrupamento de containers por de rede
+// BuildMap generates the container grouping by network.
 func (m *Mapper) BuildMap(ctx context.Context) ([]NetworkEdge, error) {
 	nets, err := m.dockerClient.ListNetworks(ctx)
 	if err != nil {
@@ -42,14 +42,14 @@ func (m *Mapper) BuildMap(ctx context.Context) ([]NetworkEdge, error) {
 	var edges []NetworkEdge
 
 	for _, n := range nets {
-		// Ignora networks built-in vazias de utilidade
+		// Skip empty built-in networks
 		if n.Name == "host" || n.Name == "none" {
 			continue
 		}
 
 		var nodes []NetworkNode
 		for id, endpoint := range n.Containers {
-			// EndpointName geralmente tem o nome limpo s/ barra
+			// EndpointName usually has the clean name without slash
 			name := endpoint.Name
 			nodes = append(nodes, NetworkNode{
 				ContainerName: name,
@@ -58,7 +58,7 @@ func (m *Mapper) BuildMap(ctx context.Context) ([]NetworkEdge, error) {
 			})
 		}
 
-		// Só retorna redes com containers ativamente plugados (ignora redes vazias)
+		// Only return networks with actively connected containers (skip empty ones)
 		if len(nodes) > 0 {
 			edges = append(edges, NetworkEdge{
 				NetworkName: n.Name,

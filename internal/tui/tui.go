@@ -6,13 +6,13 @@
 //	Model → Update → View (ciclo unidirecional)
 //
 // FEATURES:
-//   - Tabela de containers com métricas em tempo real (CPU/MEM/NET)
-//   - Log de eventos Docker em tempo real
-//   - Detalhes expandidos do container selecionado
-//   - Logs streaming do container (toggle com 'l')
-//   - Container actions: stop ('s'), restart ('R') com confirmação
-//   - Sistema de alertas com indicador visual
-//   - Atalhos: ↑↓/jk navegar, enter detalhes, l logs, s stop, R restart, ? help, q sair
+//   - Container table with real-time metrics (CPU/MEM/NET)
+//   - Real-time Docker event log
+//   - Expanded details for the selected container
+//   - Container log streaming (toggle with 'l')
+//   - Container actions: stop ('s'), restart ('R') with confirmation
+//   - Alert system with visual indicator
+//   - Shortcuts: ↑↓/jk navigate, enter details, l logs, s stop, R restart, ? help, q quit
 package tui
 
 import (
@@ -140,7 +140,7 @@ type Model struct {
 	selectedIDs   map[string]bool // containers selecionados (space)
 
 	// Container actions
-	confirmAction string // "stop" ou "restart" — vazio = sem confirmação pendente
+	confirmAction string // "stop" or "restart" — empty = no pending confirmation
 
 	// Stress test
 	showStress bool // mostra o menu de stress test
@@ -729,7 +729,7 @@ func (m Model) View() string {
 		return b.String()
 	}
 
-	// Confirmação de ação
+	// Action confirmation
 	if m.confirmAction != "" && m.cursor < len(m.containers) {
 		b.WriteString(m.renderHeader())
 		b.WriteString("\n\n")
@@ -1189,7 +1189,7 @@ func (m Model) buildLogFooter() string {
 	}
 
 	if m.logOffset > 0 {
-		footer += lipgloss.NewStyle().Foreground(warningColor).Render(fmt.Sprintf("  [Histórico offset: %d]", m.logOffset))
+		footer += lipgloss.NewStyle().Foreground(warningColor).Render(fmt.Sprintf("  [History offset: %d]", m.logOffset))
 	}
 	return footer
 }
@@ -1330,10 +1330,10 @@ func (m Model) renderCleanupPanel() string {
 	b.WriteString(lipgloss.NewStyle().Bold(true).Render("Volumes Locais Ociosos:   "))
 	b.WriteString(lipgloss.NewStyle().Foreground(volColor).Render(formatBytes(uint64(m.diskUsage.VolumesReclaimable))))
 	b.WriteString("\n")
-	b.WriteString(lipgloss.NewStyle().Foreground(mutedColor).MarginLeft(7).Render("Volumes persistentes criados pelo Docker que não estão atrelados a containers."))
+	b.WriteString(lipgloss.NewStyle().Foreground(mutedColor).MarginLeft(7).Render("Persistent volumes created by Docker not attached to any container."))
 	b.WriteString("\n\n\n")
 
-	b.WriteString("    " + lipgloss.NewStyle().Background(lipgloss.Color("#4C566A")).Foreground(lipgloss.Color("#ECEFF4")).Padding(0, 1).Render(" Ações: "))
+	b.WriteString("    " + lipgloss.NewStyle().Background(lipgloss.Color("#4C566A")).Foreground(lipgloss.Color("#ECEFF4")).Padding(0, 1).Render(" Actions: "))
 	b.WriteString("  [i] Limpar Imagens  │  [v] Limpar Volumes  │  [ESC] Voltar")
 	b.WriteString("\n")
 

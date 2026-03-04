@@ -1,23 +1,23 @@
-// Package config gerencia a configuração do Castle Rock Agent.
+// Package config manages the Castle Rock Agent configuration.
 //
-// ESTRATÉGIA DE CONFIGURAÇÃO (12-Factor App):
+// CONFIGURATION STRATEGY (12-Factor App):
 //
-//	A ordem de precedência segue o padrão recomendado:
-//	  1. Valores padrão (hardcoded no código)
-//	  2. Arquivo YAML (configs/config.yaml)
-//	  3. Variáveis de ambiente (override final)
+//	The precedence order follows the recommended pattern:
+//	  1. Default values (hardcoded in code)
+//	  2. YAML file (configs/config.yaml)
+//	  3. Environment variables (final override)
 //
-//	Este padrão é o mais usado em aplicações cloud-native porque:
-//	  - Valores padrão garantem que o app funciona sem config
-//	  - YAML permite config complexa e documentada
-//	  - ENV vars permitem override em runtime (Docker, K8s, CI/CD)
+//	This pattern is most used in cloud-native applications because:
+//	  - Default values ensure the app works without config
+//	  - YAML allows complex and documented config
+//	  - ENV vars allow runtime override (Docker, K8s, CI/CD)
 //
 // YAML vs JSON vs TOML:
 //
-//	Usamos YAML porque:
-//	  - É o padrão de facto em DevOps (K8s, Ansible, Docker Compose)
-//	  - Suporta comentários (JSON não)
-//	  - Mais legível que TOML para estruturas aninhadas
+//	We use YAML because:
+//	  - It is the de facto standard in DevOps (K8s, Ansible, Docker Compose)
+//	  - Supports comments (JSON does not)
+//	  - More readable than TOML for nested structures
 package config
 
 import (
@@ -30,53 +30,53 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Config é a estrutura raiz de configuração do agente.
+// Config is the root configuration structure for the agent.
 //
-// TAGS YAML:
+// YAML TAGS:
 //
-//	As tags `yaml:"nome"` definem como o campo é mapeado no arquivo YAML.
-//	Sem a tag, o yaml.v3 usa o nome do campo em lowercase.
+//	The `yaml:"name"` tags define how the field is mapped in the YAML file.
+//	Without the tag, yaml.v3 uses the field name in lowercase.
 type Config struct {
-	// LogLevel define o nível mínimo de log (debug, info, warn, error).
+	// LogLevel defines the minimum log level (debug, info, warn, error).
 	LogLevel string `yaml:"log_level"`
 
-	// Language define o idioma (en, pt).
+	// Language defines the UI language (en, pt).
 	Language string `yaml:"language"`
 
-	// Prometheus contém configurações do exportador de métricas.
+	// Prometheus contains metrics exporter settings.
 	Prometheus PrometheusConfig `yaml:"prometheus"`
 
-	// Stats contém configurações da coleta de métricas.
+	// Stats contains metrics collection settings.
 	Stats StatsConfig `yaml:"stats"`
 
-	// Cluster contém as configurações de modo Multi-Host.
+	// Cluster contains Multi-Host mode settings.
 	Cluster ClusterConfig `yaml:"cluster"`
 
-	// Alerts contém regras de alerta.
+	// Alerts contains alert rule settings.
 	Alerts AlertsConfig `yaml:"alerts"`
 
-	// Prune contém configurações do Garbage Collector Automático.
+	// Prune contains the Automatic Garbage Collector settings.
 	Prune PruneConfig `yaml:"prune"`
 }
 
-// PruneConfig configura as automatizações de limpeza.
+// PruneConfig configures cleanup automations.
 type PruneConfig struct {
 	Enabled            bool    `yaml:"enabled"`
 	TriggerDiskPercent float64 `yaml:"trigger_disk_percent"`
 }
 
-// PrometheusConfig configura o servidor HTTP de métricas.
+// PrometheusConfig configures the HTTP metrics server.
 type PrometheusConfig struct {
-	// Enabled ativa/desativa o exportador Prometheus.
+	// Enabled activates/deactivates the Prometheus exporter.
 	Enabled bool `yaml:"enabled"`
 
-	// Port é a porta do servidor HTTP (/metrics).
+	// Port is the HTTP server port (/metrics).
 	Port int `yaml:"port"`
 }
 
-// StatsConfig configura a coleta de métricas de containers.
+// StatsConfig configures container metrics collection.
 type StatsConfig struct {
-	// Interval é o intervalo entre coletas (ex: "5s", "10s", "1m").
+	// Interval is the time between collections (e.g. "5s", "10s", "1m").
 	Interval time.Duration `yaml:"interval"`
 
 	// IncludeContainers is a list of container names/substrings to monitor.
@@ -84,25 +84,25 @@ type StatsConfig struct {
 	IncludeContainers []string `yaml:"include_containers"`
 }
 
-// ClusterConfig gerencia o modo distribuído (Leader/Worker).
+// ClusterConfig manages the distributed mode (Leader/Worker).
 type ClusterConfig struct {
 	Mode      string `yaml:"mode"`       // "standalone", "leader", "worker"
-	LeaderURL string `yaml:"leader_url"` // Endpoint HTTP para envio de métricas (modo worker)
-	HostID    string `yaml:"host_id"`    // Identificador único deste nó
+	LeaderURL string `yaml:"leader_url"` // HTTP endpoint for metrics submission (worker mode)
+	HostID    string `yaml:"host_id"`    // Unique identifier for this node
 }
 
-// AlertsConfig configura o sistema de alertas.
+// AlertsConfig configures the alert system.
 type AlertsConfig struct {
-	// Enabled ativa/desativa alertas.
+	// Enabled activates/deactivates alerts.
 	Enabled bool `yaml:"enabled"`
 
-	// Rules define as regras de alerta.
+	// Rules defines the alert rules.
 	Rules []AlertRule `yaml:"rules"`
 }
 
-// AlertRule define uma regra de alerta individual.
+// AlertRule defines an individual alert rule.
 //
-// Exemplo YAML:
+// YAML example:
 //
 //	rules:
 //	  - name: "High CPU"
@@ -111,32 +111,32 @@ type AlertsConfig struct {
 //	    duration: "5m"
 //	    severity: "critical"
 type AlertRule struct {
-	// Name é o nome descritivo do alerta.
+	// Name is the descriptive name for the alert.
 	Name string `yaml:"name"`
 
-	// Metric é a métrica monitorada (cpu_percent, memory_percent).
+	// Metric is the monitored metric (cpu_percent, memory_percent).
 	Metric string `yaml:"metric"`
 
-	// Operator é o operador de comparação (>, <, >=, <=, ==).
+	// Operator is the comparison operator (>, <, >=, <=, ==).
 	Operator string `yaml:"operator"`
 
-	// Threshold é o valor limite que dispara o alerta.
+	// Threshold is the limit value that triggers the alert.
 	Threshold float64 `yaml:"threshold"`
 
-	// Duration é por quanto tempo a condição deve persistir
-	// antes de disparar o alerta (ex: "5m", "30s").
+	// Duration is how long the condition must persist
+	// before triggering the alert (e.g. "5m", "30s").
 	Duration time.Duration `yaml:"duration"`
 
-	// Severity é a gravidade (info, warning, critical).
+	// Severity is the gravity level (info, warning, critical).
 	Severity string `yaml:"severity"`
 }
 
-// DefaultConfig retorna a configuração padrão do agente.
+// DefaultConfig returns the default agent configuration.
 //
-// BOAS PRÁTICAS:
-//   - Sempre forneça defaults sensatos
-//   - O app deve funcionar sem arquivo de configuração
-//   - Defaults devem ser seguros (porta não-privilegiada, log level info)
+// BEST PRACTICES:
+//   - Always provide sensible defaults
+//   - The app should work without a config file
+//   - Defaults should be safe (non-privileged port, info log level)
 func DefaultConfig() Config {
 	return Config{
 		LogLevel: "info",
@@ -152,13 +152,13 @@ func DefaultConfig() Config {
 		Cluster: ClusterConfig{
 			Mode:      "standalone",
 			LeaderURL: "http://127.0.0.1:9110/api/v1/push",
-			HostID:    "", // Se vazio, usa os.Hostname() em runtime
+			HostID:    "", // If empty, uses os.Hostname() at runtime
 		},
 		Alerts: AlertsConfig{
 			Enabled: true,
 			Rules: []AlertRule{
 				{
-					Name:      "CPU Alta",
+					Name:      "High CPU",
 					Metric:    "cpu_percent",
 					Operator:  ">",
 					Threshold: 80.0,
@@ -166,7 +166,7 @@ func DefaultConfig() Config {
 					Severity:  "critical",
 				},
 				{
-					Name:      "Memória Alta",
+					Name:      "High Memory",
 					Metric:    "memory_percent",
 					Operator:  ">",
 					Threshold: 85.0,
@@ -174,7 +174,7 @@ func DefaultConfig() Config {
 					Severity:  "critical",
 				},
 				{
-					Name:      "CPU Média",
+					Name:      "Medium CPU",
 					Metric:    "cpu_percent",
 					Operator:  ">",
 					Threshold: 50.0,
@@ -190,39 +190,39 @@ func DefaultConfig() Config {
 	}
 }
 
-// Load carrega a configuração de um arquivo YAML.
-// Se o arquivo não existir, retorna a configuração padrão.
+// Load loads the configuration from a YAML file.
+// If the file does not exist, returns the default configuration.
 //
-// FLUXO:
-//  1. Inicia com defaults
-//  2. Se arquivo YAML existir, faz merge (override parcial)
-//  3. Aplica overrides de variáveis de ambiente
-//  4. Valida resultado final
+// FLOW:
+//  1. Start with defaults
+//  2. If YAML file exists, merge (partial override)
+//  3. Apply environment variable overrides
+//  4. Validate final result
 func Load(path string) (Config, error) {
 	cfg := DefaultConfig()
 
-	// Tenta ler o arquivo YAML
+	// Try to read the YAML file
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			// Arquivo não existe — usa defaults + env vars
+			// File does not exist — use defaults + env vars
 			applyEnvOverrides(&cfg)
 			return cfg, nil
 		}
-		return cfg, fmt.Errorf("config.Load: erro ao ler %s: %w", path, err)
+		return cfg, fmt.Errorf("config.Load: error reading %s: %w", path, err)
 	}
 
-	// Decodes YAML.
+	// Decode YAML.
 	// yaml.Unmarshal performs a merge: fields not present in the YAML
 	// keep their default struct value.
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return cfg, fmt.Errorf("config.Load: error parsing YAML: %w", err)
 	}
 
-	// Aplica overrides de variáveis de ambiente (maior precedência)
+	// Apply environment variable overrides (highest precedence)
 	applyEnvOverrides(&cfg)
 
-	// Se HostID não foi definido nem no config.yaml nem por env var, use o hostname
+	// If HostID was not defined in config.yaml or env var, use hostname
 	if cfg.Cluster.HostID == "" {
 		hostname, err := os.Hostname()
 		if err == nil {
@@ -235,20 +235,20 @@ func Load(path string) (Config, error) {
 	return cfg, nil
 }
 
-// applyEnvOverrides aplica overrides de variáveis de ambiente.
+// applyEnvOverrides applies environment variable overrides.
 //
-// CONVENÇÃO:
+// CONVENTION:
 //
-//	Variáveis de ambiente usam o prefixo CASTLE_ROCK_ seguido
-//	do path do campo em UPPERCASE com _ como separador.
+//	Environment variables use the CASTLE_ROCK_ prefix followed
+//	by the field path in UPPERCASE with _ as separator.
 //
-// 12-FACTOR APP (Fator III — Config):
+// 12-FACTOR APP (Factor III — Config):
 //
 //	"An app's config is everything that is likely to vary between
 //	 deploys. Config varies substantially across deploys, code does not."
 //
-// Em Docker/K8s, variáveis de ambiente são o mecanismo padrão
-// para injetar configuração runtime sem reconstruir a imagem.
+// In Docker/K8s, environment variables are the standard mechanism
+// for injecting runtime configuration without rebuilding the image.
 func applyEnvOverrides(cfg *Config) {
 	applyGeneralEnv(cfg)
 	applyPrometheusEnv(cfg)

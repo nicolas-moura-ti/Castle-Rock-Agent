@@ -19,11 +19,11 @@
 //   - Performance comparable to uber-go/zap
 //   - For new projects, the Go community recommendation is to use slog
 //
-// CORES NO TERMINAL:
+// TERMINAL COLORS:
 //
-//	Usamos códigos ANSI escape para colorir o output no terminal.
-//	Isso é uma prática comum em CLIs profissionais e melhora
-//	drasticamente a legibilidade dos logs durante desenvolvimento.
+//	We use ANSI escape codes to colorize terminal output.
+//	This is a common practice in professional CLIs and dramatically
+//	improves log readability during development.
 package logger
 
 import (
@@ -39,15 +39,15 @@ import (
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CONSTANTES DE COR ANSI
+// ANSI COLOR CONSTANTS
 // ─────────────────────────────────────────────────────────────────────────────
 //
-// Códigos ANSI são sequências de escape interpretadas pelo terminal
-// para alterar a cor e o estilo do texto. O formato é: \033[<código>m
+// ANSI codes are escape sequences interpreted by the terminal
+// to change text color and style. Format: \033[<code>m
 //
-// Referência:
-//   - 0 = Reset (volta ao padrão)
-//   - 1 = Bold (negrito)
+// Reference:
+//   - 0 = Reset (back to default)
+//   - 1 = Bold
 //   - 2 = Dim (opaco)
 //   - 3x = Foreground colors (30-37)
 //   - 9x = Bright foreground colors (90-97)
@@ -57,14 +57,14 @@ const (
 	colorDim    = "\033[2m"
 	colorItalic = "\033[3m"
 
-	// Cores de foreground
+	// Foreground colors
 	colorRed     = "\033[31m"
 	colorGreen   = "\033[32m"
 	colorMagenta = "\033[35m"
 	colorCyan    = "\033[36m"
 	colorWhite   = "\033[37m"
 
-	// Cores bright (mais vibrantes)
+	// Bright colors (more vibrant)
 	colorBrightRed    = "\033[91m"
 	colorBrightGreen  = "\033[92m"
 	colorBrightYellow = "\033[93m"
@@ -77,66 +77,66 @@ const (
 // PRETTY HANDLER (Handler Customizado para slog)
 // ─────────────────────────────────────────────────────────────────────────────
 //
-// slog.Handler é uma interface que define COMO os logs são formatados e
-// escritos. O Go fornece dois handlers built-in:
-//   - slog.TextHandler — output key=value (para humanos)
-//   - slog.JSONHandler — output JSON (para sistemas de log como ELK/Loki)
+// slog.Handler is an interface that defines HOW logs are formatted and
+// written. Go provides two built-in handlers:
+//   - slog.TextHandler — key=value output (for humans)
+//   - slog.JSONHandler — JSON output (for log systems like ELK/Loki)
 //
-// Nós criamos um handler customizado (PrettyHandler) que adiciona:
-//   - Cores ANSI para cada nível de log
-//   - Timestamp formatado com milissegundos
-//   - Separadores visuais para melhor legibilidade
-//   - Alinhamento de campos para output tabular
+// We create a custom handler (PrettyHandler) that adds:
+//   - ANSI colors for each log level
+//   - Timestamp formatted with milliseconds
+//   - Visual separators for better readability
+//   - Field alignment for tabular output
 //
-// IMPLEMENTAR A INTERFACE slog.Handler:
-//   Para criar um handler customizado, precisamos implementar:
-//   - Enabled(ctx, level) bool — determina se o nível deve ser logado
-//   - Handle(ctx, record) error — formata e escreve o log
-//   - WithAttrs(attrs) Handler — cria handler com atributos pré-definidos
-//   - WithGroup(name) Handler — cria handler com grupo de atributos
+// IMPLEMENTING THE slog.Handler INTERFACE:
+//   To create a custom handler, we must implement:
+//   - Enabled(ctx, level) bool — determines if the level should be logged
+//   - Handle(ctx, record) error — formats and writes the log
+//   - WithAttrs(attrs) Handler — creates handler with pre-defined attributes
+//   - WithGroup(name) Handler — creates handler with attribute group
 
-// PrettyHandler é nosso handler customizado que produz logs coloridos
-// e formatados para o terminal.
+// PrettyHandler is our custom handler that produces colorized
+// and formatted logs for the terminal.
 type PrettyHandler struct {
-	// mu protege escritas concorrentes no writer.
-	// Em Go, múltiplas goroutines podem logar simultaneamente,
-	// então precisamos de um mutex para evitar output corrompido.
+	// mu protects concurrent writes to the writer.
+	// In Go, multiple goroutines can log simultaneously,
+	// so we need a mutex to avoid corrupted output.
 	//
-	// NOTA: sync.Mutex é preferível a channels para proteção simples
-	// de recursos compartilhados. Channels são para comunicação entre
-	// goroutines; mutexes são para exclusão mútua.
+	// NOTE: sync.Mutex is preferable to channels for simple protection
+	// of shared resources. Channels are for communication between
+	// goroutines; mutexes are for mutual exclusion.
 	mu sync.Mutex
 
-	// w é o writer de destino (normalmente os.Stderr).
+	// w is the destination writer (normally os.Stderr).
 	w io.Writer
 
-	// level é o nível mínimo de log a ser exibido.
+	// level is the minimum log level to display.
 	level slog.Level
 
-	// attrs são atributos pré-definidos adicionados a cada log.
+	// attrs are pre-defined attributes added to every log.
 	attrs []slog.Attr
 
-	// group é o prefixo de grupo atual.
+	// group is the current group prefix.
 	group string
 }
 
-// PrettyHandlerOptions configura o PrettyHandler.
+// PrettyHandlerOptions configures the PrettyHandler.
 //
-// PADRÃO GO — Options struct:
+// GO PATTERN — Options struct:
 //
-//	Em vez de passar muitos parâmetros para o construtor, usamos uma
-//	struct de opções. Isso permite:
-//	- Valores default para campos não preenchidos (zero values do Go)
-//	- Adicionar novas opções sem quebrar a API existente
-//	- Documentação clara de cada opção
+//	Instead of passing many parameters to the constructor, we use an
+//	options struct. This allows:
+//	- Default values for unfilled fields (Go zero values)
+//	- Adding new options without breaking the existing API
+//	- Clear documentation for each option
 type PrettyHandlerOptions struct {
-	// Level define o nível mínimo de log.
+	// Level defines the minimum log level.
 	// Default: slog.LevelInfo
 	Level slog.Level
 }
 
-// NewPrettyHandler cria um novo PrettyHandler que escreve logs
-// coloridos e formatados para o writer especificado.
+// NewPrettyHandler creates a new PrettyHandler that writes colorized
+// and formatted logs to the specified writer.
 //
 // Exemplo de uso:
 //
@@ -156,23 +156,23 @@ func NewPrettyHandler(w io.Writer, opts *PrettyHandlerOptions) *PrettyHandler {
 	}
 }
 
-// Enabled reporta se o handler processa logs neste nível.
+// Enabled reports whether the handler processes logs at this level.
 //
-// slog chama este método ANTES de construir o Record, evitando
-// alocações desnecessárias para logs que serão descartados.
-// Isso é uma otimização de performance importante.
+// slog calls this method BEFORE constructing the Record, avoiding
+// unnecessary allocations for logs that will be discarded.
+// This is an important performance optimization.
 func (h *PrettyHandler) Enabled(_ context.Context, level slog.Level) bool {
 	return level >= h.level
 }
 
-// Handle formata e escreve um registro de log com cores ANSI.
+// Handle formats and writes a log record with ANSI colors.
 //
-// Este é o coração do handler — aqui decidimos como cada log aparece
-// no terminal. O design prioriza legibilidade e scannability:
-//   - Timestamp com milissegundos para correlação precisa
-//   - Nível colorido e com largura fixa para alinhamento
-//   - Mensagem em destaque (bold)
-//   - Atributos formatados como key=value com cores diferenciadas
+// This is the heart of the handler — here we decide how each log appears
+// in the terminal. The design prioritizes readability and scannability:
+//   - Timestamp with milliseconds for precise correlation
+//   - Colorized level with fixed width for alignment
+//   - Message highlighted (bold)
+//   - Attributes formatted as key=value with differentiated colors
 func (h *PrettyHandler) Handle(_ context.Context, r slog.Record) error {
 	// Formats the timestamp with milliseconds.
 	// The format "15:04:05.000" follows the Go reference time convention:
@@ -197,21 +197,21 @@ func (h *PrettyHandler) Handle(_ context.Context, r slog.Record) error {
 	// Mensagem principal em bold
 	fmt.Fprintf(&b, "%s%s%s", colorBold, r.Message, colorReset)
 
-	// Adiciona atributos pré-definidos (do WithAttrs)
+	// Add pre-defined attributes (from WithAttrs)
 	for _, attr := range h.attrs {
 		h.appendAttr(&b, attr)
 	}
 
-	// Adiciona atributos do Record (passados na chamada de log)
+	// Add Record attributes (passed in the log call)
 	r.Attrs(func(a slog.Attr) bool {
 		h.appendAttr(&b, a)
-		return true // continua iterando
+		return true // continue iterating
 	})
 
 	b.WriteString("\n")
 
-	// Mutex para escritas thread-safe.
-	// Sem isso, logs de múltiplas goroutines poderiam se misturar.
+	// Mutex for thread-safe writes.
+	// Without this, logs from multiple goroutines could interleave.
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
@@ -219,9 +219,9 @@ func (h *PrettyHandler) Handle(_ context.Context, r slog.Record) error {
 	return err
 }
 
-// WithAttrs retorna um novo handler com atributos adicionais.
+// WithAttrs returns a new handler with additional attributes.
 //
-// Este método implementa o padrão de "logger contextual":
+// This method implements the "contextual logger" pattern:
 // permite criar loggers especializados que sempre incluem
 // certos campos. Exemplo:
 //
@@ -255,7 +255,7 @@ func (h *PrettyHandler) WithGroup(name string) slog.Handler {
 	}
 }
 
-// formatLevel retorna o label e a cor para cada nível de log.
+// formatLevel returns the label and color for each log level.
 func (h *PrettyHandler) formatLevel(level slog.Level) (string, string) {
 	switch {
 	case level < slog.LevelInfo:
@@ -269,9 +269,9 @@ func (h *PrettyHandler) formatLevel(level slog.Level) (string, string) {
 	}
 }
 
-// appendAttr formata e adiciona um atributo ao builder.
+// appendAttr formats and appends an attribute to the builder.
 func (h *PrettyHandler) appendAttr(b *strings.Builder, a slog.Attr) {
-	// Ignora atributos com valor vazio.
+	// Ignore attributes with empty values.
 	if a.Equal(slog.Attr{}) {
 		return
 	}
@@ -281,7 +281,7 @@ func (h *PrettyHandler) appendAttr(b *strings.Builder, a slog.Attr) {
 		key = h.group + "." + key
 	}
 
-	// Key em cyan, value em branco para diferenciação visual
+	// Key in cyan, value in white for visual differentiation
 	fmt.Fprintf(b, " %s%s%s=%s%v%s",
 		colorCyan, key, colorReset,
 		colorWhite, a.Value, colorReset,
@@ -289,21 +289,22 @@ func (h *PrettyHandler) appendAttr(b *strings.Builder, a slog.Attr) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// INICIALIZAÇÃO GLOBAL
+// ─────────────────────────────────────────────────────────────────────────────
+// GLOBAL INITIALIZATION
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Setup configura o logger global da aplicação.
+// Setup configures the application's global logger.
 //
-// PADRÃO GO — slog.SetDefault:
+// GO PATTERN — slog.SetDefault:
 //
-//	slog.SetDefault define o logger padrão usado por slog.Info(),
-//	slog.Error(), etc. Isso permite que qualquer package use logging
-//	sem precisar receber o logger como parâmetro.
+//	slog.SetDefault defines the default logger used by slog.Info(),
+//	slog.Error(), etc. This allows any package to use logging
+//	without receiving the logger as a parameter.
 //
-//	Em projetos maiores, considere injeção de dependência (passar
-//	*slog.Logger como parâmetro). Para o MVP, o logger global é aceitável.
+//	In larger projects, consider dependency injection (passing
+//	*slog.Logger as a parameter). For the MVP, the global logger is acceptable.
 func Setup(level string) *slog.Logger {
-	// Converte string de nível para slog.Level
+	// Convert level string to slog.Level
 	var slogLevel slog.Level
 	switch strings.ToLower(level) {
 	case "debug":
@@ -343,9 +344,9 @@ func PrintBanner(version, goVersion string) {
 	banner := fmt.Sprintf(`
 %s%s┌─────────────────────────────────────────────────────────┐%s
 %s%s│%s    🏰  %s%sCastle Rock Agent%s                                %s%s│%s
-%s%s│%s    Observabilidade Docker em tempo real                %s%s│%s
+%s%s│%s    Real-time Docker observability                %s%s│%s
 %s%s├─────────────────────────────────────────────────────────┤%s
-%s%s│%s  %sVersão:%s    %-46s %s%s│%s
+%s%s│%s  %sVersion:%s    %-46s %s%s│%s
 %s%s│%s  %sGo:%s        %-46s %s%s│%s
 %s%s│%s  %sArch:%s      %-46s %s%s│%s
 %s%s│%s  %sPID:%s       %-46d %s%s│%s
@@ -365,12 +366,12 @@ func PrintBanner(version, goVersion string) {
 	fmt.Fprint(os.Stderr, banner)
 }
 
-// PrintDockerInfo exibe informações do Docker daemon em formato de tabela.
+// PrintDockerInfo displays Docker daemon information in table format.
 func PrintDockerInfo(info map[string]string) {
 	fmt.Fprintf(os.Stderr, "\n%s%s  ⚙  Docker Engine%s\n", colorBold, colorMagenta, colorReset)
 	fmt.Fprintf(os.Stderr, "%s  ───────────────────────────────────────────────%s\n", colorDim, colorReset)
 
-	// Ordem definida para consistência visual
+	// Defined order for visual consistency
 	keys := []string{"Server Version", "API Version", "OS/Arch", "Kernel", "Total Memory", "Containers", "Images"}
 	for _, key := range keys {
 		if val, ok := info[key]; ok {
@@ -383,20 +384,20 @@ func PrintDockerInfo(info map[string]string) {
 	fmt.Fprintln(os.Stderr)
 }
 
-// PrintContainerTable exibe containers em formato de tabela colorida.
+// PrintContainerTable displays containers in a colorized table format.
 func PrintContainerTable(containers []ContainerDisplay) {
 	if len(containers) == 0 {
-		fmt.Fprintf(os.Stderr, "\n%s  📭 Nenhum container em execução encontrado%s\n\n", colorDim, colorReset)
+		fmt.Fprintf(os.Stderr, "\n%s  📭 No running containers found%s\n\n", colorDim, colorReset)
 		return
 	}
 
-	fmt.Fprintf(os.Stderr, "\n%s%s  🐳  Containers em Execução (%d)%s\n",
+	fmt.Fprintf(os.Stderr, "\n%s%s  🐳  Running Containers (%d)%s\n",
 		colorBold, colorGreen, len(containers), colorReset)
 	fmt.Fprintf(os.Stderr, "%s  ═══════════════════════════════════════════════════════════════════%s\n",
 		colorDim, colorReset)
 
 	for i, c := range containers {
-		// Estado com cor
+		// State with color
 		var stateColor, stateIcon string
 		switch c.State {
 		case "running":
@@ -421,22 +422,22 @@ func PrintContainerTable(containers []ContainerDisplay) {
 		fmt.Fprintf(os.Stderr, "  %s┌──────────────────────────────────────────────────────────────┐%s\n",
 			colorDim, colorReset)
 
-		// Dados do container
+		// Container data
 		printField("ID", c.ID)
-		printField("Imagem", c.Image)
+		printField("Image", c.Image)
 		printField("Status", c.Status)
-		printField("Estado", fmt.Sprintf("%s%s%s", stateColor, c.State, colorReset))
+		printField("State", fmt.Sprintf("%s%s%s", stateColor, c.State, colorReset))
 		if c.Command != "" {
 			printField("Command", c.Command)
 		}
 		if c.Ports != "" {
-			printField("Portas", c.Ports)
+			printField("Ports", c.Ports)
 		}
 		if c.Created != "" {
-			printField("Criado", c.Created)
+			printField("Created", c.Created)
 		}
 		if len(c.Networks) > 0 {
-			printField("Redes", strings.Join(c.Networks, ", "))
+			printField("Networks", strings.Join(c.Networks, ", "))
 		}
 		if len(c.Labels) > 0 {
 			printField("Labels", "")
@@ -449,7 +450,7 @@ func PrintContainerTable(containers []ContainerDisplay) {
 			}
 		}
 		if c.SizeRw != "" {
-			printField("Tamanho (RW)", c.SizeRw)
+			printField("Size (RW)", c.SizeRw)
 		}
 
 		fmt.Fprintf(os.Stderr, "  %s└──────────────────────────────────────────────────────────────┘%s\n",
@@ -459,7 +460,7 @@ func PrintContainerTable(containers []ContainerDisplay) {
 	fmt.Fprintln(os.Stderr)
 }
 
-// printField imprime um campo formatado dentro da tabela de container.
+// printField prints a formatted field inside the container table.
 func printField(key, value string) {
 	fmt.Fprintf(os.Stderr, "  %s│%s  %s%-14s%s %s%s%s\n",
 		colorDim, colorReset,
@@ -468,13 +469,13 @@ func printField(key, value string) {
 	)
 }
 
-// PrintShutdown exibe a mensagem de encerramento.
+// PrintShutdown displays the shutdown message.
 func PrintShutdown() {
-	fmt.Fprintf(os.Stderr, "\n%s%s  🛑  Encerrando Castle Rock Agent...%s\n", colorBold, colorRed, colorReset)
+	fmt.Fprintf(os.Stderr, "\n%s%s  🛑  Shutting down Castle Rock Agent...%s\n", colorBold, colorRed, colorReset)
 	fmt.Fprintf(os.Stderr, "%s  ───────────────────────────────────────────────%s\n", colorDim, colorReset)
 }
 
-// PrintUptime exibe o tempo de execução do agente.
+// PrintUptime displays the agent's uptime.
 func PrintUptime(startTime time.Time) {
 	uptime := time.Since(startTime).Round(time.Second)
 	fmt.Fprintf(os.Stderr, "  %sUptime:%s          %s%s%s\n",
@@ -483,8 +484,8 @@ func PrintUptime(startTime time.Time) {
 	)
 }
 
-// ContainerDisplay é um DTO usado pelo logger para exibição detalhada.
-// Separado de models.ContainerInfo para manter o model limpo.
+// ContainerDisplay is a DTO used by the logger for detailed display.
+// Separated from models.ContainerInfo to keep the model clean.
 type ContainerDisplay struct {
 	HostID        string
 	ID            string

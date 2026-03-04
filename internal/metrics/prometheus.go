@@ -1,22 +1,22 @@
-// Package metrics fornece o exportador de métricas Prometheus.
+// Package metrics provides the Prometheus metrics exporter.
 //
-// PROMETHEUS — O PADRÃO DE OBSERVABILIDADE:
+// PROMETHEUS — THE OBSERVABILITY STANDARD:
 //
-//	Prometheus é o sistema de monitoramento mais usado em ambientes
-//	cloud-native (CNCF graduated project). Ele funciona no modelo PULL:
-//	  1. A aplicação expõe métricas em um endpoint HTTP (/metrics)
-//	  2. O Prometheus server faz scraping periódico desse endpoint
-//	  3. As métricas são armazenadas em uma time-series database
-//	  4. Grafana visualiza as métricas em dashboards
+//	Prometheus is the most widely used monitoring system in cloud-native
+//	environments (CNCF graduated project). It uses a PULL model:
+//	  1. The application exposes metrics on an HTTP endpoint (/metrics)
+//	  2. The Prometheus server periodically scrapes that endpoint
+//	  3. Metrics are stored in a time-series database
+//	  4. Grafana visualizes the metrics in dashboards
 //
-// TIPOS DE MÉTRICAS PROMETHEUS:
-//   - Gauge: valor que sobe e desce (ex: CPU%, memória usada)
-//   - Counter: valor que só cresce (ex: total de requests)
-//   - Histogram: distribuição de valores (ex: latência de requests)
-//   - Summary: como histogram, mas calcula percentis do lado do client
+// PROMETHEUS METRIC TYPES:
+//   - Gauge: value that goes up and down (e.g. CPU%, memory used)
+//   - Counter: value that only increases (e.g. total requests)
+//   - Histogram: value distribution (e.g. request latency)
+//   - Summary: like histogram, but computes percentiles client-side
 //
-// Neste exportador, usamos GaugeVec (gauge com labels) porque métricas
-// de containers são valores instantâneos que variam continuamente.
+// In this exporter, we use GaugeVec (gauge with labels) because container
+// metrics are instantaneous values that vary continuously.
 package metrics
 
 import (
@@ -35,27 +35,27 @@ import (
 	"github.com/nicolas-moura-ti/castle-rock-agent/pkg/models"
 )
 
-// Exporter gerencia as métricas Prometheus e o servidor HTTP.
+// Exporter manages Prometheus metrics and the HTTP server.
 //
 // DESIGN:
 //
-//	O Exporter roda em background (goroutine própria), coletando
-//	métricas periodicamente e atualizando os gauges do Prometheus.
-//	O servidor HTTP expõe /metrics para scraping do Prometheus.
+//	The Exporter runs in background (its own goroutine), collecting
+//	metrics periodically and updating Prometheus gauges.
+//	The HTTP server exposes /metrics for Prometheus scraping.
 type Exporter struct {
 	dockerClient *docker.Client
 	interval     time.Duration
 	port         int
 	log          *slog.Logger
 
-	// receiver (opcional) traz dados de outros nós do cluster em modo Leader
+	// receiver (optional) brings data from other cluster nodes in Leader mode
 	receiver *cluster.Receiver
 
-	// hostID é o nome desta própria máquina
+	// hostID is this machine's own name
 	hostID string
 
-	// Métricas Prometheus
-	// GaugeVec permite múltiplas séries com labels diferentes.
+	// Prometheus metrics.
+	// GaugeVec allows multiple series with different labels.
 	// Labels: container_id, container_name, image
 	cpuPercent    *prometheus.GaugeVec
 	memoryUsage   *prometheus.GaugeVec
@@ -66,29 +66,29 @@ type Exporter struct {
 	blockRead     *prometheus.GaugeVec
 	blockWrite    *prometheus.GaugeVec
 
-	// Info gauge (sempre 1, carrega metadata como labels)
+	// Info gauge (always 1, carries metadata as labels)
 	containerInfo *prometheus.GaugeVec
 
-	// Controle de lifecycle
-	mu        sync.Mutex
+	// Lifecycle control
+	mu        sync.RWMutex
 	lastStats map[string]models.ContainerMetrics
 }
 
-// containerLabels define os labels usados em todas as métricas.
-// Labels são dimensões que permitem filtrar e agrupar métricas.
+// containerLabels defines the labels used in all metrics.
+// Labels are dimensions that allow filtering and grouping metrics.
 //
-// Exemplo de query PromQL:
+// Example PromQL query:
 //
 //	castle_rock_container_cpu_percent{container_name="postgres"}
 var containerLabels = []string{"host_id", "container_id", "container_name", "image"}
 
-// NewExporter cria um novo exportador Prometheus.
+// NewExporter creates a new Prometheus exporter.
 //
-// CONVENÇÃO PROMETHEUS para nomes de métricas:
-//   - Prefixo: nome da aplicação (castle_rock_)
-//   - Sufixo: unidade (_bytes, _percent, _total)
-//   - Snake_case sempre
-//   - Referência: https://prometheus.io/docs/practices/naming/
+// PROMETHEUS naming convention for metrics:
+//   - Prefix: application name (castle_rock_)
+//   - Suffix: unit (_bytes, _percent, _total)
+//   - Snake_case always
+//   - Reference: https://prometheus.io/docs/practices/naming/
 func NewExporter(dockerClient *docker.Client, receiver *cluster.Receiver, hostID string, interval time.Duration, port int, log *slog.Logger) *Exporter {
 	e := &Exporter{
 		dockerClient: dockerClient,
@@ -103,68 +103,68 @@ func NewExporter(dockerClient *docker.Client, receiver *cluster.Receiver, hostID
 			Namespace: "castle_rock",
 			Subsystem: "container",
 			Name:      "cpu_percent",
-			Help:      "Percentual de uso de CPU do container",
+			Help:      "CPU usage percentage of the container",
 		}, containerLabels),
 
 		memoryUsage: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: "castle_rock",
 			Subsystem: "container",
 			Name:      "memory_usage_bytes",
-			Help:      "Uso de memória do container em bytes",
+			Help:      "Memory usage of the container in bytes",
 		}, containerLabels),
 
 		memoryLimit: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: "castle_rock",
 			Subsystem: "container",
 			Name:      "memory_limit_bytes",
-			Help:      "Limite de memória do container em bytes",
+			Help:      "Memory limit of the container in bytes",
 		}, containerLabels),
 
 		memoryPercent: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: "castle_rock",
 			Subsystem: "container",
 			Name:      "memory_percent",
-			Help:      "Percentual de uso de memória do container",
+			Help:      "Memory usage percentage of the container",
 		}, containerLabels),
 
 		networkRx: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: "castle_rock",
 			Subsystem: "container",
 			Name:      "network_rx_bytes",
-			Help:      "Total de bytes recebidos pela rede",
+			Help:      "Total bytes received over the network",
 		}, containerLabels),
 
 		networkTx: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: "castle_rock",
 			Subsystem: "container",
 			Name:      "network_tx_bytes",
-			Help:      "Total de bytes transmitidos pela rede",
+			Help:      "Total bytes transmitted over the network",
 		}, containerLabels),
 
 		blockRead: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: "castle_rock",
 			Subsystem: "container",
 			Name:      "block_read_bytes",
-			Help:      "Total de bytes lidos do disco",
+			Help:      "Total bytes read from disk",
 		}, containerLabels),
 
 		blockWrite: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: "castle_rock",
 			Subsystem: "container",
 			Name:      "block_write_bytes",
-			Help:      "Total de bytes escritos no disco",
+			Help:      "Total bytes written to disk",
 		}, containerLabels),
 
 		containerInfo: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: "castle_rock",
 			Subsystem: "container",
 			Name:      "info",
-			Help:      "Informações do container (valor sempre 1, metadata em labels)",
+			Help:      "Container info (value always 1, metadata in labels)",
 		}, containerLabels),
 	}
 
-	// Registra todas as métricas no registry padrão do Prometheus.
-	// O registry é o repositório central de todas as métricas.
+	// Register all metrics in the default Prometheus registry.
+	// The registry is the central repository for all metrics.
 	prometheus.MustRegister(
 		e.cpuPercent,
 		e.memoryUsage,
@@ -180,17 +180,17 @@ func NewExporter(dockerClient *docker.Client, receiver *cluster.Receiver, hostID
 	return e
 }
 
-// Start inicia o exportador: servidor HTTP + loop de coleta.
+// Start initializes the exporter: HTTP server + collection loop.
 //
-// GOROUTINES DE LONGA DURAÇÃO:
+// LONG-RUNNING GOROUTINES:
 //
-//	Lançamos duas goroutines:
-//	1. Servidor HTTP (bloqueia na porta configurada)
-//	2. Loop de coleta (ticker periódico)
+//	We launch two goroutines:
+//	1. HTTP server (blocks on configured port)
+//	2. Collection loop (periodic ticker)
 //
-//	Ambas são controladas pelo context — quando cancelado, ambas encerram.
+//	Both are controlled by context — when cancelled, both terminate.
 func (e *Exporter) Start(ctx context.Context) {
-	// Goroutine 1: Servidor HTTP para /metrics
+	// Goroutine 1: HTTP server for /metrics
 	go func() {
 		mux := http.NewServeMux()
 		mux.Handle("/metrics", promhttp.Handler())
@@ -200,7 +200,7 @@ func (e *Exporter) Start(ctx context.Context) {
 			fmt.Fprintf(w, `{"status":"ok"}`)
 		})
 
-		// Monta o Receiver (modo Leader) no mesmo servidor HTTP do Prometheus
+		// Mount the Receiver (Leader mode) on the same HTTP server as Prometheus
 		if e.receiver != nil {
 			mux.Handle("/api/v1/push", e.receiver)
 		}
@@ -208,29 +208,31 @@ func (e *Exporter) Start(ctx context.Context) {
 		addr := fmt.Sprintf(":%d", e.port)
 		server := &http.Server{Addr: addr, Handler: mux}
 
-		e.log.Info("Prometheus metrics server iniciado",
+		e.log.Info("prometheus metrics server started",
 			slog.String("endpoint", fmt.Sprintf("http://localhost%s/metrics", addr)),
 			slog.Int("port", e.port),
 		)
 
-		// Goroutine para shutdown graceful do HTTP server
+		// Goroutine for graceful HTTP server shutdown
 		go func() {
 			<-ctx.Done()
 			shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
-			server.Shutdown(shutdownCtx)
+			if err := server.Shutdown(shutdownCtx); err != nil {
+				e.log.Warn("error during http server shutdown", slog.String("error", err.Error()))
+			}
 		}()
 
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			e.log.Error("Erro no servidor Prometheus",
+			e.log.Error("prometheus server error",
 				slog.String("error", err.Error()),
 			)
 		}
 	}()
 
-	// Goroutine 2: Loop de coleta periódica
+	// Goroutine 2: Periodic collection loop
 	go func() {
-		// Coleta inicial
+		// Initial collection
 		e.collect(ctx)
 
 		ticker := time.NewTicker(e.interval)
@@ -247,17 +249,17 @@ func (e *Exporter) Start(ctx context.Context) {
 	}()
 }
 
-// collect executa uma coleta de métricas e atualiza os gauges Prometheus.
+// collect executes a metrics collection and updates Prometheus gauges.
 func (e *Exporter) collect(ctx context.Context) {
 	stats, err := e.dockerClient.GetAllContainerStats(ctx)
 	if err != nil {
-		e.log.Debug("Falha ao coletar stats para Prometheus",
+		e.log.Debug("failed to collect stats for prometheus",
 			slog.String("error", err.Error()),
 		)
 		return
 	}
 
-	// Reseta métricas antigas (containers que pararam)
+	// Reset old metrics (stopped containers)
 	e.cpuPercent.Reset()
 	e.memoryUsage.Reset()
 	e.memoryLimit.Reset()
@@ -268,23 +270,23 @@ func (e *Exporter) collect(ctx context.Context) {
 	e.blockWrite.Reset()
 	e.containerInfo.Reset()
 
-	// Prepara a lista total de métricas (Locais + Remotas do Cluster)
+	// Prepare the total metrics list (Local + Remote from Cluster)
 	var allStats []models.ContainerMetrics
 
-	// Formata stats locais adicionando o HostID
+	// Format local stats by adding the HostID
 	for _, s := range stats {
 		s.HostID = e.hostID
 		allStats = append(allStats, s)
 	}
 
-	// Anexa stats remotas caso exista um receiver (Modo Leader)
+	// Append remote stats if a receiver exists (Leader mode)
 	if e.receiver != nil {
 		allStats = append(allStats, e.receiver.GetAllMetrics()...)
 	}
 
-	// Atualiza métricas para cada container (locais e remotos combinados)
+	// Update metrics for each container (local and remote combined)
 	for _, s := range allStats {
-		// Fallback amigável
+		// Friendly fallback
 		hid := s.HostID
 		if hid == "" {
 			hid = "unknown"
@@ -308,19 +310,19 @@ func (e *Exporter) collect(ctx context.Context) {
 		e.containerInfo.With(labels).Set(1)
 	}
 
-	// Salva stats para acesso externo (pela TUI)
+	// Save stats for external access (by the TUI)
 	e.mu.Lock()
 	e.lastStats = stats
 	e.mu.Unlock()
 }
 
-// GetLastStats retorna o último snapshot de métricas coletado.
-// Thread-safe — pode ser chamado de qualquer goroutine.
+// GetLastStats returns the last collected metrics snapshot.
+// Thread-safe — can be called from any goroutine.
 func (e *Exporter) GetLastStats() map[string]models.ContainerMetrics {
-	e.mu.Lock()
-	defer e.mu.Unlock()
+	e.mu.RLock()
+	defer e.mu.RUnlock()
 
-	// Retorna uma cópia para evitar race conditions
+	// Return a copy to avoid race conditions
 	result := make(map[string]models.ContainerMetrics, len(e.lastStats))
 	for k, v := range e.lastStats {
 		result[k] = v

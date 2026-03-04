@@ -1,15 +1,15 @@
-// Package alerts implementa o motor de alertas do Castle Rock Agent.
+// Package alerts implements the Castle Rock Agent alert engine.
 //
-// O motor avalia regras configuráveis contra métricas coletadas dos
-// containers Docker. Quando uma condição persiste por tempo suficiente
-// (duration), um alerta é disparado.
+// The engine evaluates configurable rules against metrics collected from
+// Docker containers. When a condition persists long enough (duration),
+// an alert is fired.
 //
 // DESIGN:
-//   - Regras são carregadas do config.yaml
-//   - Cada regra define: métrica, operador, threshold, duration, severity
-//   - O motor mantém estado de "desde quando" cada condição está ativa
-//   - Alertas só disparam após a condição persistir por >= duration
-//   - Cada alerta dispara apenas uma vez (não repete enquanto ativo)
+//   - Rules are loaded from config.yaml
+//   - Each rule defines: metric, operator, threshold, duration, severity
+//   - The engine maintains state of "since when" each condition is active
+//   - Alerts only fire after the condition persists for >= duration
+//   - Each alert fires only once (does not repeat while active)
 package alerts
 
 import (
@@ -21,7 +21,7 @@ import (
 	"github.com/nicolas-moura-ti/castle-rock-agent/pkg/models"
 )
 
-// Alert representa um alerta ativo.
+// Alert represents an active alert.
 type Alert struct {
 	RuleName      string
 	ContainerID   string
@@ -34,30 +34,30 @@ type Alert struct {
 	ActiveSince   time.Time
 }
 
-// Engine é o motor de avaliação de alertas.
+// Engine is the alert evaluation engine.
 //
-// REGRA DE DESIGN:
+// DESIGN RULE:
 //
-//	O motor é thread-safe (protegido por mutex) porque pode ser
-//	acessado tanto pela goroutine de coleta quanto pela TUI.
+//	The engine is thread-safe (protected by mutex) because it can be
+//	accessed by both the collection goroutine and the TUI.
 type Engine struct {
 	rules []config.AlertRule
 
-	// conditionStart rastreia desde quando cada condição está ativa.
-	// Chave: "containerID:ruleName"
+	// conditionStart tracks since when each condition has been active.
+	// Key: "containerID:ruleName"
 	conditionStart map[string]time.Time
 
-	// activeAlerts armazena alertas que já foram disparados.
-	// Chave: "containerID:ruleName"
+	// activeAlerts stores alerts that have already been fired.
+	// Key: "containerID:ruleName"
 	activeAlerts map[string]Alert
 
-	// firedAlerts histórico de alertas (últimos 50)
+	// firedAlerts is the alert history (last 50)
 	firedAlerts []Alert
 
 	mu sync.Mutex
 }
 
-// NewEngine cria um novo motor de alertas.
+// NewEngine creates a new alert engine.
 func NewEngine(rules []config.AlertRule) *Engine {
 	return &Engine{
 		rules:          rules,
@@ -67,22 +67,22 @@ func NewEngine(rules []config.AlertRule) *Engine {
 	}
 }
 
-// Evaluate avalia todas as regras contra as métricas fornecidas.
+// Evaluate evaluates all rules against the provided metrics.
 //
-// ALGORITMO:
+// ALGORITHM:
 //
-//	Para cada container × cada regra:
-//	  1. Extrai o valor da métrica relevante
-//	  2. Aplica o operador de comparação
-//	  3. Se condição TRUE:
-//	     a. Se é novo → registra o início da condição
-//	     b. Se já está ativo há >= duration → dispara alerta
-//	  4. Se condição FALSE:
-//	     a. Limpa o estado (reseta timer)
+//	For each container x each rule:
+//	  1. Extract the relevant metric value
+//	  2. Apply the comparison operator
+//	  3. If condition TRUE:
+//	     a. If new -> record the condition start time
+//	     b. If already active for >= duration -> fire alert
+//	  4. If condition FALSE:
+//	     a. Clear state (reset timer)
 //
-// Este padrão é similar ao que o Prometheus Alertmanager usa:
+// This pattern is similar to what Prometheus Alertmanager uses:
 //
-//	Pending → Firing → Resolved
+//	Pending -> Firing -> Resolved
 func (e *Engine) Evaluate(stats map[string]models.ContainerMetrics) []Alert {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -90,7 +90,7 @@ func (e *Engine) Evaluate(stats map[string]models.ContainerMetrics) []Alert {
 	var newAlerts []Alert
 	now := time.Now()
 
-	// Limpa alertas de containers que não existem mais
+	// Clear alerts for containers that no longer exist
 	for key := range e.activeAlerts {
 		found := false
 		for _, s := range stats {
@@ -109,24 +109,24 @@ func (e *Engine) Evaluate(stats map[string]models.ContainerMetrics) []Alert {
 		for _, rule := range e.rules {
 			key := e.alertKey(s.ContainerID, rule.Name)
 
-			// Extrai o valor da métrica
+			// Extract the metric value
 			value := e.getMetricValue(s, rule.Metric)
 
-			// Avalia a condição
+			// Evaluate the condition
 			conditionMet := e.evaluateCondition(value, rule.Operator, rule.Threshold)
 
 			if conditionMet {
-				// Condição ativa — verifica se já está sendo rastreada
+				// Condition active — check if already being tracked
 				startTime, exists := e.conditionStart[key]
 				if !exists {
-					// Novo — registra início
+					// New — record start
 					e.conditionStart[key] = now
 					continue
 				}
 
-				// Verifica se já passou tempo suficiente (duration)
+				// Check if enough time has passed (duration)
 				if now.Sub(startTime) >= rule.Duration {
-					// Verifica se já disparou (não repetir)
+					// Check if already fired (don't repeat)
 					if _, alreadyFired := e.activeAlerts[key]; !alreadyFired {
 						alert := Alert{
 							RuleName:      rule.Name,
@@ -143,7 +143,7 @@ func (e *Engine) Evaluate(stats map[string]models.ContainerMetrics) []Alert {
 						e.activeAlerts[key] = alert
 						newAlerts = append(newAlerts, alert)
 
-						// Adiciona ao histórico
+						// Add to history
 						e.firedAlerts = append([]Alert{alert}, e.firedAlerts...)
 						if len(e.firedAlerts) > 50 {
 							e.firedAlerts = e.firedAlerts[:50]
@@ -151,7 +151,7 @@ func (e *Engine) Evaluate(stats map[string]models.ContainerMetrics) []Alert {
 					}
 				}
 			} else {
-				// Condição não ativa — limpa estado
+				// Condition not active — clear state
 				delete(e.conditionStart, key)
 				delete(e.activeAlerts, key)
 			}
@@ -161,14 +161,14 @@ func (e *Engine) Evaluate(stats map[string]models.ContainerMetrics) []Alert {
 	return newAlerts
 }
 
-// GetActiveAlerts retorna todos os alertas atualmente ativos,
-// filtrando para manter apenas o de maior severidade por container e métrica.
+// GetActiveAlerts returns all currently active alerts,
+// filtering to keep only the highest severity per container and metric.
 func (e *Engine) GetActiveAlerts() []Alert {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	// Agrupa por ContainerID + Metric para deduzir alertas duplicados
-	// (ex: Warning e Critical de Memória ao mesmo tempo)
+	// Group by ContainerID + Metric to deduplicate alerts
+	// (e.g. Warning and Critical for Memory at the same time)
 	bestAlerts := make(map[string]Alert)
 
 	for _, a := range e.activeAlerts {
@@ -190,7 +190,7 @@ func (e *Engine) GetActiveAlerts() []Alert {
 	return result
 }
 
-// severityWeight retorna um peso numérico para priorização de alertas
+// severityWeight returns a numeric weight for alert prioritization.
 func severityWeight(severity string) int {
 	switch severity {
 	case "critical":
@@ -204,8 +204,8 @@ func severityWeight(severity string) int {
 	}
 }
 
-// GetPendingConditions retorna contagem de condições em avaliação
-// (ativas mas que ainda não atingiram o duration threshold).
+// GetPendingCount returns the count of conditions being evaluated
+// (active but haven't reached the duration threshold yet).
 func (e *Engine) GetPendingCount() int {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -219,12 +219,12 @@ func (e *Engine) GetPendingCount() int {
 	return pending
 }
 
-// alertKey gera a chave única para rastrear estado de uma condição.
+// alertKey generates the unique key for tracking a condition's state.
 func (e *Engine) alertKey(containerID, ruleName string) string {
 	return containerID + ":" + ruleName
 }
 
-// getMetricValue extrai o valor numérico de uma métrica do container.
+// getMetricValue extracts the numeric value of a container metric.
 func (e *Engine) getMetricValue(stats models.ContainerMetrics, metric string) float64 {
 	switch metric {
 	case "cpu_percent":
@@ -242,7 +242,7 @@ func (e *Engine) getMetricValue(stats models.ContainerMetrics, metric string) fl
 	}
 }
 
-// evaluateCondition aplica o operador de comparação.
+// evaluateCondition applies the comparison operator.
 func (e *Engine) evaluateCondition(value float64, operator string, threshold float64) bool {
 	switch operator {
 	case ">":
@@ -260,7 +260,7 @@ func (e *Engine) evaluateCondition(value float64, operator string, threshold flo
 	}
 }
 
-// FormatAlert formata um alerta para exibição.
+// FormatAlert formats an alert for display.
 func FormatAlert(a Alert) string {
 	return fmt.Sprintf("[%s] %s: %s %.1f%% > %.1f%% (container: %s)",
 		a.Severity, a.RuleName, a.Metric,

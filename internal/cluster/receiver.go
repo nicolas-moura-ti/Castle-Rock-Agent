@@ -10,21 +10,22 @@ import (
 	"github.com/nicolas-moura-ti/castle-rock-agent/pkg/models"
 )
 
-// HostData armazena o último snapshot de métricas/containers recebido de um Worker.
+// HostData stores the latest metrics/containers snapshot received from a Worker.
 type HostData struct {
 	LastUpdate time.Time
 	Payload    models.PushPayload
 }
 
-// Receiver é o servidor HTTP integrado no Leader para receber dados dos Workers.
-// Todo o acesso de leitura/escrita é thread-safe (protegido por RWMutex) pois pode
-// ser acessado simultaneamente pela TUI, exportador Prometheus e rotina de recebimento HTTP.
+// Receiver is the HTTP server integrated in the Leader to receive data from Workers.
+// All read/write access is thread-safe (protected by RWMutex) since it can be
+// accessed simultaneously by the TUI, Prometheus exporter and HTTP receive routine.
 type Receiver struct {
 	mu    sync.RWMutex
 	hosts map[string]HostData
 	log   *slog.Logger
 }
 
+// NewReceiver creates a new Receiver instance.
 func NewReceiver(log *slog.Logger) *Receiver {
 	return &Receiver{
 		hosts: make(map[string]HostData),
@@ -32,23 +33,23 @@ func NewReceiver(log *slog.Logger) *Receiver {
 	}
 }
 
-// ServeHTTP implementa a interface http.Handler para receber POSTs com o Payload.
+// ServeHTTP implements the http.Handler interface to receive POSTs with the Payload.
 func (r *Receiver) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if req.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+	defer req.Body.Close()
 
 	var payload models.PushPayload
 	if err := json.NewDecoder(req.Body).Decode(&payload); err != nil {
-		r.log.Warn("Receiver: falha ao decodificar JSON", slog.String("error", err.Error()))
+		r.log.Warn("receiver: failed to decode JSON", slog.String("error", err.Error()))
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return
 	}
-	defer req.Body.Close()
 
 	if payload.HostID == "" {
-		r.log.Warn("Receiver: bloco rejeitado, payload sem HostID")
+		r.log.Warn("receiver: payload rejected, missing HostID")
 		http.Error(w, "Missing HostID", http.StatusBadRequest)
 		return
 	}
@@ -63,7 +64,7 @@ func (r *Receiver) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 }
 
-// GetAllMetrics retorna uma lista contendo todas as métricas recentes de todos os Workers.
+// GetAllMetrics returns a list containing all recent metrics from all Workers.
 func (r *Receiver) GetAllMetrics() []models.ContainerMetrics {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -72,9 +73,9 @@ func (r *Receiver) GetAllMetrics() []models.ContainerMetrics {
 	now := time.Now()
 
 	for hostID, data := range r.hosts {
-		// Tolerância a falhas: Ignoramos Workers que não se comunicam há mais de 30s.
+		// Fault tolerance: ignore Workers that haven't communicated in over 30s.
 		if now.Sub(data.LastUpdate) > 30*time.Second {
-			r.log.Debug("Receiver: host inativo ignorado", slog.String("host", hostID))
+			r.log.Debug("receiver: inactive host ignored", slog.String("host", hostID))
 			continue
 		}
 		all = append(all, data.Payload.Metrics...)
@@ -83,7 +84,7 @@ func (r *Receiver) GetAllMetrics() []models.ContainerMetrics {
 	return all
 }
 
-// GetAllContainers retorna informações estáticas (Containers) recentes de todos os Workers.
+// GetAllContainers returns static container info from all recent Workers.
 func (r *Receiver) GetAllContainers() []models.ContainerInfo {
 	r.mu.RLock()
 	defer r.mu.RUnlock()

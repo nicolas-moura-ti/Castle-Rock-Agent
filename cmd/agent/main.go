@@ -1,12 +1,12 @@
-// Package main é o entrypoint do Castle Rock Agent.
+// Package main is the entrypoint for the Castle Rock Agent.
 //
-// Este arquivo demonstra práticas idiomáticas de Go para:
-//   - Configuração via YAML + variáveis de ambiente (12-Factor App)
-//   - Uso correto de context.Context para propagação de cancelamento
-//   - Graceful shutdown com signal.NotifyContext
-//   - TUI interativa com Bubble Tea
-//   - Exportação de métricas Prometheus em /metrics
-//   - Separação de responsabilidades usando packages internos
+// This file demonstrates idiomatic Go practices for:
+//   - Configuration via YAML + environment variables (12-Factor App)
+//   - Correct usage of context.Context for cancellation propagation
+//   - Graceful shutdown with signal.NotifyContext
+//   - Interactive TUI with Bubble Tea
+//   - Prometheus metrics export at /metrics
+//   - Separation of concerns using internal packages
 package main
 
 import (
@@ -32,7 +32,7 @@ const Version = "0.3.0"
 func main() {
 	cfg, err := config.Load("configs/config.yaml")
 	if err != nil {
-		slog.Warn("Erro ao carregar config, usando defaults",
+		slog.Warn("failed to load config, using defaults",
 			slog.String("error", err.Error()),
 		)
 		cfg = config.DefaultConfig()
@@ -47,7 +47,7 @@ func main() {
 	)
 	defer stop()
 
-	log.Info("Castle Rock Agent iniciando",
+	log.Info("Castle Rock Agent starting",
 		slog.String("version", Version),
 		slog.String("go_version", runtime.Version()),
 		slog.String("log_level", cfg.LogLevel),
@@ -55,9 +55,9 @@ func main() {
 
 	dockerClient, err := docker.NewClient()
 	if err != nil {
-		log.Error("Falha ao criar Docker client",
+		log.Error("failed to create docker client",
 			slog.String("error", err.Error()),
-			slog.String("hint", "Verifique se o Docker Desktop está rodando"),
+			slog.String("hint", "check if Docker Desktop is running"),
 		)
 		return
 	}
@@ -66,23 +66,23 @@ func main() {
 
 	defer func() {
 		if err := dockerClient.Close(); err != nil {
-			log.Warn("Erro ao fechar Docker client",
+			log.Warn("error closing docker client",
 				slog.String("error", err.Error()),
 			)
 		}
 	}()
 
-	log.Info("Docker daemon conectado")
+	log.Info("docker daemon connected")
 
 	sysInfo := make(map[string]string)
 	info, err := dockerClient.GetSystemInfo(ctx)
 	if err != nil {
-		log.Warn("Não foi possível obter info do Docker",
+		log.Warn("unable to get docker info",
 			slog.String("error", err.Error()),
 		)
 	} else {
 		sysInfo = info
-		log.Info("Docker info coletado",
+		log.Info("docker info collected",
 			slog.String("version", sysInfo["Server Version"]),
 		)
 	}
@@ -93,7 +93,7 @@ func main() {
 	var receiver *cluster.Receiver
 	if cfg.Cluster.Mode == "leader" {
 		receiver = cluster.NewReceiver(log)
-		log.Info("Cluster Receiver ativo", slog.String("host_id", cfg.Cluster.HostID))
+		log.Info("cluster receiver active", slog.String("host_id", cfg.Cluster.HostID))
 	}
 
 	// ─────────────────────────────────────────────────────────────────────
@@ -102,51 +102,51 @@ func main() {
 	if cfg.Prometheus.Enabled {
 		exporter := metrics.NewExporter(dockerClient, receiver, cfg.Cluster.HostID, cfg.Stats.Interval, cfg.Prometheus.Port, log)
 		exporter.Start(ctx)
-		log.Info("Prometheus exporter ativo",
+		log.Info("prometheus exporter active",
 			slog.Int("port", cfg.Prometheus.Port),
 			slog.Duration("interval", cfg.Stats.Interval),
 		)
 	}
 
 	// ─────────────────────────────────────────────────────────────────────
-	// MODO DE EXECUÇÃO
+	// EXECUTION MODE
 	// ─────────────────────────────────────────────────────────────────────
 	//
 	// CASTLE_ROCK_MODE=headless:
-	//   Roda sem TUI, ideal para Docker Compose / Kubernetes.
-	//   O agente fica ativo apenas como servidor de métricas Prometheus.
+	//   Runs without TUI, ideal for Docker Compose / Kubernetes.
+	//   The agent stays active only as a Prometheus metrics server.
 	//
-	// Modo padrão:
-	//   TUI interativa com dashboard completo.
+	// Default mode:
+	//   Interactive TUI with full dashboard.
 	mode := os.Getenv("CASTLE_ROCK_MODE")
 
-	// Override pela nova config de cluster se estiver ativada
+	// Override by new cluster config if enabled
 	if cfg.Cluster.Mode == "worker" {
-		log.Info("Iniciando em modo Worker",
+		log.Info("starting in worker mode",
 			slog.String("leader_url", cfg.Cluster.LeaderURL),
 		)
 		go cluster.StartSender(ctx, dockerClient, cfg, log)
 
-		// Bloqueia até receber sinal de shutdown
+		// Block until shutdown signal
 		<-ctx.Done()
-		log.Info("Castle Rock Agent encerrado (worker)")
+		log.Info("Castle Rock Agent stopped (worker)")
 		return
 	}
 
 	if mode == "headless" || cfg.Cluster.Mode == "leader" {
-		log.Info("Modo headless/leader — aguardando conexões e scraping",
+		log.Info("headless/leader mode — waiting for connections and scraping",
 			slog.Int("port", cfg.Prometheus.Port),
 		)
-		// Bloqueia até receber sinal de shutdown
+		// Block until shutdown signal
 		<-ctx.Done()
-		log.Info("Castle Rock Agent encerrado (headless/leader)")
+		log.Info("Castle Rock Agent stopped (headless/leader)")
 		return
 	}
 
 	// Storage (SQLite)
 	store, err := storage.NewSQLiteStore("castle-rock-events.db")
 	if err != nil {
-		log.Error("Aviso: Falha ao iniciar SQLite Histórico", slog.String("error", err.Error()))
+		log.Error("failed to init sqlite store", slog.String("error", err.Error()))
 	} else {
 		defer store.Close()
 	}
@@ -155,14 +155,14 @@ func main() {
 	if cfg.Prune.Enabled {
 		pruner := prune.NewAutoPruner(dockerClient, store, cfg.Prune.TriggerDiskPercent)
 		go pruner.Start(ctx)
-		log.Info("AutoPrune ativado", slog.Float64("threshold_pct", cfg.Prune.TriggerDiskPercent))
+		log.Info("auto-prune enabled", slog.Float64("threshold_pct", cfg.Prune.TriggerDiskPercent))
 	}
 
-	// Modo TUI
-	log.Info("Iniciando dashboard interativo...")
+	// TUI Mode
+	log.Info("starting interactive dashboard...")
 	if err := tui.Run(dockerClient, receiver, ctx, sysInfo, Version, cfg, store); err != nil {
-		log.Error("Erro na TUI", slog.String("error", err.Error()))
+		log.Error("TUI error", slog.String("error", err.Error()))
 		return
 	}
-	log.Info("Castle Rock Agent encerrado")
+	log.Info("Castle Rock Agent stopped")
 }

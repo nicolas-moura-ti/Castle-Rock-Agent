@@ -1,15 +1,15 @@
-// Package collector define as interfaces e implementações para coleta
-// de métricas de containers Docker.
+// Package collector defines interfaces and implementations for
+// collecting Docker container metrics.
 //
-// Este package é o coração do sistema de observabilidade. Ele define
-// a interface Collector que abstrai a lógica de coleta, permitindo
-// diferentes implementações (CPU, memória, rede, disco).
+// This package is the heart of the observability system. It defines
+// the Collector interface that abstracts collection logic, allowing
+// different implementations (CPU, memory, network, disk).
 //
-// ARQUITETURA:
-//   - Collector é uma interface (contrato)
-//   - Cada tipo de métrica terá sua própria implementação
-//   - O orquestrador (main ou um scheduler) chama Collect() periodicamente
-//   - Segue o princípio Open/Closed: aberto para extensão, fechado para modificação
+// ARCHITECTURE:
+//   - Collector is an interface (contract)
+//   - Each metric type will have its own implementation
+//   - The orchestrator (main or a scheduler) calls Collect() periodically
+//   - Follows the Open/Closed principle: open for extension, closed for modification
 package collector
 
 import (
@@ -18,59 +18,59 @@ import (
 	"github.com/nicolas-moura-ti/castle-rock-agent/pkg/models"
 )
 
-// Collector define o contrato para coletores de métricas.
+// Collector defines the contract for metric collectors.
 //
-// INTERFACES EM GO:
-//   - Interfaces são definidas pelo consumidor, não pelo implementador
-//   - Uma interface pequena é melhor que uma grande (Interface Segregation)
-//   - A convenção Go é: "Accept interfaces, return structs"
-//   - Não crie interfaces prematuramente — extraia-as quando houver
-//     necessidade real de polimorfismo
+// INTERFACES IN GO:
+//   - Interfaces are defined by the consumer, not the implementer
+//   - A small interface is better than a large one (Interface Segregation)
+//   - Go convention: "Accept interfaces, return structs"
+//   - Don't create interfaces prematurely — extract them when there's
+//     a real need for polymorphism
 //
-// Por que definir esta interface agora?
-//   - Estabelece o contrato que futuras implementações devem seguir
-//   - Permite uso de mocks em testes unitários
-//   - Documenta a intenção arquitetural do sistema
+// Why define this interface now?
+//   - Establishes the contract that future implementations must follow
+//   - Allows using mocks in unit tests
+//   - Documents the architectural intent of the system
 type Collector interface {
-	// Collect executa a coleta de métricas para todos os containers.
+	// Collect executes metric collection for all containers.
 	//
-	// Aceita um context para suportar cancelamento e timeouts.
-	// Retorna um slice de ContainerMetrics ou um erro.
+	// Accepts a context to support cancellation and timeouts.
+	// Returns a slice of ContainerMetrics or an error.
 	Collect(ctx context.Context) ([]models.ContainerMetrics, error)
 
-	// Name retorna o nome do coletor (ex: "cpu", "memory", "network").
-	// Usado para logging e identificação.
+	// Name returns the collector name (e.g. "cpu", "memory", "network").
+	// Used for logging and identification.
 	Name() string
 }
 
-// ContainerCollector é um scaffold para o coletor principal de containers.
-// Futuramente, esta struct será expandida com as dependências necessárias
-// (Docker client, configuração, etc.).
+// ContainerCollector is a scaffold for the main container collector.
+// In the future, this struct will be expanded with necessary dependencies
+// (Docker client, configuration, etc.).
 type ContainerCollector struct {
-	// TODO: Adicionar dependências quando implementar a coleta real.
-	// Exemplo:
+	// TODO: Add dependencies when implementing real collection.
+	// Example:
 	//   dockerClient *docker.Client
 	//   interval     time.Duration
 }
 
-// NewContainerCollector cria uma nova instância do ContainerCollector.
+// NewContainerCollector creates a new ContainerCollector instance.
 //
-// Segue o padrão constructor New<Tipo> do Go.
+// Follows the Go constructor pattern New<Type>.
 func NewContainerCollector() *ContainerCollector {
 	return &ContainerCollector{}
 }
 
-// Collect implementa a interface Collector.
+// Collect implements the Collector interface.
 //
-// TODO: Implementar coleta real de métricas via Docker Stats API.
-// A Docker Stats API fornece métricas em tempo real de CPU, memória,
-// I/O de rede e disco para cada container.
+// TODO: Implement real metric collection via Docker Stats API.
+// The Docker Stats API provides real-time CPU, memory,
+// network I/O and disk metrics for each container.
 func (c *ContainerCollector) Collect(ctx context.Context) ([]models.ContainerMetrics, error) {
-	// Placeholder — será implementado na próxima iteração.
+	// Placeholder — will be implemented in the next iteration.
 	return nil, nil
 }
 
-// Name retorna o nome deste coletor.
+// Name returns the name of this collector.
 func (c *ContainerCollector) Name() string {
 	return "container"
 }

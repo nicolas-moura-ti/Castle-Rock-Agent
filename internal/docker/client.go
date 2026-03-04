@@ -109,15 +109,15 @@ func (c *Client) Close() error {
 	return c.cli.Close()
 }
 
-// StopContainer para um container pelo nome ou ID.
+// StopContainer stops a container by name or ID.
 //
 // TIMEOUT:
 //
-//	O Docker primeiro envia SIGTERM ao PID 1 do container.
-//	Se o processo não encerrar dentro do timeout, envia SIGKILL.
-//	Usamos 10 segundos como timeout padrão — o mesmo do `docker stop`.
+//	Docker first sends SIGTERM to PID 1 of the container.
+//	If the process does not exit within the timeout, it sends SIGKILL.
+//	We use 10 seconds as the default timeout — same as `docker stop`.
 func (c *Client) StopContainer(ctx context.Context, containerID string) error {
-	timeout := 10 // segundos
+	timeout := 10 // seconds
 	stopOpts := container.StopOptions{Timeout: &timeout}
 
 	if err := c.cli.ContainerStop(ctx, containerID, stopOpts); err != nil {
@@ -126,10 +126,10 @@ func (c *Client) StopContainer(ctx context.Context, containerID string) error {
 	return nil
 }
 
-// RestartContainer reinicia um container.
+// RestartContainer restarts a container.
 //
-// O Docker faz stop + start atomicamente. O timeout se aplica
-// apenas à fase de stop (SIGTERM → SIGKILL).
+// Docker performs stop + start atomically. The timeout applies
+// only to the stop phase (SIGTERM → SIGKILL).
 func (c *Client) RestartContainer(ctx context.Context, containerID string) error {
 	timeout := 10
 	restartOpts := container.StopOptions{Timeout: &timeout}
@@ -140,8 +140,8 @@ func (c *Client) RestartContainer(ctx context.Context, containerID string) error
 	return nil
 }
 
-// InspectContainer retorna informações detalhadas sobre um container,
-// incluindo configurações de segurança, rede e volumes.
+// InspectContainer returns detailed information about a container,
+// including security settings, networking and volumes.
 func (c *Client) InspectContainer(ctx context.Context, containerID string) (types.ContainerJSON, error) {
 	inspectJSON, err := c.cli.ContainerInspect(ctx, containerID)
 	if err != nil {
@@ -150,8 +150,8 @@ func (c *Client) InspectContainer(ctx context.Context, containerID string) (type
 	return inspectJSON, nil
 }
 
-// PruneSystem executa uma limpeza de segurança (Garbage Collection):
-// Remove containers parados, redes vazias e imagens pendentes (danglings).
+// PruneSystem performs a safe cleanup (Garbage Collection):
+// Removes stopped containers, empty networks, and dangling images.
 func (c *Client) PruneSystem(ctx context.Context) (uint64, error) {
 	var totalReclaimed uint64
 
@@ -173,7 +173,7 @@ func (c *Client) PruneSystem(ctx context.Context) (uint64, error) {
 	return totalReclaimed, nil
 }
 
-// ListNetworks lista informações detalhadas de conectividade do Docker
+// ListNetworks lists detailed Docker connectivity information.
 func (c *Client) ListNetworks(ctx context.Context) ([]network.Inspect, error) {
 	nets, err := c.cli.NetworkList(ctx, network.ListOptions{})
 	if err != nil {
@@ -182,7 +182,7 @@ func (c *Client) ListNetworks(ctx context.Context) ([]network.Inspect, error) {
 
 	var results []network.Inspect
 	for _, n := range nets {
-		// Inspeciona caso a caso para pegar os containers engajados dinamicamente
+		// Inspect each one to get dynamically connected containers
 		insp, err := c.cli.NetworkInspect(ctx, n.ID, network.InspectOptions{})
 		if err == nil {
 			results = append(results, insp)
@@ -191,19 +191,19 @@ func (c *Client) ListNetworks(ctx context.Context) ([]network.Inspect, error) {
 	return results, nil
 }
 
-// StreamContainerLogs retorna um channel com as últimas linhas de log
-// de um container, seguido de logs em tempo real (tail -f).
+// StreamContainerLogs returns a channel with the last lines of log
+// from a container, followed by real-time logs (tail -f).
 //
 // DOCKER LOGS API:
 //
-//	A API /containers/{id}/logs com Follow:true mantém a conexão
-//	aberta e envia novas linhas à medida que o container produz output.
-//	Usamos Tail:"50" para mostrar as últimas 50 linhas primeiro.
+//	The /containers/{id}/logs API with Follow:true keeps the connection
+//	open and sends new lines as the container produces output.
+//	We use Tail:"50" to show the last 50 lines first.
 //
 // CHANNEL PATTERN:
 //
-//	Retornamos um channel de strings para integrar com o loop
-//	de mensagens do Bubble Tea. Cada linha de log vira uma mensagem.
+//	We return a string channel to integrate with the Bubble Tea
+//	message loop. Each log line becomes a message.
 func (c *Client) StreamContainerLogs(ctx context.Context, containerID string) (<-chan string, error) {
 	reader, err := c.cli.ContainerLogs(ctx, containerID, container.LogsOptions{
 		ShowStdout: true,
@@ -216,14 +216,14 @@ func (c *Client) StreamContainerLogs(ctx context.Context, containerID string) (<
 		return nil, fmt.Errorf("docker.StreamContainerLogs: %w", err)
 	}
 
-	logCh := make(chan string, 100) // Buffer de 100 linhas
+	logCh := make(chan string, 100) // Buffer of 100 lines
 
 	go func() {
 		defer close(logCh)
 		defer reader.Close()
 
-		// Docker logs têm um header de 8 bytes por linha no modo multiplexed.
-		// Lemos byte a byte para extrair linhas completas.
+		// Docker logs have an 8-byte header per line in multiplexed mode.
+		// We read byte by byte to extract complete lines.
 		buf := make([]byte, 8192)
 		for {
 			select {
@@ -235,18 +235,18 @@ func (c *Client) StreamContainerLogs(ctx context.Context, containerID string) (<
 					return
 				}
 				if n > 0 {
-					// Remove header de 8 bytes do Docker multiplexed stream
+					// Remove 8-byte header from Docker multiplexed stream
 					content := string(buf[:n])
-					// Split por linhas e envia cada uma
+					// Split by lines and send each one
 					lines := strings.Split(content, "\n")
 					for _, line := range lines {
-						// Limpa caracteres de controle do header Docker
+						// Clean Docker header control characters
 						cleaned := cleanLogLine(line)
 						if cleaned != "" {
 							select {
 							case logCh <- cleaned:
 							default:
-								// Buffer cheio, descarta linha antiga
+								// Buffer full, discard old line
 							}
 						}
 					}
@@ -258,23 +258,23 @@ func (c *Client) StreamContainerLogs(ctx context.Context, containerID string) (<
 	return logCh, nil
 }
 
-// cleanLogLine remove o header de 8 bytes do Docker multiplexed stream.
+// cleanLogLine removes the 8-byte header from Docker multiplexed stream.
 func cleanLogLine(line string) string {
-	// O header Docker tem 8 bytes: [stream_type, 0, 0, 0, size_bytes...]
-	// Se a linha começa com byte <= 2, provavelmente tem header
+	// Docker header has 8 bytes: [stream_type, 0, 0, 0, size_bytes...]
+	// If the line starts with byte <= 2, it probably has a header
 	if len(line) > 8 && (line[0] == 1 || line[0] == 2 || line[0] == 0) {
 		return strings.TrimSpace(line[8:])
 	}
 	return strings.TrimSpace(line)
 }
 
-// SystemDiskUsage representa um resumo simplificado de consumo do Docker no host.
+// SystemDiskUsage represents a simplified summary of Docker disk consumption on the host.
 type SystemDiskUsage struct {
 	ImagesReclaimable  int64
 	VolumesReclaimable int64
 }
 
-// GetDiskUsage retorna o uso de disco do Docker (equivalente a docker system df).
+// GetDiskUsage returns Docker disk usage (equivalent to docker system df).
 func (c *Client) GetDiskUsage(ctx context.Context) (SystemDiskUsage, error) {
 	du, err := c.cli.DiskUsage(ctx, types.DiskUsageOptions{})
 	if err != nil {
@@ -284,7 +284,7 @@ func (c *Client) GetDiskUsage(ctx context.Context) (SystemDiskUsage, error) {
 	var imgReclaim, volReclaim int64
 
 	for _, img := range du.Images {
-		if img.Containers == 0 { // Imagem não está sendo usada por nenhum container
+		if img.Containers == 0 { // Image not used by any container
 			imgReclaim += img.SharedSize + (img.Size - img.SharedSize)
 		}
 	}
@@ -301,7 +301,7 @@ func (c *Client) GetDiskUsage(ctx context.Context) (SystemDiskUsage, error) {
 	}, nil
 }
 
-// PruneImages apaga todas as imagens órfãs (dangling = true)
+// PruneImages deletes all orphaned images (dangling = true).
 func (c *Client) PruneImages(ctx context.Context) (uint64, error) {
 	report, err := c.cli.ImagesPrune(ctx, filters.NewArgs(filters.Arg("dangling", "true")))
 	if err != nil {
@@ -310,7 +310,7 @@ func (c *Client) PruneImages(ctx context.Context) (uint64, error) {
 	return report.SpaceReclaimed, nil
 }
 
-// PruneVolumes apaga volumes locais que não estão atrelados a nenhum container
+// PruneVolumes deletes local volumes not attached to any container.
 func (c *Client) PruneVolumes(ctx context.Context) (uint64, error) {
 	report, err := c.cli.VolumesPrune(ctx, filters.NewArgs())
 	if err != nil {
@@ -319,62 +319,62 @@ func (c *Client) PruneVolumes(ctx context.Context) (uint64, error) {
 	return report.SpaceReclaimed, nil
 }
 
-// DockerEvent representa um evento de lifecycle de container.
+// DockerEvent represents a container lifecycle event.
 //
-// Eventos Docker são o mecanismo nativo para monitoramento em tempo real.
-// Em vez de fazer polling periódico (lento e ineficiente), o Docker daemon
-// envia eventos via streaming HTTP quando containers mudam de estado.
+// Docker events are the native mechanism for real-time monitoring.
+// Instead of periodic polling (slow and inefficient), the Docker daemon
+// sends events via HTTP streaming when containers change state.
 //
-// Tipos de eventos relevantes para observabilidade:
-//   - "start"   → container iniciou
-//   - "stop"    → container foi parado (graceful)
-//   - "die"     → container encerrou (pode ser crash)
-//   - "create"  → container foi criado (mas pode não estar running)
-//   - "destroy" → container foi removido
-//   - "pause"   → container foi pausado
-//   - "unpause" → container foi retomado
+// Relevant event types for observability:
+//   - "start"   → container started
+//   - "stop"    → container was stopped (graceful)
+//   - "die"     → container terminated (could be a crash)
+//   - "create"  → container was created (may not be running)
+//   - "destroy" → container was removed
+//   - "pause"   → container was paused
+//   - "unpause" → container was resumed
 type DockerEvent struct {
-	// Action é o tipo do evento (start, stop, die, create, destroy, etc.)
+	// Action is the event type (start, stop, die, create, destroy, etc.)
 	Action string
 
-	// ContainerID é o ID completo do container afetado.
+	// ContainerID is the full ID of the affected container.
 	ContainerID string
 
-	// ContainerName é o nome do container (sem prefixo "/").
+	// ContainerName is the container name (without "/" prefix).
 	ContainerName string
 
-	// Image é a imagem Docker do container.
+	// Image is the container's Docker image.
 	Image string
 }
 
-// WatchEvents escuta eventos de containers do Docker daemon em tempo real.
+// WatchEvents listens for container events from the Docker daemon in real-time.
 //
-// ARQUITETURA — Event-Driven vs Polling:
+// ARCHITECTURE — Event-Driven vs Polling:
 //
-//	Esta função usa a Docker Events API (HTTP streaming) para receber
-//	notificações instantâneas de mudanças. Isso é MUITO mais eficiente
-//	que polling periódico porque:
-//	  - Zero CPU quando nenhum evento ocorre
-//	  - Latência mínima (milissegundos vs segundos do polling)
-//	  - Menos chamadas à API do Docker
+//	This function uses the Docker Events API (HTTP streaming) to receive
+//	instant notifications of changes. This is MUCH more efficient
+//	than periodic polling because:
+//	  - Zero CPU when no events occur
+//	  - Minimal latency (milliseconds vs polling seconds)
+//	  - Fewer calls to the Docker API
 //
-// CHANNELS EM GO:
+// CHANNELS IN GO:
 //
-//	A função retorna um channel (<-chan DockerEvent) que é o mecanismo
-//	nativo de Go para comunicação entre goroutines. O chamador lê
-//	eventos deste channel usando range ou select.
+//	The function returns a channel (<-chan DockerEvent) which is Go's
+//	native mechanism for communication between goroutines. The caller
+//	reads events from this channel using range or select.
 //
-// PADRÃO — Context-based lifecycle:
+// PATTERN — Context-based lifecycle:
 //
-//	O channel é fechado automaticamente quando o context é cancelado
-//	(Ctrl+C ou SIGTERM). Isso garante que a goroutine interna não
-//	vaza (leak), mesmo em cenários de erro.
+//	The channel is automatically closed when the context is cancelled
+//	(Ctrl+C or SIGTERM). This guarantees the internal goroutine does
+//	not leak, even in error scenarios.
 func (c *Client) WatchEvents(ctx context.Context) (<-chan DockerEvent, <-chan error) {
 	eventCh := make(chan DockerEvent)
-	errCh := make(chan error, 1) // buffer 1 para não bloquear a goroutine
+	errCh := make(chan error, 1) // buffer 1 to avoid blocking the goroutine
 
-	// Filtra apenas eventos de containers (ignora imagens, volumes, redes).
-	// Isso reduz o volume de eventos e o processamento necessário.
+	// Filter only container events (ignore images, volumes, networks).
+	// This reduces event volume and required processing.
 	msgs, errs := c.cli.Events(ctx, types.EventsOptions{
 		Filters: filters.NewArgs(
 			filters.Arg("type", "container"),
@@ -388,13 +388,13 @@ func (c *Client) WatchEvents(ctx context.Context) (<-chan DockerEvent, <-chan er
 		),
 	})
 
-	// GOROUTINE — Processamento assíncrono de eventos:
-	//   Lançamos uma goroutine para ler eventos do Docker daemon
-	//   e encaminhá-los para o channel de saída. A goroutine encerra
-	//   quando o context é cancelado (channel msgs é fechado pelo SDK).
+	// GOROUTINE — Async event processing:
+	//   We launch a goroutine to read events from the Docker daemon
+	//   and forward them to the output channel. The goroutine terminates
+	//   when the context is cancelled (msgs channel is closed by the SDK).
 	//
-	//   REGRA: toda goroutine deve ter uma condição de saída clara.
-	//   Aqui, a saída é garantida pelo ctx.Done() que fecha msgs.
+	//   RULE: every goroutine must have a clear exit condition.
+	//   Here, exit is guaranteed by ctx.Done() which closes msgs.
 	go func() {
 		defer close(eventCh)
 		defer close(errCh)
@@ -413,7 +413,7 @@ func (c *Client) WatchEvents(ctx context.Context) (<-chan DockerEvent, <-chan er
 				if !ok {
 					return
 				}
-				// Extrai o nome do container do atributo "name" do evento.
+				// Extract container name from the event's "name" attribute.
 				name := msg.Actor.Attributes["name"]
 
 				if !c.isMonitored(name) {
@@ -433,34 +433,34 @@ func (c *Client) WatchEvents(ctx context.Context) (<-chan DockerEvent, <-chan er
 	return eventCh, errCh
 }
 
-// GetAllContainerStats retorna métricas de performance de TODOS os
-// containers em execução. Coleta stats de cada container em paralelo.
+// GetAllContainerStats returns performance metrics for ALL running
+// containers. Collects stats from each container in parallel.
 //
 // DOCKER STATS API:
 //
-//	A API /containers/{id}/stats retorna um stream JSON com métricas
-//	em tempo real. Usamos Stream:false para obter apenas um snapshot
-//	(sem stream contínuo), o que é adequado para polling periódico.
+//	The /containers/{id}/stats API returns a JSON stream with real-time
+//	metrics. We use Stream:false to get only a snapshot (no continuous
+//	stream), which is adequate for periodic polling.
 //
-// CONCORRÊNCIA COM GOROUTINES:
+// CONCURRENCY WITH GOROUTINES:
 //
-//	Coletamos stats de todos os containers em paralelo usando goroutines
-//	+ sync.WaitGroup. Isso reduz a latência total de N*RTT para ~1*RTT
-//	(onde RTT é o round-trip time de uma chamada à API).
+//	We collect stats from all containers in parallel using goroutines
+//	+ sync.WaitGroup. This reduces total latency from N*RTT to ~1*RTT
+//	(where RTT is the round-trip time of one API call).
 func (c *Client) GetAllContainerStats(ctx context.Context) (map[string]models.ContainerMetrics, error) {
-	// Primeiro, lista os containers em execução
+	// First, list running containers
 	containerList, err := c.cli.ContainerList(ctx, container.ListOptions{All: false})
 	if err != nil {
-		return nil, fmt.Errorf("docker.GetAllContainerStats: falha ao listar: %w", err)
+		return nil, fmt.Errorf("docker.GetAllContainerStats: failed to list: %w", err)
 	}
 
-	// Mapa thread-safe para resultados
+	// Thread-safe map for results
 	results := make(map[string]models.ContainerMetrics)
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 
 	for _, cont := range containerList {
-		// Nome do container (sem prefixo "/")
+		// Container name (without "/" prefix)
 		name := ""
 		if len(cont.Names) > 0 {
 			name = strings.TrimPrefix(cont.Names[0], "/")
@@ -472,15 +472,15 @@ func (c *Client) GetAllContainerStats(ctx context.Context) (map[string]models.Co
 
 		wg.Add(1)
 
-		// Lança uma goroutine para cada container.
-		// Capturamos 'cont' e 'name' como parâmetros para evitar race condition
-		// (variável de loop compartilhada).
+		// Launch a goroutine for each container.
+		// We capture 'cont' and 'name' as parameters to avoid race condition
+		// (shared loop variable).
 		go func(ctr types.Container, cName string) {
 			defer wg.Done()
 
 			stats, err := c.getContainerStats(ctx, ctr.ID)
 			if err != nil {
-				return // Ignora containers que falharam (podem ter parado)
+				return // Ignore containers that failed (may have stopped)
 			}
 
 			stats.ContainerID = ctr.ID[:12]
@@ -512,8 +512,8 @@ func (c *Client) GetAllContainerStats(ctx context.Context) (map[string]models.Co
 //	  systemDelta = system_cpu_usage - pre_system_cpu_usage
 //	  cpu% = (cpuDelta / systemDelta) * numCPUs * 100
 func (c *Client) getContainerStats(ctx context.Context, containerID string) (models.ContainerMetrics, error) {
-	// Stream: false retorna um único snapshot (não um stream contínuo).
-	// Isso é mais eficiente para polling periódico.
+	// Stream: false returns a single snapshot (not a continuous stream).
+	// This is more efficient for periodic polling.
 	resp, err := c.cli.ContainerStats(ctx, containerID, false)
 	if err != nil {
 		return models.ContainerMetrics{}, fmt.Errorf("stats: %w", err)
@@ -525,10 +525,10 @@ func (c *Client) getContainerStats(ctx context.Context, containerID string) (mod
 		return models.ContainerMetrics{}, fmt.Errorf("decode stats: %w", err)
 	}
 
-	// Cálculo de CPU percentage (fórmula do docker stats CLI)
+	// CPU percentage calculation (docker stats CLI formula)
 	cpuPercent := calculateCPUPercent(&statsJSON)
 
-	// Cálculo de memória
+	// Memory calculation
 	memUsage := statsJSON.MemoryStats.Usage
 	memLimit := statsJSON.MemoryStats.Limit
 	var memPercent float64
@@ -536,14 +536,14 @@ func (c *Client) getContainerStats(ctx context.Context, containerID string) (mod
 		memPercent = float64(memUsage) / float64(memLimit) * 100.0
 	}
 
-	// Cálculo de rede (soma de todas as interfaces)
+	// Network calculation (sum of all interfaces)
 	var netRx, netTx uint64
 	for _, net := range statsJSON.Networks {
 		netRx += net.RxBytes
 		netTx += net.TxBytes
 	}
 
-	// Cálculo de block I/O
+	// Block I/O calculation
 	var blockRead, blockWrite uint64
 	for _, bio := range statsJSON.BlkioStats.IoServiceBytesRecursive {
 		switch bio.Op {
@@ -566,10 +566,10 @@ func (c *Client) getContainerStats(ctx context.Context, containerID string) (mod
 	}, nil
 }
 
-// calculateCPUPercent calcula o percentual de CPU usando a fórmula
-// oficial do Docker CLI.
+// calculateCPUPercent calculates the CPU percentage using the
+// official Docker CLI formula.
 //
-// REFERÊNCIA: https://github.com/moby/moby/blob/master/api/types/stats.go
+// REFERENCE: https://github.com/moby/moby/blob/master/api/types/stats.go
 func calculateCPUPercent(stats *types.StatsJSON) float64 {
 	cpuDelta := float64(stats.CPUStats.CPUUsage.TotalUsage) -
 		float64(stats.PreCPUStats.CPUUsage.TotalUsage)
@@ -591,7 +591,7 @@ func calculateCPUPercent(stats *types.StatsJSON) float64 {
 	return 0.0
 }
 
-// GetSystemInfo retorna informações detalhadas sobre o Docker daemon.
+// GetSystemInfo returns detailed information about the Docker daemon.
 //
 // This information is essential for observability:
 //   - Server and API version
@@ -602,21 +602,21 @@ func calculateCPUPercent(stats *types.StatsJSON) float64 {
 // In a production agent, this information would be exported as
 // metrics (Prometheus gauges) and used for infrastructure dashboards.
 func (c *Client) GetSystemInfo(ctx context.Context) (map[string]string, error) {
-	// ServerVersion retorna a versão do Docker daemon.
-	// É uma chamada leve (HTTP GET /version) e útil para health check.
+	// ServerVersion returns the Docker daemon version.
+	// It is a lightweight call (HTTP GET /version) and useful for health checks.
 	version, err := c.cli.ServerVersion(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("docker.GetSystemInfo: falha ao obter versão: %w", err)
+		return nil, fmt.Errorf("docker.GetSystemInfo: failed to get version: %w", err)
 	}
 
-	// Info retorna informações detalhadas do sistema Docker.
-	// Inclui: OS, arquitetura, memória, CPUs, containers, imagens, etc.
+	// Info returns detailed Docker system information.
+	// Includes: OS, architecture, memory, CPUs, containers, images, etc.
 	info, err := c.cli.Info(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("docker.GetSystemInfo: falha ao obter info: %w", err)
+		return nil, fmt.Errorf("docker.GetSystemInfo: failed to get info: %w", err)
 	}
 
-	// Formata memória total em formato legível (GB).
+	// Format total memory in human-readable format (GB).
 	memoryGB := float64(info.MemTotal) / (1024 * 1024 * 1024)
 
 	result := map[string]string{
@@ -632,33 +632,33 @@ func (c *Client) GetSystemInfo(ctx context.Context) (map[string]string, error) {
 	return result, nil
 }
 
-// ListRunningContainers retorna uma lista de todos os containers em execução.
+// ListRunningContainers returns a list of all running containers.
 //
-// PARÂMETRO ctx (context.Context):
-//   - Permite cancelamento da operação (ex: Ctrl+C, timeout, deadline)
-//   - Se o context for cancelado durante a chamada HTTP ao Docker daemon,
-//     a operação é abortada imediatamente e retorna ctx.Err()
-//   - REGRA DE OURO: toda função que faz I/O deve aceitar um context
-//     como primeiro parâmetro
+// PARAMETER ctx (context.Context):
+//   - Allows operation cancellation (e.g. Ctrl+C, timeout, deadline)
+//   - If the context is cancelled during the HTTP call to the Docker daemon,
+//     the operation is aborted immediately and returns ctx.Err()
+//   - GOLDEN RULE: every function that does I/O should accept a context
+//     as its first parameter
 //
-// RETORNO ([]models.ContainerInfo, error):
-//   - Multi-value return é o padrão Go para operações que podem falhar
-//   - Nunca retorne (nil, nil) — sempre retorne dados OU erro
-//   - Em caso de sucesso com lista vazia, retorne ([]ContainerInfo{}, nil)
+// RETURN ([]models.ContainerInfo, error):
+//   - Multi-value return is the Go standard for operations that can fail
+//   - Never return (nil, nil) — always return data OR error
+//   - On success with empty list, return ([]ContainerInfo{}, nil)
 func (c *Client) ListRunningContainers(ctx context.Context) ([]models.ContainerInfo, error) {
-	// container.ListOptions filtra quais containers retornar.
-	// All: false retorna apenas containers em execução (Running).
-	// Para incluir containers parados, use All: true.
+	// container.ListOptions filters which containers to return.
+	// All: false returns only running containers.
+	// To include stopped containers, use All: true.
 	containers, err := c.cli.ContainerList(ctx, container.ListOptions{
-		All: false, // Apenas containers em execução
+		All: false, // Only running containers
 	})
 	if err != nil {
-		return nil, fmt.Errorf("docker.ListRunningContainers: falha ao listar: %w", err)
+		return nil, fmt.Errorf("docker.ListRunningContainers: failed to list: %w", err)
 	}
 
-	// Pré-alocamos o slice com o tamanho exato usando make([]T, 0, cap).
-	// Isso evita realocações de memória durante o append, melhorando
-	// a performance. Em um agente de observabilidade, cada alocação conta.
+	// Pre-allocate the slice with exact size using make([]T, 0, cap).
+	// This avoids memory reallocations during append, improving
+	// performance. In an observability agent, every allocation counts.
 	result := make([]models.ContainerInfo, 0, len(containers))
 
 	for _, ctr := range containers {
@@ -683,7 +683,7 @@ func (c *Client) ListRunningContainersDetailed(ctx context.Context) ([]logger.Co
 		All: false,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("docker.ListRunningContainersDetailed: falha ao listar: %w", err)
+		return nil, fmt.Errorf("docker.ListRunningContainersDetailed: failed to list: %w", err)
 	}
 
 	result := make([]logger.ContainerDisplay, 0, len(containers))
@@ -777,23 +777,23 @@ func (c *Client) enrichMountDetails(inspect *types.ContainerJSON, cd *logger.Con
 	}
 }
 
-// toContainerInfo converte um container da SDK do Docker para nosso DTO interno.
+// toContainerInfo converts a Docker SDK container to our internal DTO.
 //
-// Esta função é não-exportada (minúscula) porque é um detalhe de implementação.
-// O chamador externo não precisa saber como fazemos a conversão.
+// This function is unexported (lowercase) because it is an implementation detail.
+// External callers do not need to know how we perform the conversion.
 func toContainerInfo(c types.Container) models.ContainerInfo {
-	// Os nomes dos containers no Docker começam com "/" por razões históricas.
-	// Removemos a barra para exibição mais limpa.
+	// Docker container names start with "/" for historical reasons.
+	// We remove the slash for cleaner display.
 	name := ""
 	if len(c.Names) > 0 {
 		name = strings.TrimPrefix(c.Names[0], "/")
 	}
 
-	// Formata as portas expostas de forma legível.
+	// Format exposed ports in a human-readable way.
 	ports := formatPorts(c.Ports)
 
 	return models.ContainerInfo{
-		ID:     c.ID[:12], // Usamos apenas os 12 primeiros caracteres (short ID)
+		ID:     c.ID[:12], // Use only the first 12 characters (short ID)
 		Name:   name,
 		Image:  c.Image,
 		Status: c.Status,
@@ -802,14 +802,14 @@ func toContainerInfo(c types.Container) models.ContainerInfo {
 	}
 }
 
-// toContainerDisplay converte um container para o formato detalhado de display.
+// toContainerDisplay converts a container to the detailed display format.
 func toContainerDisplay(c types.Container) logger.ContainerDisplay {
 	name := ""
 	if len(c.Names) > 0 {
 		name = strings.TrimPrefix(c.Names[0], "/")
 	}
 
-	// Extrai nomes das redes conectadas ao container.
+	// Extract names of networks connected to the container.
 	networks := make([]string, 0)
 	if c.NetworkSettings != nil {
 		for netName := range c.NetworkSettings.Networks {
@@ -817,21 +817,21 @@ func toContainerDisplay(c types.Container) logger.ContainerDisplay {
 		}
 	}
 
-	// Filtra labels relevantes (ignora labels internos do Docker/Compose).
+	// Filter relevant labels (ignore Docker/Compose internal labels).
 	labels := make(map[string]string)
 	for k, v := range c.Labels {
-		// Inclui apenas labels de usuário ou compose, ignora labels
-		// internos muito verbosos do Docker Desktop.
+		// Include only user or compose labels, ignore overly verbose
+		// Docker Desktop internal labels.
 		if !strings.HasPrefix(k, "desktop.docker.") &&
 			!strings.HasPrefix(k, "org.opencontainers.") {
 			labels[k] = v
 		}
 	}
 
-	// Formata o timestamp de criação em formato legível.
+	// Format the creation timestamp in a human-readable format.
 	created := time.Unix(c.Created, 0).Format("2006-01-02 15:04:05")
 
-	// Trunca o comando se muito longo para exibição.
+	// Truncate command if too long for display.
 	command := c.Command
 	if len(command) > 60 {
 		command = command[:57] + "..."
@@ -851,15 +851,15 @@ func toContainerDisplay(c types.Container) logger.ContainerDisplay {
 	}
 }
 
-// formatPorts converte a lista de portas da API do Docker em uma
-// representação legível para humanos (ex: "0.0.0.0:8080->80/tcp").
+// formatPorts converts the Docker API port list into a
+// human-readable representation (e.g. "0.0.0.0:8080->80/tcp").
 func formatPorts(ports []types.Port) string {
 	if len(ports) == 0 {
 		return ""
 	}
 
-	// strings.Builder é mais eficiente que concatenação com + para
-	// múltiplas strings, pois evita alocações intermediárias.
+	// strings.Builder is more efficient than concatenation with + for
+	// multiple strings, as it avoids intermediate allocations.
 	var b strings.Builder
 
 	for i, p := range ports {
@@ -877,26 +877,26 @@ func formatPorts(ports []types.Port) string {
 	return b.String()
 }
 
-// RunStressTest cria um container temporário de stress test.
-// Usamos alpine + stress-ng para garantir compatibilidade com
-// todas as arquiteturas (arm64, amd64) e evitar erros de manifest antigo.
-// O container se auto-remove após terminar.
+// RunStressTest creates a temporary stress test container.
+// We use alpine + stress-ng for compatibility with all architectures
+// (arm64, amd64) and to avoid old manifest errors.
+// The container self-removes after finishing.
 //
-// MODOS:
+// MODES:
 //   - "cpu"    → stress-ng --cpu 2 --timeout Xs
 //   - "memory" → stress-ng --vm 1 --vm-bytes 256M --timeout Xs
 //   - "both"   → stress-ng --cpu 2 --vm 1 --vm-bytes 256M --timeout Xs
 //
 // DOCKER API (ContainerCreate + ContainerStart):
 //
-//	Usamos a mesma API que o `docker run` usa internamente.
-//	AutoRemove:true garante que o container é removido após execução,
-//	evitando acúmulo de containers parados.
+//	We use the same API that `docker run` uses internally.
+//	AutoRemove:true ensures the container is removed after execution,
+//	avoiding accumulation of stopped containers.
 func (c *Client) RunStressTest(ctx context.Context, mode string, durationSec int) error {
 	stressImage := "alpine:latest"
 	containerName := "castle-rock-stress"
 
-	// Monta os argumentos do stress-ng
+	// Build stress-ng arguments
 	var stressArgs string
 	switch mode {
 	case "cpu":
@@ -907,23 +907,23 @@ func (c *Client) RunStressTest(ctx context.Context, mode string, durationSec int
 	case "both":
 		stressArgs = fmt.Sprintf("--cpu 2 --vm 1 --vm-bytes 256M --vm-hang 0 --timeout %ds", durationSec)
 	default:
-		return fmt.Errorf("docker.RunStressTest: modo inválido: %s", mode)
+		return fmt.Errorf("docker.RunStressTest: invalid mode: %s", mode)
 	}
 
 	cmd := []string{"sh", "-c", fmt.Sprintf("apk add --no-cache stress-ng && stress-ng %s", stressArgs)}
 
-	// Tenta remover container anterior com mesmo nome (se existir)
+	// Try to remove previous container with the same name (if it exists)
 	_ = c.cli.ContainerRemove(ctx, containerName, container.RemoveOptions{Force: true})
 
-	// Puxa a imagem se não existir localmente
+	// Pull image if not available locally
 	_, _, err := c.cli.ImageInspectWithRaw(ctx, stressImage)
 	if err != nil {
 		reader, pullErr := c.cli.ImagePull(ctx, "docker.io/library/"+stressImage, image.PullOptions{})
 		if pullErr != nil {
-			return fmt.Errorf("docker.RunStressTest: falha ao baixar imagem %s: %w", stressImage, pullErr)
+			return fmt.Errorf("docker.RunStressTest: failed to pull image %s: %w", stressImage, pullErr)
 		}
 		defer reader.Close()
-		// Consome o reader para completar o pull
+		// Consume the reader to complete the pull
 		buf := make([]byte, 4096)
 		for {
 			_, readErr := reader.Read(buf)
@@ -933,24 +933,24 @@ func (c *Client) RunStressTest(ctx context.Context, mode string, durationSec int
 		}
 	}
 
-	// Cria o container
+	// Create the container
 	resp, err := c.cli.ContainerCreate(ctx,
 		&container.Config{
 			Image: stressImage,
 			Cmd:   cmd,
 		},
 		&container.HostConfig{
-			AutoRemove: true, // Remove automaticamente após terminar
+			AutoRemove: true, // Automatically remove after finishing
 		},
 		nil, nil, containerName,
 	)
 	if err != nil {
-		return fmt.Errorf("docker.RunStressTest: falha ao criar container: %w", err)
+		return fmt.Errorf("docker.RunStressTest: failed to create container: %w", err)
 	}
 
-	// Inicia o container
+	// Start the container
 	if err := c.cli.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
-		return fmt.Errorf("docker.RunStressTest: falha ao iniciar container: %w", err)
+		return fmt.Errorf("docker.RunStressTest: failed to start container: %w", err)
 	}
 
 	return nil

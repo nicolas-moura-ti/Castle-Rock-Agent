@@ -3,6 +3,7 @@ package prune
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/nicolas-moura-ti/castle-rock-agent/internal/docker"
@@ -10,34 +11,36 @@ import (
 	"github.com/shirou/gopsutil/v3/disk"
 )
 
-// AutoPruner gerencia o ciclo de verificação de disco e limpeza
+// AutoPruner manages the disk check and cleanup cycle.
 type AutoPruner struct {
 	dockerClient *docker.Client
 	store        *storage.SQLiteStore
+	log          *slog.Logger
 
 	thresholdPct float64
 	checkPeriod  time.Duration
 	pathToCheck  string
 
-	// Previne execuções seguidas muito rapidamente
+	// Prevents rapid consecutive executions
 	lastPrune time.Time
 }
 
-// NewAutoPruner cria uma instância do pruner configurada para vigiar uma rota e limite
+// NewAutoPruner creates a configured pruner instance to watch a path and threshold.
 func NewAutoPruner(client *docker.Client, store *storage.SQLiteStore, triggerPct float64) *AutoPruner {
-	// Geralmente na maioria dos sistemas (mesmo containerizados via docker-socket)
-	// avaliar o root FS ("/") é o suficiente, ou o próprio volume host mapeado.
+	// In most systems (even containerized via docker-socket),
+	// checking the root FS ("/") is sufficient, or the host-mapped volume.
 	return &AutoPruner{
 		dockerClient: client,
 		store:        store,
+		log:          slog.Default(),
 		thresholdPct: triggerPct,
-		checkPeriod:  time.Minute * 5, // Checa o disco a cada 5m
+		checkPeriod:  time.Minute * 5, // Check disk every 5m
 		pathToCheck:  "/",
 	}
 }
 
-// Start dispara a rotina de watchdog em background.
-// Só termina quando o Context morre.
+// Start launches the watchdog routine in background.
+// Only terminates when the Context is cancelled.
 func (p *AutoPruner) Start(ctx context.Context) {
 	ticker := time.NewTicker(p.checkPeriod)
 	defer ticker.Stop()
@@ -53,13 +56,14 @@ func (p *AutoPruner) Start(ctx context.Context) {
 }
 
 func (p *AutoPruner) checkAndPrune(ctx context.Context) {
-	// Se rodou há menos de 1h, skip (evita oneração caso disco não esvazie mesmo com prune)
+	// If ran less than 1h ago, skip (avoids overhead if disk doesn't clear even after prune)
 	if time.Since(p.lastPrune) < time.Hour {
 		return
 	}
 
 	usage, err := disk.UsageWithContext(ctx, p.pathToCheck)
 	if err != nil {
+		p.log.Debug("pruner: failed to check disk usage", slog.String("error", err.Error()))
 		return
 	}
 

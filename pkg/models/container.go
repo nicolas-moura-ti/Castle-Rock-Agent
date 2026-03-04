@@ -1,93 +1,93 @@
-// Package models define os DTOs (Data Transfer Objects) e structs
-// públicas do Castle Rock Agent.
+// Package models defines the DTOs (Data Transfer Objects) and public
+// structs for the Castle Rock Agent.
 //
-// Este package fica em pkg/ (não internal/) porque pode ser importado
-// por outros projetos que queiram consumir os dados do agente.
+// This package lives in pkg/ (not internal/) because it can be imported
+// by other projects that want to consume the agent's data.
 //
-// CONVENÇÃO GO:
-//   - pkg/ = código público, reutilizável por projetos externos
-//   - internal/ = código privado, restrito ao módulo atual
-//   - A distinção é enforçada pelo compilador Go (não apenas convenção)
+// GO CONVENTION:
+//   - pkg/ = public code, reusable by external projects
+//   - internal/ = private code, restricted to the current module
+//   - The distinction is enforced by the Go compiler (not just convention)
 package models
 
-// ContainerInfo representa as informações básicas de um container Docker.
+// ContainerInfo represents basic information about a Docker container.
 //
-// Esta struct é o DTO principal para a listagem de containers.
-// Contém apenas dados de identificação e estado — métricas de performance
-// ficam em ContainerMetrics.
+// This struct is the main DTO for container listing.
+// It contains only identification and state data — performance metrics
+// are stored in ContainerMetrics.
 //
-// BOAS PRÁTICAS EM STRUCTS GO:
-//   - Campos exportados (maiúsculos) para serialização JSON
-//   - Tags JSON para controlar os nomes no output serializado
-//   - Documentação em cada campo para auto-documentação da API
+// GO STRUCT BEST PRACTICES:
+//   - Exported fields (uppercase) for JSON serialization
+//   - JSON tags to control names in serialized output
+//   - Documentation on each field for API self-documentation
 type ContainerInfo struct {
-	// HostID identifica em qual máquina o container está rodando.
+	// HostID identifies which machine the container is running on.
 	HostID string `json:"host_id,omitempty"`
 
-	// ID é o identificador único do container (short ID, 12 caracteres).
+	// ID is the container's unique identifier (short ID, 12 characters).
 	ID string `json:"id"`
 
-	// Name é o nome atribuído ao container (sem o prefixo "/").
+	// Name is the name assigned to the container (without the "/" prefix).
 	Name string `json:"name"`
 
-	// Image é o nome da imagem Docker usada pelo container.
+	// Image is the Docker image name used by the container.
 	Image string `json:"image"`
 
-	// Status é a descrição legível do estado (ex: "Up 2 hours").
+	// Status is the human-readable state description (e.g. "Up 2 hours").
 	Status string `json:"status"`
 
-	// State é o estado técnico do container (running, exited, paused, etc.).
+	// State is the technical container state (running, exited, paused, etc.).
 	State string `json:"state"`
 
-	// Ports são as portas expostas formatadas (ex: "0.0.0.0:8080->80/tcp").
+	// Ports are the exposed ports formatted for display (e.g. "0.0.0.0:8080->80/tcp").
 	Ports string `json:"ports,omitempty"`
 }
 
-// ContainerMetrics representa as métricas de performance de um container.
+// ContainerMetrics represents the performance metrics of a container.
 //
-// Este DTO será populado pelo collector usando a Docker Stats API.
-// A separação entre ContainerInfo e ContainerMetrics segue o princípio
-// de responsabilidade única: info é estático, metrics é dinâmico.
+// This DTO is populated by the collector using the Docker Stats API.
+// The separation between ContainerInfo and ContainerMetrics follows the
+// Single Responsibility Principle: info is static, metrics are dynamic.
 type ContainerMetrics struct {
-	// HostID identifica de qual máquina vieram as métricas.
+	// HostID identifies which machine the metrics came from.
 	HostID string `json:"host_id,omitempty"`
 
-	// ContainerID identifica o container ao qual estas métricas pertencem.
+	// ContainerID identifies the container these metrics belong to.
 	ContainerID string `json:"container_id"`
 
-	// ContainerName é o nome do container (para labels de métricas).
+	// ContainerName is the container name (for metric labels).
 	ContainerName string `json:"container_name"`
 
-	// Image é a imagem Docker do container.
+	// Image is the container's Docker image.
 	Image string `json:"image"`
 
-	// CPUPercent é o percentual de uso de CPU do container.
+	// CPUPercent is the container's CPU usage percentage.
 	CPUPercent float64 `json:"cpu_percent"`
 
-	// MemoryUsage é o uso de memória em bytes.
+	// MemoryUsage is the memory usage in bytes.
 	MemoryUsage uint64 `json:"memory_usage"`
 
-	// MemoryLimit é o limite de memória configurado em bytes.
+	// MemoryLimit is the configured memory limit in bytes.
 	MemoryLimit uint64 `json:"memory_limit"`
 
-	// MemoryPercent é o percentual de uso de memória.
+	// MemoryPercent is the memory usage percentage.
 	MemoryPercent float64 `json:"memory_percent"`
 
-	// NetworkRx é o total de bytes recebidos pela rede.
+	// NetworkRx is the total bytes received over the network.
 	NetworkRx uint64 `json:"network_rx"`
 
-	// NetworkTx é o total de bytes transmitidos pela rede.
+	// NetworkTx is the total bytes transmitted over the network.
 	NetworkTx uint64 `json:"network_tx"`
 
-	// BlockRead é o total de bytes lidos do disco.
+	// BlockRead is the total bytes read from disk.
 	BlockRead uint64 `json:"block_read"`
 
-	// BlockWrite é o total de bytes escritos no disco.
+	// BlockWrite is the total bytes written to disk.
 	BlockWrite uint64 `json:"block_write"`
 }
 
-// PushPayload é o pacote de dados enviado pelo Worker ao Leader.
-// Ele agrupa o estado de todos os containers de uma vez (snapshot).
+// PushPayload is the data package sent by a Worker to the Leader.
+// It groups the state of all containers at once (snapshot).
 type PushPayload struct {
 	HostID     string             `json:"host_id"`
 	Containers []ContainerInfo    `json:"containers"`
