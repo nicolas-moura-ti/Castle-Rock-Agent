@@ -1,14 +1,19 @@
+<div align="center">
+
 # 🏰 Castle Rock Agent
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/nicolas-moura-ti/castle-rock-agent)](https://goreportcard.com/report/github.com/nicolas-moura-ti/castle-rock-agent)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Go Version](https://img.shields.io/github/go-mod/go-version/nicolas-moura-ti/castle-rock-agent)](https://github.com/nicolas-moura-ti/castle-rock-agent)
+[![Go Report Card](https://goreportcard.com/badge/github.com/nicolas-moura-ti/castle-rock-agent?style=flat-square)](https://goreportcard.com/report/github.com/nicolas-moura-ti/castle-rock-agent)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
+[![Go Version](https://img.shields.io/badge/Go-v1.24.2-blue?style=flat-square&logo=go)](https://github.com/nicolas-moura-ti/castle-rock-agent)
 
-*Read this in other languages: [English](README.md), [Português](README.pt-BR.md).*
+\
+*Read this in other languages: [English](README.md) · [Português](README.pt-BR.md)*
 
 > A Go-native observability agent for monitoring Docker containers with an interactive dashboard, Prometheus metrics, and configurable alerts.
 
-### ⛰️ Why "Castle Rock"?
+</div>
+
+---### ⛰️ Why "Castle Rock"?
 Inspired by medieval watchtowers built on rocky peaks (Castle Rocks), which offered an **absolute panoramic view** of everything happening around the castle. Just like these towers, this agent sits at a privileged observation point (the Docker Socket) to monitor, watch, and alert on the health of your entire container infrastructure.
 
 ---
