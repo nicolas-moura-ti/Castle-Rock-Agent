@@ -1303,10 +1303,11 @@ func (m Model) renderHelpBar() string {
 	}
 
 	if m.showHelp {
+		legend := "\n  Icons: 🚨 Critical Alert │ ⚠️ Warning Alert │ 🛡️ Security Issue │ ❤️ Healthy │ 🩺 Unhealthy │ ⏳ Starting"
 		return lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).BorderForeground(primaryColor).
 			Padding(0, 1).MarginLeft(2).
-			Render(bar) + "\n"
+			Render(bar+legend) + "\n"
 	}
 
 	promInfo := ""

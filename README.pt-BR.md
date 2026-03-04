@@ -20,63 +20,49 @@ Inspirado nas torres de vigia medievais erguidas sobre rochedos (Castle Rocks), 
 
 ---
 
-## 🧠 Como Funciona — Explicação Simples
+## 📖 Documentação Completa por Módulos
 
-Imagine que você tem vários containers Docker rodando (banco de dados, API, nginx...). Você quer saber: **Quanta CPU cada um está usando? Está consumindo muita memória? A rede está normal?**
+Para mergulhar em detalhes técnicos e funcionalidades específicas, por favor consulte nossa pasta de documentações oficias:
 
-O problema é que o Docker sozinho tem a memória de um peixinho dourado. Ele sabe o que está acontecendo **agora**, mas não faz ideia do que aconteceu há 5 minutos. E também não tem como gerar gráficos bonitos para você mostrar na reunião de sexta-feira.
-
-Para resolver isso, usamos **3 peças** que trabalham juntas:
-
-### 🏰 Castle Rock Agent (este projeto)
-É o **coletor**. Ele se conecta ao Docker, pergunta "como cada container está?", e traduz essas informações para um formato padronizado. Sem ele, o Prometheus não teria como acessar os dados do Docker.
-
-**Analogia:** É como um termômetro que mede a temperatura e expõe a leitura em uma tela.
-
-### 📊 Prometheus
-É o **banco de dados de métricas**. A cada 5 segundos ele visita o agente (`http://agent:9110/metrics`), coleta os números e **guarda com timestamp**. Assim você pode perguntar: "Qual foi a CPU do postgres às 14h30?"
-
-**Analogia:** É como um caderno onde alguém anota a temperatura a cada 5 segundos. Depois de uma semana, você tem um histórico completo.
-
-### 📈 Grafana
-É o **painel de visualização**. Ele lê os dados do Prometheus e gera **gráficos, gauges e tabelas** em tempo real. É onde você realmente "vê" o que está acontecendo.
-
-**Analogia:** É como pegar aquele caderno de anotações e transformar em um gráfico bonito na tela.
-
-### Fluxo de dados
-
-```
-Docker Containers → Castle Rock Agent → Prometheus → Grafana
-(geram métricas)    (coleta e traduz)   (armazena)    (visualiza)
-```
-
-**Por que não usar uma ferramenta só?** Porque na prática cada peça faz UMA coisa muito bem. Essa separação é o padrão da indústria — é assim que empresas como Google, Netflix e Uber monitoram seus sistemas.
+- 🖥️ **[Painel Interativo TUI & Referência de Operação](docs/TUI.pt-BR.md)** 
+  *(Stress Test, Acesso a Shell `exec`, Limpeza Docker Prune, Live Tail & Grep, Diagnóstico Integrado)*
+- 📈 **[Observabilidade (Prometheus & Grafana) & Motores de Alerta](docs/OBSERVABILITY.pt-BR.md)** 
+  *(Lista das Enumerações de Métricas, Detalhe dos 5 Dashboards Grafana, Modo Multi-Cloud/Cluster, Conexão e Regras de Alerta Prom)*
+- ⚙️ **[Configuração e Variáveis do Kernel](docs/CONFIGURATION.pt-BR.md)**
+  *(Especificação do `config.yaml`, Sobrescrita e Regras Hierárquicas 12-Factor, Precedências de Ambientes Injetáveis)*
 
 ---
 
-## ✨ Features
+## 🧠 Como Funciona — Explicação Rápida
 
-| Feature | Descrição |
+O monitoramento do agente depende da integração com outras três chaves de observadores:
+
+1. **Castle Rock Agent (este pacote Binário):** Extrai a alma performática do sistema conectando aos arquivos de Soquete do Docker e agindo como Coletor nativo, em repasse ao interpretador.
+2. **Prometheus:** Exerce trabalho escravo como o seu **Bando de Dados em Tempo Real e Histórico**. Acorda de 5s em 5s e intercepta o repassado do endpoint HTTP (`http://127.0.0.1:9110/metrics`), guardando isso sob sua própria carimbagem do tempo.
+3. **Grafana:** O Painel Interativo de Relatores a Visitação do usuário onde extrairá o prometheus e transformará em **Desenhos Gráficos Visuais.**
+
+```
+Containers Nativos →  Castle Rock Agent  →   Prometheus DB Base  →  Dashboards Grafana WEB 
+(Geram os danos)      (Coleta e formata)     (Armazena no tempo)    (Plástico visual a você)
+```
+
+---
+
+## ✨ Principais Diferenciais (Features)
+
+| Funcionalidade | Descrição Curta |
 |---|---|
-| **TUI Interativa** | Dashboard fullscreen com [Bubble Tea](https://github.com/charmbracelet/bubbletea) — tabela de containers, métricas, eventos |
-| **Métricas Tempo Real** | CPU%, Memória%, Network I/O, Disk I/O via Docker Stats API |
-| **Prometheus Exporter** | Expõe 9 métricas em `/metrics` para scraping (porta 9110) |
-| **Grafana Dashboard** | Dashboard pré-configurado com 6 painéis (CPU, Memória, Rede, Gauges) |
-| **Alertas Configuráveis** | Regras customizáveis com threshold + duração (similar ao Alertmanager) |
-| **Container Actions** | Stop e restart de containers direto da TUI com confirmação |
-| **Logs Streaming** | Visualizar logs do container em tempo real (como `docker logs -f`) |
-| **Docker Events** | Eventos de lifecycle (start, stop, die) com ícones e cores |
-| **Cluster Mode 🌐** | Arquitetura Multi-Host (Leader/Worker) para agregar métricas de múltiplos servidores |
-| **SQLite Historian 🗄️** | Banco de dados SQLite Puro-Go para persistir o histórico de alertas e eventos (porque a memória do admin não deve ser tão curta quanto a RAM). |
-| **Auto Prune 🧹** | Um Garbage Collector próprio pro Docker. Vigia o uso de disco do host e roda um `docker system prune` nativo antes que seu servidor vá para o espaço. |
-| **Service Map 🕸️** | Aperte `M` para inspecionar visualmente a topologia da sua Rede Docker e ver quem está na mesma rede de quem. |
-| **Auditoria de Segurança 🛡️** | Scanning "Shift-Left" em tempo real. O motor intercepta 9 anomalias críticas de segurança (ex: usuário root, modo privilegiado, portas de DB expostas globalmente). |
-| **i18n & Internacionalização 🌍** | O agente agora fala fluentemente Inglês (`en`) e Português (`pt`). Modifique no `config.yaml` ou via env var `CASTLE_ROCK_LANGUAGE=pt`. |
-| **Config YAML + ENV** | Configuração via `config.yaml` com override por variáveis de ambiente |
+| **TUI Dinâmica** | Console em Shell Extensa (Fullscreen) preenchedora com Live Tables integradas. |
+| **Ponto Exato em Tempo Efetivo** | Porcentuais instantâneos base de Leitura de Disco I/O e Placas de Rede acopladas limitadas. |
+| **Templates Nativos Grafana** | Cinco layouts previamente escritos de Painéis analíticos e tabelas interligadas do ecossistema Grafana. |
+| **Dispensador de Alertas Dual** | Notificações Operacionais que piscam cores críticas locais além dos gatilhos Webhooks externos do Prometheus integráveis. |
+| **Central de Nodos em Cluster 🌐** | Capacidade Distributiva Multi-Server ligando Agentes Escravos por Polling repassando para um Painel Único de Matriz.|
+| **Auditoria Tática Anti-Válvula 🛡️** | Rastreador Real-Time Shift-Left expondo "Vistas Prontas" críticas em containers como permissão de Roots não mascarada ou falta cênica em limitações preventivas. |
+| **Lavador Ocioso Nativo 🧹** | Expurgo preventivo automático atrelado por Garbage Collector que deleta as lamas digitais do Docker para salvar a partição raiz. |
 
 ---
 
-## Arquitetura
+## Topologia de Rede e Arquitetura do Serviço Base
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
@@ -93,752 +79,79 @@ Docker Containers → Castle Rock Agent → Prometheus → Grafana
 │         └─────────┬───────┴──────────┼───────────┘             │
 │                   ▼                  │ (HTTP POST)             │
 │         ┌──────────────────┐         │  ┌───────────────────┐  │
-│         │  Docker Client   │         └──┤ Worker Node (Ag.) │  │
-│         │  (SDK oficial)   │            └───────────────────┘  │
+│         │   Motor SDK API  │         └──┤ Nó Excedente (Op) │  │
+│         │  (Coleta Docker) │            └───────────────────┘  │
 │         └─────────┬────────┘                                   │
 │                   │                                            │
 └───────────────────┼────────────────────────────────────────────┘
                     ▼
-            Docker Engine API
+            Sistema Físico Docker Interno Root
       (unix:///var/run/docker.sock)
 ```
 
-### Estrutura de Diretórios
+---
 
-```
-castle-rock-agent/
-├── cmd/agent/main.go              # Entrypoint — bootstrapping e modos (TUI/headless)
-├── internal/
-│   ├── docker/client.go           # Docker SDK: containers, stats, events, logs, actions
-│   ├── tui/tui.go                 # Dashboard interativo (Bubble Tea + lipgloss)
-│   ├── metrics/prometheus.go      # Exportador Prometheus com 9 GaugeVec
-│   ├── alerts/alerts.go           # Motor de alertas (regras, pending→firing→resolved)
-│   ├── config/config.go           # Loader YAML + env vars (12-Factor App)
-│   ├── logger/logger.go           # slog customizado com cores ANSI
-│   └── collector/container.go     # Interface Collector (extensível)
-├── pkg/models/container.go        # DTOs: ContainerInfo, ContainerMetrics, ContainerDisplay
-├── configs/config.yaml            # Configuração YAML documentada
-├── deploy/
-│   ├── prometheus/
-│   │   ├── prometheus.yml         # Scrape config
-│   │   └── alert_rules.yml        # Regras de alerta Prometheus
-│   └── grafana/provisioning/
-│       ├── datasources/           # Auto-config Prometheus como datasource
-│       └── dashboards/            # Dashboard JSON pré-configurado
-├── docker-compose.yml             # Stack completa: Agent + Prometheus + Grafana
-├── Dockerfile                     # Multi-stage build (Go 1.24 → Alpine)
-├── Makefile                       # Targets padronizados
-└── go.mod / go.sum
-```
+## O Que É Necessário Antes (Prerequisitos)
+
+| Binários ou Serviços Básicos | Suporte Minimo | 
+|---|---|
+| **Go** | 1.24+ | 
+| **Docker** | 20.10+ | 
+| **Make** | Qualquer lib clássica | 
+
+*(Aos amigos adeptos da Maçã - Em Mac OS atente ao consentimento silencioso de terminal da devida C tools Xcode com: `sudo xcodebuild -license accept`)*
 
 ---
 
-## Pré-requisitos
+## Primeiros Passos e Rodando: Quick Boot
 
-| Dependência | Versão Mínima | Verificação |
-|---|---|---|
-| **Go** | 1.24+ | `go version` |
-| **Docker** | 20.10+ | `docker --version` |
-| **Docker Desktop** ou **Engine** | Rodando | `docker info` |
-| **Make** | qualquer | `make --version` |
+### Formato #1: Modo Local Console Gráfico TUI (Simples Teste/Dev)
 
-### macOS — Xcode Command Line Tools
+Acopla instantaneamente o motor visual da Castle na linha de comando nativa. Operação limpa onde só fará sentido para o olho local testando.
 
 ```bash
-# Instalar (se necessário)
-xcode-select --install
-
-# Aceitar licença (OBRIGATÓRIO após instalação/atualização)
-sudo xcodebuild -license accept
-```
-
-> ⚠️ **Sem aceitar a licença, o `go build` falhará** com `"please accept the Xcode license as the root user"`.
-
----
-
-## Quick Start
-
-### Modo 1: TUI Local (desenvolvimento)
-
-```bash
-# Clone
+# Baixando
 git clone https://github.com/nicolas-moura-ti/castle-rock-agent.git
 cd castle-rock-agent
 
-# Instalar dependências
-make tidy
-
-# Executar (abre dashboard interativo)
+# Aciona Interface (Entrando Tela TUI Visão Master)
 make run
 ```
 
-### Modo 2: Docker Compose (stack completa de observabilidade)
+### Formato #2: O Modo Definitivo Docker Compose (Central de Monitoria Mestra)
+
+Eleva de forma isolada do HD três pilares atrelados para atuar 24/7 horas sobre a sua Nuvem sem fechar, usando apenas portas expostas (**O Castle entra no modo sombra (Headless) recolhendo silenciosamente dados ao Prome**).
 
 ```bash
-# Levanta Agent + Prometheus + Grafana
 docker compose up -d
 
-# Acesse:
-# - Grafana:    http://localhost:3000  (admin / castlerock)
-# - Prometheus: http://localhost:9090
-# - Métricas:   http://localhost:9110/metrics
+# Visualização no Navegador:
+# - A sua Central Grafana em Geral: http://127.0.0.1:3000  (admin / castlerock)
+# - O Banco Analítico Primitivo Prom:  http://127.0.0.1:9090
+# - Ver Endpoint de saída Castle Crua  http://127.0.0.1:9110/metrics
 ```
 
-Para parar:
+> 💡 **USO CONJUNTO E SÁBIO DO SISTEMA:** Nunca mate o `docker compose up -d` da máquina! Deixe as duas instâncias conviverem em paralelo! 
+Sua grade Web do grafana ficará recolhendo infinitamente histórico métrico analítico 24/7/365 enquanto você de sossego abre seu TUI esporádico `make run` local com o chefe num fim de expediente unicamente pontual para rastrear vazamentos de Memória local.
+
+---
+
+## 🧪 Base Coberta Analítica (Desenvolvimento e Setup)
 
 ```bash
-docker compose down
+make test          # Cobertura contra corrida de Race Condicional (-race)
+make lint          # Análise profunda Go contra code smell GoVet (Static Analysis vet)
+make build         # Cria o tijolo empacotado Binário super pequeno (Optimized Binary)
+make docker-build  # Compila uma imagem Alpine com seu Castle dentro pronta.
 ```
 
-### Comparação dos modos
-
-| | `make run` | `docker compose up` |
-|---|---|---|
-| **Onde roda** | Direto no seu Mac | Dentro de containers Docker |
-| **TUI (dashboard terminal)** | ✅ Sim | ❌ Não (headless) |
-| **Prometheus coletando** | ❌ Não | ✅ Sim |
-| **Grafana com gráficos** | ❌ Não | ✅ Sim |
-| **Por que usar** | Desenvolvimento e análise rápida | Monitoramento 24/7 e alertas visuais |
-
-> 💡 **USO EM PARALELO:** Você pode (e deve!) rodar os dois modos ao mesmo tempo!
-> Deixe o `docker compose up -d` rodando no fundo coletando métricas para o Grafana, e sempre que quiser inspecionar a fundo ou testar cargas ("Stress Test"), abra um terminal e rode `make run`. Um não interfere no outro e ambos monitoram o mesmo ambiente de forma cooperativa.
-
-### Modo 3: Multi-Host Cluster 🌐
-
-O agente suporta rodar de forma distribuída para monitorar múltiplos servidores de uma vez.
-Você sobe **um Leader** e múltiplos **Workers** (agentes remotos que enviam dados para o Leader).
-
-```bash
-# Servidor Principal (Leader)
-CASTLE_ROCK_CLUSTER_MODE=leader CASTLE_ROCK_CLUSTER_HOST_ID=matriz make run
-
-# Em outro servidor (Worker) - Sem TUI, rodando em background
-CASTLE_ROCK_CLUSTER_MODE=worker \
-CASTLE_ROCK_CLUSTER_HOST_ID=filial-sp \
-CASTLE_ROCK_CLUSTER_LEADER_URL=http://<IP_DO_LEADER>:9110 \
-make run
-```
-
-Os containers do Worker aparecerão automaticamente na TUI do Leader com a coluna "HOST" indicando a origem, e o Prometheus do Leader vai expor as métricas usando a tag `host_id` para o Grafana.
+### Resposta e Cobertura Base a Nível Go Module
+- `internal/tui`: Alojamento visual sobre transformações lógicas numéricas dos bytes capturados do Socket Host Docker no formato gráfico via LipGloss.
+- `internal/alerts`: Análise de validações assíncronas no contexto background (Goroutines).
+- `internal/config`: Precessadores limpos priorizando Injeções Ambientais contra o Root e Arquivo Serializado YAML em memória.
 
 ---
 
-## 🖥️ TUI — Dashboard Interativo
+## Licença Base
 
-Ao executar `make run`, o agente abre um dashboard fullscreen:
-
-```
- 🏰 Castle Rock Agent    v0.3.0 │ Docker 29.2.1 │ ⏱ 2m30s │ 📡 5 events
-
-    ID             NOME                 CPU%    MEM%    MEM       NET ↓/↑     ESTADO
- ▸  9b157cd0abf6   postgres             2.3%    45.2%   350MB     12M/5M      ● up
-    abc123def456   redis                0.1%    12.8%   98MB      3M/1M       ● up
-    fed987654321   nginx                0.5%    5.1%    42MB      50M/45M     ● up
-
- 📋 Eventos
-  ╭──────────────────────────────────────────────────────╮
-  │  16:05:32 🟢 start      nginx                       │
-  │  16:05:30 📦 create     nginx                       │
-  │  16:04:15 🔴 die        old-container               │
-  ╰──────────────────────────────────────────────────────╯
-
-  ↑↓ nav │ space select │ enter details │ l log 1 │ L log N │ x shell │ C prune │ s stop │ R restart │ S stress │ M map │ ? help │ q quit
-```
-
-> 💡 **Barra de Ajuda Contextual:** A barra inferior muda automaticamente conforme a tela ativa. Por exemplo, ao visualizar logs ela mostra `↑↓ scroll │ / grep │ f tail │ E export │ Esc back`. Na Dashboard de Prune: `[i] images │ [v] volumes │ Esc back`.
-
-### Atalhos de Teclado
-
-| Tecla | Ação |
-|---|---|
-| `↑` / `k` | Navegar para cima |
-| `↓` / `j` | Navegar para baixo |
-| `Enter` | Expandir detalhes do container (métricas, labels, redes, portas) |
-| `l` | Toggle logs em tempo real do container selecionado |
-| `Espaço` | Selecionar/Deselecionar container para Multi-Tailing |
-| `Shift+L` | Toggle logs agregados para **todos os selecionados** |
-| `/` | Aplicar Filtro (Live Grep) enquanto visualiza logs |
-| `f` | Voltar a seguir (tail) o final dos logs em tempo real |
-| `E` | Exportar logs atuais (com filtro aplicado) para `/tmp/castle-rock-logs-*.txt` |
-| `x` | Entrar no Shell Interativo do container (`/bin/sh` ou `/bin/bash`) |
-| `C` | Abrir Dashboard de Prune Interativo (Limpar imagens/volumes) |
-| `s` | **Stop** container (pede confirmação `y`) |
-| `R` | **Restart** container (pede confirmação `y`) |
-| `S` | **Stress Test Mode** (CPU/Memória para simular Noisy Neighbor) |
-| `M` | **Service Map** (Topologia visual de redes) |
-| `r` | Refresh manual da lista |
-| `?` | Exibir/ocultar ajuda detalhada |
-| `Esc` | Fechar panels abertos |
-| `q` / `Ctrl+C` | Sair do agente |
-
-### Cores dos indicadores
-
-| Cor | Significado |
-|---|---|
-| 🟢 Verde | Normal (CPU < 40%, MEM < 50%) |
-| 🟡 Amarelo | Atenção (CPU 40-80%, MEM 50-80%) |
-| 🔴 Vermelho | Crítico (CPU > 80%, MEM > 80%) |
-
----
-
-## ⚡ Stress Test Mode (Noisy Neighbor)
-
-O agente possui uma funcionalidade didática embutida para estressar a máquina e ver as métricas/alertas disparando no Grafana em tempo real.
-
-Ao pressionar `S` na TUI, você cria um container temporário construído via código (`alpine` + `stress-ng` nativo) que injeta carga no host:
-- `c` **CPU:** Stressa 2 cores a 100%
-- `m` **Memória:** Aloca e trava 256MB inteiros (sem queimar CPU)
-- `b` **Ambos:** Aplica carga dupla
-
-*O container dura exatamente 30 segundos e se auto-destrói (`AutoRemove: true`), para que você possa ver a curva de disparo dos alertas e, logo em seguida, a recuperação (resolved).*
-
-### ⚠️ Limitações do Stress Test
-- **Máquina Virtual vs Host:** No macOS e Windows (Docker Desktop), a carga máxima apontada pelo agente reflete os limites de recursos da Virtual Machine do Docker alocada, e não a máquina física inteira.
-- **Conectividade Inicial:** Exige acesso à internet na 1ª execução para baixar a imagem oficial `alpine` (apenas ~5MB).
-- **Sem Docker Proxy (Somente Leitura):** O teste não funciona no modo headless acoplado ao `docker-socket-proxy`. O proxy possui a flag `POST=0` travada por segurança (não permite criar containers). Por isso, sugerimos usar a TUI via `make run` diretamente no SO real local para usá-lo com sucesso.
-
----
-
-## 📜 Visualizador Avançado de Logs (Advanced Logs Viewer)
-
-A TUI inclui um **Visualizador Avançado de Logs** nativo, carregado com recursos modernos de CLI, reduzindo a necessidade de sair do painel para inspecionar os outputs dos seus containers.
-
-### 📖 Como ler os Logs (`l`, `L`, `f`)
-
-- **`l` (Log 1 - Simples):** Use as setas para colocar o cursor `▸` sobre um único container (ex: `postgres`) e aperte `l` minúsculo para abrir o tail.
-- **`L` (Log N - Multi-Tailing):** Navegue na tabela e aperte `Espaço` em múltiplos containers para selecioná-los. Depois aperte `Shift + L` (L maiúsculo). O agente vai cruzar os logs de todos eles ao mesmo tempo, adicionando uma tag colorida `[nome-do-container]` na frente.
-- **`f` (Follow):** Ao abrir um log, ele rola para baixo automaticamente. Se você apertar a `Seta para Cima`, a rolagem pausa (congela) para você ler um erro. Quando terminar, aperte a letra `f` para que a tela volte a "seguir" as mensagens mais recentes em tempo real.
-
-### Principais Funcionalidades
-1. **🔍 Live Grep (Filtro em Tempo Real):** Pressione `/` para abrir a barra de busca. A interface filtra os logs instantaneamente enquanto você digita (ignorando maiúsculas e minúsculas). Pressione `Enter` ou `Esc` para fechar a busca.
-2. **🔀 Multi-Tailing (Agregação Híbrida):** Agrupe vários containers lado a lado usando `Espaço` e `Shift+L`.
-3. **⏪ Paginação Histórica:** Use as setas `↑` e `↓` (ou `k` e `j`) para rolar o histórico e vasculhar o passado. O auto-scroll entra em colapso e pausa enquanto você explora. Pressione `f` para reatar o Tail ao vivo.
-4. **🎨 JSON Highlighting:** O motor detecta automaticamente níveis de log comuns (`error`, `warn`, `info`) em outputs JSON estruturados e os colore de forma vibrante (ex: azul claro para info, vermelho para erro).
-5. **⏱️ Timestamps Nativos:** O Agente consome a API do Docker com a flag `Timestamps: true` ativada, colorindo a minutagem padrão do docker (ISO8601) em cinza. Ideal pra você correlacionar com picos nos gráficos de CPU.
-6. **📤 Exportação Rápida (Dump):** Pressione `E` enquanto estiver na tela de logs para salvar um arquivo no estado atual (aplicando qualquer filtro Grep ativo) direto para o disco em `/tmp/castle-rock-logs-[nome]-[timestamp].txt`. Um evento de confirmação (`📤 export`) aparece no painel de Eventos com o caminho exato do arquivo.
-
-> ⚠️ **Importante:** O atalho `E` só funciona quando você está **dentro da tela de logs** (após apertar `l` ou `L`). Não funciona no dashboard principal porque não há logs na tela para exportar. Passos: `l` (abrir logs) → `E` (exportar) → checar pasta `/tmp/`.
-
----
-
-## 💼 Ferramentas Enterprise (UX Tools)
-
-Voltado para a rotina caótica dos SysAdmins, este canivete vem equipado com poderosos utilitários de interação e resgate em tempo real:
-
-### 1. 🖥️ Host Health Metrics (Métricas do Servidor Físico)
-O topo da TUI monitora constantemente o **Uso Real do Hardware Hospedeiro** por baixo dos panos (CPU Total e Memória RAM global). Ao invés de supor por que os microserviços estão falhando baseados em CPU Shares de containers, você sabe exatamente se a máquina virtual ou bare-metal alcançou seu limite físico. 
-
-### 2. 💻 Shell Interativo (Exec)
-Se encontrou uma violação no painel de auditoria, navegue com o cursor sobre o container e pressione `x`. O Castle Rock Agent vai se auto-suspender e transportar todo o STDIN/STDOUT e Controle TTY da sua tela para dentro de um `bash` ou `sh` rodando ao vivo naquele container. Ao rodar `exit`, a TUI retoma o controle suavemente como se nada tivesse acontecido.
-
-### 3. 🧹 Interactive Prune Dashboard (Faxina)
-Servidor pedindo socorro por disco lotado? Pressione tecla **`C`** (maiúsculo) para abrir a dashboard de Prune interativo. O motor consome a API de uso em disco do Docker e lista exatamente quantos Terabytes ou Megabytes estão pendurados silenciosamente em Imagens Órfãs ou Volumes Ociosos. Pressione `i` para limpar o lixo de imagens ou `v` para limpar os discos montados fantasmas, resgatando GBs na hora.
-
----
-
-## 🔎 Debug & Diagnostics
-
-O painel de detalhes do container (acessado com `Enter`) agora inclui duas ferramentas formidáveis de diagnóstico em tempo real:
-
-### 1. 🔎 Environment Variables Inspector (Inspetor de Variáveis)
-Ao inspecionar um container (`Enter`), o painel inferior agora extrai e exibe todas as variáveis de ambiente setadas lá dentro. As chaves (Keys) são coloridas em destaque. Valores muito longos são truncados, mostrando até 15 variáveis por vez. É a ferramenta definitiva para descobrir em 2 segundos se o container subiu com a string errada de conexão de banco de dados (`DATABASE_URL`) ou se está no `NODE_ENV` errado.
-
-### 2. 🏥 Health Check Status (Status de Saúde do Container)
-Containers que implementam a diretiva `HEALTHCHECK` no Dockerfile agora ganham um badge visual direto na tabela principal do Castle Rock:
-- ❤️ **healthy** — Container está 100% saudável.
-- 🩺 **unhealthy** — Falha nos testes de saúde (investigue urgente!)
-- ⏳ **starting** — Container ainda subindo ou rodando os primeiros testes.
-
-Além de aparecer na tabela, ao apertar `Enter` nos detalhes, você consegue ler exatamente o **Output Original (Stdout/Stderr)** do último Health Check que falhou. Assim você sabe imediatamente o que quebrou sem precisar digitar um longo comando `docker inspect`.
-
-### 3. ⚙️ Entrypoint / Command
-Exibe o comando exato sendo executado pelo container (ex: `node server.js`, `postgres -c shared_buffers=256MB`). Nunca mais adivinhe o que o processo está realmente fazendo.
-
-### 4. 📂 Volumes & Bind Mounts
-Lista todos os volumes e bind mounts no formato `origem → destino (tipo)`. Descubra instantaneamente volumes não montados ou caminhos errados — a causa #1 de "meus dados sumiram".
-
-### 5. 🔄 Restart Policy & Crash Count
-Mostra a política de restart (`always`, `on-failure:5`, `no`) e quantas vezes o container crashou. Um alerta vermelho `(crashed 3x)` torna impossível ignorar restart loops.
-
-### 6. 🚧 Resource Limits
-Exibe limites de CPU e Memória configurados. **Containers sem limite mostram `unlimited ⚠` em vermelho**, facilitando a identificação de containers que podem derrubar o host inteiro.
-
----
-
-## �📊 Prometheus — Métricas Exportadas
-
-O agente expõe métricas no formato Prometheus em `http://localhost:9110/metrics`.
-
-### Métricas Disponíveis
-
-| Métrica | Tipo | Descrição |
-|---|---|---|
-| `castle_rock_container_cpu_percent` | Gauge | Percentual de uso de CPU |
-| `castle_rock_container_memory_usage_bytes` | Gauge | Memória utilizada (bytes) |
-| `castle_rock_container_memory_limit_bytes` | Gauge | Limite de memória (bytes) |
-| `castle_rock_container_memory_percent` | Gauge | Percentual de memória usada |
-| `castle_rock_container_network_rx_bytes` | Gauge | Bytes recebidos pela rede |
-| `castle_rock_container_network_tx_bytes` | Gauge | Bytes transmitidos pela rede |
-| `castle_rock_container_block_read_bytes` | Gauge | Bytes lidos do disco |
-| `castle_rock_container_block_write_bytes` | Gauge | Bytes escritos no disco |
-| `castle_rock_container_info` | Gauge | Metadata do container (labels) |
-
-Todas as métricas possuem os labels: `container_id`, `container_name`, `image`.
-
-### Exemplo de query PromQL
-
-```promql
-# CPU de um container específico
-castle_rock_container_cpu_percent{container_name="postgres"}
-
-# Top 5 containers por memória
-topk(5, castle_rock_container_memory_percent)
-
-# Tráfego de rede total
-sum(castle_rock_container_network_rx_bytes) by (container_name)
-```
-
-### Testar localmente
-
-```bash
-# Enquanto o agente roda (make run ou docker compose up)
-curl -s http://localhost:9110/metrics | grep castle_rock
-
-# Health check
-curl http://localhost:9110/health
-```
-
----
-
-## 📈 Grafana — 5 Dashboards Pré-configurados
-
-O Docker Compose provisiona automaticamente **5 dashboards** no Grafana. Todos atualizam em tempo real (5s).
-
-**Acesso:** http://localhost:3000 → Login: `admin` / `castlerock`
-
----
-
-### Dashboard 1: Overview
-
-Visão geral de todos os containers em uma única tela.
-
-| Painel | Tipo | Descrição |
-|---|---|---|
-| Containers Ativos | Stat | Contagem total de containers monitorados |
-| CPU Média | Stat | Média de CPU% entre todos os containers |
-| Memória Média | Stat | Média de memória% entre todos os containers |
-| Memória Total Usada | Stat | Soma de RAM usada por todos (em bytes) |
-| Tráfego de Rede Total | Stat | Soma de RX + TX de todos os containers |
-| CPU % por Container | Time Series | Histórico de CPU com linhas suaves e gradiente |
-| CPU Gauge | Gauge | Velocímetros com thresholds verde/amarelo/vermelho |
-| Memória % | Time Series | Histórico de memória com thresholds |
-| Uso de Memória (stacked) | Time Series | Uso empilhado — mostra contribuição de cada container |
-| Memória Bar Gauge | Bar Gauge | Barras horizontais com gradiente por container |
-| Network RX | Time Series | Bytes recebidos por container |
-| Network TX | Time Series | Bytes transmitidos por container |
-| Disk Read | Time Series | Leitura de disco por container |
-| Disk Write | Time Series | Escrita de disco por container |
-| Containers Monitorados | Table | Tabela filtrável com ID, nome e imagem |
-
----
-
-### Dashboard 2: Container Detail
-
-Deep dive em **um container específico**. Um dropdown no topo permite selecionar qual container analisar.
-
-| Painel | Tipo | Descrição |
-|---|---|---|
-| CPU Atual | Gauge | CPU% em tempo real com thresholds |
-| Memória Atual | Gauge | Memória% em tempo real com thresholds |
-| RAM Usada | Stat | Memória usada em bytes |
-| RAM Limite | Stat | Limite de memória configurado |
-| Network Total | Stat | Tráfego total (RX + TX) |
-| CPU % Histórico | Time Series | CPU ao longo do tempo com zonas de warning/critical |
-| Memória % Histórico | Time Series | Memória ao longo do tempo com zonas de alerta |
-| Memória Uso vs Limite | Time Series | Duas linhas: uso real vs limite configurado |
-| Network I/O | Time Series | Download (RX) e Upload (TX) no mesmo gráfico |
-| Disk I/O | Time Series | Leitura e escrita de disco |
-
----
-
-### Dashboard 3: Network Analysis
-
-Análise focada em tráfego de rede.
-
-| Painel | Tipo | Descrição |
-|---|---|---|
-| Total Download ↓ | Stat | Soma de bytes recebidos |
-| Total Upload ↑ | Stat | Soma de bytes transmitidos |
-| Tráfego Total | Stat | RX + TX combinados |
-| Containers com Rede | Stat | Quantos containers têm tráfego > 0 |
-| Download Time Series | Time Series | Bytes RX ao longo do tempo |
-| Download Top Containers | Bar Gauge | Ranking de quem mais baixa dados |
-| Upload Time Series | Time Series | Bytes TX ao longo do tempo |
-| Upload Top Containers | Bar Gauge | Ranking de quem mais envia dados |
-| Tráfego Empilhado | Time Series | Todos os RX/TX empilhados para ver o total |
-
----
-
-### Dashboard 4: Memory Deep Dive
-
-Análise profunda de memória — útil para detectar leaks e risco de OOM kill.
-
-| Painel | Tipo | Descrição |
-|---|---|---|
-| RAM Total Usada | Stat | Soma de memória usada por todos os containers |
-| RAM Total Limite | Stat | Soma de limites de memória configurados |
-| Média Memória % | Stat | Média de utilização de memória |
-| Max Memória % | Stat | Container com maior uso de memória |
-| Memória % Todos | Time Series | Histórico de todos os containers com linhas de threshold |
-| Uso Empilhado | Time Series | Memória usada empilhada (quem consome mais) |
-| Ranking Memória % | Bar Gauge | Barras horizontais com gradiente verde→vermelho |
-| Uso vs Limite | Time Series | Para cada container: uso real vs limite (quando se aproximam, risco de OOM) |
-
----
-
-### Dashboard 5: Alerts & Health
-
-Monitoramento de saúde e violações de threshold.
-
-| Painel | Tipo | Descrição |
-|---|---|---|
-| Containers CPU > 80% | Stat | Quantos containers estão em estado crítico de CPU |
-| Containers MEM > 85% | Stat | Quantos containers estão em estado crítico de memória |
-| Containers CPU > 50% | Stat | Quantos containers estão em warning de CPU |
-| Containers Saudáveis | Stat | Quantos estão abaixo de 50% em CPU e memória |
-| CPU Ranking | Bar Gauge | Barras do maior para o menor uso de CPU |
-| Memória Ranking | Bar Gauge | Barras do maior para o menor uso de memória |
-| CPU Máxima | Time Series | Pico de CPU ao longo do tempo com zonas de alerta |
-| Memória Máxima | Time Series | Pico de memória com risco de OOM |
-| CPU Média vs Máxima | Time Series | Compara a média com o pico — identifica outliers |
-| Memória Média vs Máxima | Time Series | Mesma comparação para memória |
-
----
-
-## ⚠️ Alertas Configuráveis
-
-O sistema de alertas funciona em **duas camadas**:
-
-### Camada 1: Alertas na TUI (interno)
-
-Definidos em `configs/config.yaml`, avaliados pelo motor interno do agente:
-
-```yaml
-alerts:
-  enabled: true
-  rules:
-    - name: "CPU Crítica"
-      metric: "cpu_percent"
-      operator: ">"
-      threshold: 80.0
-      duration: 2m           # Só dispara após 2 min acima do threshold
-      severity: "critical"
-
-    - name: "Memória Alta"
-      metric: "memory_percent"
-      operator: ">"
-      threshold: 70.0
-      duration: 5m
-      severity: "warning"
-```
-
-Quando um alerta dispara, ele aparece:
-- 🚨 Na barra de status da TUI
-- 📋 No log de eventos com detalhes
-- Com indicador visual no container na tabela
-
-### Camada 2: Alertas no Prometheus (externo)
-
-Definidos em `deploy/prometheus/alert_rules.yml`, avaliados pelo Prometheus:
-
-```yaml
-- alert: ContainerHighCPU
-  expr: castle_rock_container_cpu_percent > 80
-  for: 2m
-  labels:
-    severity: critical
-  annotations:
-    summary: "CPU alta no container {{ $labels.container_name }}"
-```
-
-Estes podem ser conectados ao **Alertmanager** para notificações via Slack, email, PagerDuty, etc.
-
----
-
-## ⚙️ Configuração
-
-### Arquivo `configs/config.yaml`
-
-```yaml
-log_level: "info"           # debug, info, warn, error
-
-prometheus:
-  enabled: true
-  port: 9110                # Porta do servidor HTTP
-
-stats:
-  interval: 5s              # Intervalo de coleta de métricas
-
-alerts:
-  enabled: true
-  rules:                    # Regras de alerta (ver seção Alertas)
-    - name: "CPU Crítica"
-      metric: "cpu_percent"
-      operator: ">"
-      threshold: 80.0
-      duration: 2m
-      severity: "critical"
-```
-
-### Variáveis de Ambiente (override)
-
-Variáveis de ambiente têm **prioridade máxima** sobre o arquivo YAML:
-
-| Variável | Descrição | Default |
-|---|---|---|
-| `CASTLE_ROCK_LOG_LEVEL` | Nível de log | `info` |
-| `CASTLE_ROCK_PROMETHEUS_PORT` | Porta do Prometheus | `9110` |
-| `CASTLE_ROCK_PROMETHEUS_ENABLED` | Ativar/desativar Prometheus | `true` |
-| `CASTLE_ROCK_STATS_INTERVAL` | Intervalo de coleta | `5s` |
-| `CASTLE_ROCK_STATS_INCLUDE_CONTAINERS` | Lista de nomes/fragmentos de containers a monitorar (separados por vírgula). Vazio monitora todos. | `""` |
-| `CASTLE_ROCK_ALERTS_ENABLED` | Ativar/desativar alertas | `true` |
-| `CASTLE_ROCK_MODE` | `headless` = sem TUI (Docker/K8s) | `` (TUI) |
-| `CASTLE_ROCK_CLUSTER_MODE` | `standalone`, `leader`, `worker` | `standalone` |
-| `CASTLE_ROCK_CLUSTER_HOST_ID` | Identificador na TUI/Grafana | Nome nativo da máquina |
-| `CASTLE_ROCK_CLUSTER_LEADER_URL` | URL de destino (modo worker) | `http://127.0.0.1:9110` |
-
-### Variáveis Docker padrão
-
-| Variável | Descrição | Default |
-|---|---|---|
-| `DOCKER_HOST` | Endereço do Docker daemon | `unix:///var/run/docker.sock` |
-| `DOCKER_API_VERSION` | Versão da API | auto-negociação |
-
-### Ordem de Precedência (12-Factor App)
-
-```
-1. Defaults hardcoded (código Go)
-2. configs/config.yaml (override parcial)
-3. Variáveis de ambiente CASTLE_ROCK_* (override final)
-```
-
-### 🎯 Monitoramento Seletivo (Filtro de Containers)
-
-Você pode filtrar quais containers o agente deve monitorar. Isso é extremamente útil se você quer observar apenas serviços específicos (ex: seu banco de dados e sua API principal) sem poluir o Prometheus e o Grafana com sidecars ou outros containers barulhentos do host.
-
-Para monitorar containers específicos, defina uma lista de nomes ou trechos de nomes (como `postgres` ou `api`). Somente containers que contenham pelo menos uma dessas strings em seus nomes serão monitorados e aparecerão na TUI. Se a lista estiver vazia (o padrão), *todos* os containers em execução são monitorados normalmente.
-
-**Via config.yaml**:
-```yaml
-stats:
-  interval: 5s
-  include_containers: ["postgres", "redis", "minha-api"]
-```
-
-**Via Variável de Ambiente**:
-```bash
-CASTLE_ROCK_STATS_INCLUDE_CONTAINERS="postgres,redis,minha-api"
-```
-
----
-
-## 🐳 Docker Compose — Stack de Observabilidade
-
-O `docker-compose.yml` levanta 3 serviços:
-
-```
-┌────────────────────────────────────────────────────────┐
-│                  Docker Compose Stack                  │
-│                                                        │
-│  ┌──────────────┐   ┌────────────┐   ┌──────────────┐  │
-│  │ Castle Rock  │ → │ Prometheus │ → │   Grafana    │  │
-│  │ Agent :9110  │   │   :9090    │   │    :3000     │  │
-│  │  (headless)  │   │ (scraping) │   │ (dashboards) │  │
-│  └──────┬───────┘   └────────────┘   └──────────────┘  │
-│         │                                              │
-│         ▼                                              │
-│   Docker Socket                                        │
-│  (monitoramento)                                       │
-└────────────────────────────────────────────────────────┘
-```
-
-### Docker Socket e Permissões
-
-O agente precisa de acesso ao Docker socket para monitorar containers:
-
-```yaml
-volumes:
-  - /var/run/docker.sock:/var/run/docker.sock:ro  # Somente leitura
-```
-
-> ⚠️ **Por que `user: root` no docker-compose?**
->
-> O Docker socket (`/var/run/docker.sock`) é de propriedade do `root`. Agentes de monitoramento como o **cAdvisor** (Google), **node-exporter** (Prometheus) e o **Datadog Agent** também rodam como root para acessar o socket.
->
-> O volume é montado como `:ro` (read-only) para segurança. O agente NÃO modifica nada no Docker daemon — apenas lê informações.
->
-> Em produção, considere alternativas:
-> - Docker rootless mode
-> - Proxy socket como [tecnativa/docker-socket-proxy](https://github.com/Tecnativa/docker-socket-proxy)
-
-### Modo Headless
-
-No Docker Compose, o agente roda em **modo headless** (sem TUI):
-
-```bash
-CASTLE_ROCK_MODE=headless  # Definido no docker-compose.yml
-```
-
-Neste modo, o agente atua apenas como servidor de métricas Prometheus, sem tentar abrir o dashboard interativo (que requer terminal TTY).
-
----
-
-## Targets do Makefile
-
-| Target | Descrição |
-|---|---|
-| `make build` | Compila o binário otimizado |
-| `make run` | Compila e executa (TUI interativa) |
-| `make test` | Executa testes com `-race` e cobertura |
-| `make lint` | Análise estática (`go vet`) |
-| `make clean` | Remove binários |
-| `make tidy` | Organiza dependências |
-| `make docker-build` | Constrói imagem Docker |
-| `make docker-run` | Executa via Docker |
-
----
-
-## 🧪 Testes
-
-```bash
-# Executar todos os testes
-go test ./... -v
-
-# Com cobertura
-go test ./... -cover
-
-# Com race detector
-go test ./... -race
-```
-
-### Cobertura de testes
-
-| Package | Testes | Cobertura |
-|---|---|---|
-| `internal/tui` | formatBytes, truncate, min | Formatação de métricas |
-| `internal/alerts` | evaluateCondition, metrics, fire/resolve | Motor de alertas completo |
-| `internal/config` | defaults, YAML loading, env overrides | Config loader |
-
----
-
-## Troubleshooting
-
-### ❌ `Agreeing to the Xcode and Apple SDKs license requires admin privileges`
-
-```bash
-sudo xcodebuild -license accept
-```
-
-Se o Xcode não estiver instalado: `xcode-select --install`
-
-### ❌ `Cannot connect to the Docker daemon`
-
-- **macOS**: Abra o **Docker Desktop** e aguarde o ícone ficar verde
-- **Linux**: `sudo systemctl start docker`
-- **Verificar**: `docker info`
-
-### ❌ `unable to get image [...]: Cannot connect to the Docker daemon`
-
-Este erro comum (principalmente no macOS) significa que a ferramenta não achou o socket do Docker no caminho esperado (ex: `~/.docker/run/docker.sock`).
-- Verifique se o **Docker Desktop** (ou OrbStack/Colima) está aberto e completamente carregado.
-- Vá nas configurações do Docker Desktop: `Settings` > `Advanced` e marque a opção **"Allow the default Docker socket to be used"** (pode exigir senha).
-- Se usar **OrbStack**, rode no terminal: `export DOCKER_HOST="unix://$HOME/.orbstack/run/docker.sock"`
-
-### ❌ `permission denied` no Docker socket
-
-**No host (Linux):**
-```bash
-sudo usermod -aG docker $USER
-newgrp docker  # ou re-login
-```
-
-**No Docker Compose:**
-Já resolvido com `user: root` no `docker-compose.yml`.
-
-### ❌ `go: command not found`
-
-```bash
-# macOS
-brew install go
-
-# Linux
-wget https://go.dev/dl/go1.24.0.linux-amd64.tar.gz
-sudo tar -C /usr/local -xzf go1.24.0.linux-amd64.tar.gz
-export PATH=$PATH:/usr/local/go/bin
-```
-
-### ⚠️ `make: *** [run] Error 1` após Ctrl+C
-
-**Comportamento normal.** O Go encerra com exit code 130 (SIGINT) e o `make` interpreta como erro. O agente encerrou corretamente (graceful shutdown).
-
-### ⚠️ Containers não aparecem
-
-1. Verifique se containers estão rodando: `docker ps`
-2. Verifique o Docker context: `docker context ls`
-3. Reinicie o agente: `make run`
-
-### ⚠️ Grafana sem dados
-
-1. Verifique se o agent está rodando: `docker compose ps`
-2. Verifique as métricas: `curl http://localhost:9110/metrics`
-3. Verifique o Prometheus: http://localhost:9090/targets (status deve ser "UP")
-
----
-
-## Conceitos Técnicos
-
-### Bubble Tea (Arquitetura Elm)
-
-O dashboard usa o framework [Bubble Tea](https://github.com/charmbracelet/bubbletea) que segue a arquitetura Elm:
-
-```
-Model → Update → View (ciclo unidirecional)
-```
-
-- **Model**: struct imutável com todo o estado
-- **Update**: função pura que processa mensagens e retorna novo estado
-- **View**: função pura que renderiza o estado como string
-- **Cmd**: operações assíncronas (Docker API, timers) que produzem mensagens
-
-### Docker Stats API — Cálculo de CPU%
-
-O cálculo de CPU% usa a fórmula oficial do Docker CLI:
-
-```
-cpuDelta = cpu_usage.total - pre_cpu_usage.total
-systemDelta = system_cpu_usage - pre_system_cpu_usage
-cpu% = (cpuDelta / systemDelta) × numCPUs × 100
-```
-
-### Context e Graceful Shutdown
-
-Todas as goroutines compartilham um `context.Context` cancelável:
-
-```
-Ctrl+C → SIGINT → context cancelado → todas as goroutines encerram
-                                     → Docker client fecha
-                                     → HTTP server para
-                                     → recursos liberados via defer
-```
-
-### 12-Factor App — Configuração
-
-O agente segue o fator III (Config) da [12-Factor App](https://12factor.net/config):
-configuração separada do código, com precedência: defaults → YAML → env vars.
-
----
-
-## Licença
-
-MIT
-# Castle-Rock-Agent
+Aprovado via MIT. Produzido ao povo em aberto.
