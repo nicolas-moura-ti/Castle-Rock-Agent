@@ -414,71 +414,83 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) handleModalKeys(msg tea.KeyMsg) (Model, tea.Cmd, bool) {
 	if m.confirmAction != "" {
-		switch msg.String() {
-		case "y", "Y":
-			action := m.confirmAction
-			m.confirmAction = ""
-			if m.cursor < len(m.containers) {
-				c := m.containers[m.cursor]
-				return m, m.executeAction(action, c.ID, c.Name), true
-			}
-		default:
-			m.confirmAction = ""
-		}
-		return m, nil, true
+		return m.handleConfirmKeys(msg)
 	}
-
 	if m.showStress {
-		switch msg.String() {
-		case "c", "m", "b":
-			m.showStress = false
-			mode := "both"
-			if msg.String() == "c" {
-				mode = "cpu"
-			} else if msg.String() == "m" {
-				mode = "memory"
-			}
-			return m, m.executeStress(mode), true
-		default:
-			m.showStress = false
-		}
-		return m, nil, true
+		return m.handleStressKeys(msg)
 	}
-
 	if m.showCleanup {
-		switch msg.String() {
-		case "esc", "c", "C":
-			m.showCleanup = false
-			m.pruneFeedback = ""
-		case "i":
-			m.pruning = true
-			m.pruneFeedback = ""
-			return m, m.runPrune("images"), true
-		case "v":
-			m.pruning = true
-			m.pruneFeedback = ""
-			return m, m.runPrune("volumes"), true
-		}
-		return m, nil, true
+		return m.handleCleanupKeys(msg)
 	}
-
 	if m.searchMode {
-		switch msg.String() {
-		case "esc", "enter":
-			m.searchMode = false
-		case "backspace":
-			if len(m.logSearch) > 0 {
-				m.logSearch = m.logSearch[:len(m.logSearch)-1]
-			}
-		default:
-			if len(msg.String()) == 1 {
-				m.logSearch += msg.String()
-			}
-		}
-		return m, nil, true
+		return m.handleSearchKeys(msg)
 	}
-
 	return m, nil, false
+}
+
+func (m Model) handleConfirmKeys(msg tea.KeyMsg) (Model, tea.Cmd, bool) {
+	switch msg.String() {
+	case "y", "Y":
+		action := m.confirmAction
+		m.confirmAction = ""
+		if m.cursor < len(m.containers) {
+			c := m.containers[m.cursor]
+			return m, m.executeAction(action, c.ID, c.Name), true
+		}
+	default:
+		m.confirmAction = ""
+	}
+	return m, nil, true
+}
+
+func (m Model) handleStressKeys(msg tea.KeyMsg) (Model, tea.Cmd, bool) {
+	switch msg.String() {
+	case "c", "m", "b":
+		m.showStress = false
+		mode := "both"
+		if msg.String() == "c" {
+			mode = "cpu"
+		} else if msg.String() == "m" {
+			mode = "memory"
+		}
+		return m, m.executeStress(mode), true
+	default:
+		m.showStress = false
+	}
+	return m, nil, true
+}
+
+func (m Model) handleCleanupKeys(msg tea.KeyMsg) (Model, tea.Cmd, bool) {
+	switch msg.String() {
+	case "esc", "c", "C":
+		m.showCleanup = false
+		m.pruneFeedback = ""
+	case "i":
+		m.pruning = true
+		m.pruneFeedback = ""
+		return m, m.runPrune("images"), true
+	case "v":
+		m.pruning = true
+		m.pruneFeedback = ""
+		return m, m.runPrune("volumes"), true
+	}
+	return m, nil, true
+}
+
+func (m Model) handleSearchKeys(msg tea.KeyMsg) (Model, tea.Cmd, bool) {
+	switch msg.String() {
+	case "esc", "enter":
+		m.searchMode = false
+	case "backspace":
+		if len(m.logSearch) > 0 {
+			m.logSearch = m.logSearch[:len(m.logSearch)-1]
+		}
+	default:
+		if len(msg.String()) == 1 {
+			m.logSearch += msg.String()
+		}
+	}
+	return m, nil, true
 }
 
 func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -503,38 +515,58 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m Model) handleNavigationKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "/":
-		if m.showLogs {
-			m.searchMode = true
-		}
+		m.handleSearchToggle()
 	case "up", "k":
-		if m.showLogs {
-			m.logOffset++
-		} else if m.cursor > 0 {
-			m.cursor--
-		}
+		m.handleScrollUp()
 	case "down", "j":
-		if m.showLogs {
-			if m.logOffset > 0 {
-				m.logOffset--
-			}
-		} else if m.cursor < len(m.containers)-1 {
-			m.cursor++
-		}
+		m.handleScrollDown()
 	case "f":
-		if m.showLogs {
-			m.logOffset = 0
-		}
+		m.handleScrollReset()
 	case " ":
-		if !m.showLogs && !m.showDetail && !m.showMap && m.cursor < len(m.containers) {
-			id := m.containers[m.cursor].ID
-			if m.selectedIDs[id] {
-				delete(m.selectedIDs, id)
-			} else {
-				m.selectedIDs[id] = true
-			}
-		}
+		m.handleSpaceSelection()
 	}
 	return m, nil
+}
+
+func (m *Model) handleSearchToggle() {
+	if m.showLogs {
+		m.searchMode = true
+	}
+}
+
+func (m *Model) handleScrollUp() {
+	if m.showLogs {
+		m.logOffset++
+	} else if m.cursor > 0 {
+		m.cursor--
+	}
+}
+
+func (m *Model) handleScrollDown() {
+	if m.showLogs {
+		if m.logOffset > 0 {
+			m.logOffset--
+		}
+	} else if m.cursor < len(m.containers)-1 {
+		m.cursor++
+	}
+}
+
+func (m *Model) handleScrollReset() {
+	if m.showLogs {
+		m.logOffset = 0
+	}
+}
+
+func (m *Model) handleSpaceSelection() {
+	if !m.showLogs && !m.showDetail && !m.showMap && m.cursor < len(m.containers) {
+		id := m.containers[m.cursor].ID
+		if m.selectedIDs[id] {
+			delete(m.selectedIDs, id)
+		} else {
+			m.selectedIDs[id] = true
+		}
+	}
 }
 
 func (m Model) handleLogKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
