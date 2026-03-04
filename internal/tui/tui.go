@@ -226,262 +226,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 
 	case tea.KeyMsg:
-		// Se tem confirmação pendente, trata primeiro
-		if m.confirmAction != "" {
-			switch msg.String() {
-			case "y", "Y":
-				action := m.confirmAction
-				m.confirmAction = ""
-				if m.cursor < len(m.containers) {
-					c := m.containers[m.cursor]
-					return m, m.executeAction(action, c.ID, c.Name)
-				}
-			default:
-				// Qualquer outra tecla cancela
-				m.confirmAction = ""
-			}
-			return m, nil
-		}
-
-		// Menu de stress test
-		if m.showStress {
-			switch msg.String() {
-			case "c", "m", "b":
-				m.showStress = false
-				mode := "both"
-				if msg.String() == "c" {
-					mode = "cpu"
-				} else if msg.String() == "m" {
-					mode = "memory"
-				}
-				return m, m.executeStress(mode)
-			default:
-				m.showStress = false
-			}
-			return m, nil
-		}
-
-		// Se está no modo de Cleanup (Prune Dashboard)
-		if m.showCleanup {
-			switch msg.String() {
-			case "esc", "c", "C":
-				m.showCleanup = false
-				m.pruneFeedback = ""
-			case "i":
-				// prune imagens
-				m.pruning = true
-				m.pruneFeedback = ""
-				return m, m.runPrune("images")
-			case "v":
-				// prune volumes
-				m.pruning = true
-				m.pruneFeedback = ""
-				return m, m.runPrune("volumes")
-			}
-			return m, nil
-		}
-
-		// Se está no modo de busca do Live Grep
-		if m.searchMode {
-			switch msg.String() {
-			case "esc", "enter":
-				m.searchMode = false
-			case "backspace":
-				if len(m.logSearch) > 0 {
-					m.logSearch = m.logSearch[:len(m.logSearch)-1]
-				}
-			default:
-				// Append printable characters (rough approximation for simple TUI)
-				if len(msg.String()) == 1 {
-					m.logSearch += msg.String()
-				}
-			}
-			return m, nil
-		}
-
-		switch msg.String() {
-		case "q", "ctrl+c":
-			m.quitting = true
-			return m, tea.Quit
-		case "/":
-			if m.showLogs {
-				m.searchMode = true
-				return m, nil
-			}
-		case "up", "k":
-			if m.showLogs {
-				m.logOffset++
-			} else {
-				if m.cursor > 0 {
-					m.cursor--
-				}
-			}
-		case "down", "j":
-			if m.showLogs {
-				if m.logOffset > 0 {
-					m.logOffset--
-				}
-			} else {
-				if m.cursor < len(m.containers)-1 {
-					m.cursor++
-				}
-			}
-		case "f":
-			if m.showLogs {
-				m.logOffset = 0 // back to real-time tail
-			}
-		case " ":
-			if !m.showLogs && !m.showDetail && !m.showMap && m.cursor < len(m.containers) {
-				id := m.containers[m.cursor].ID
-				if m.selectedIDs[id] {
-					delete(m.selectedIDs, id)
-				} else {
-					m.selectedIDs[id] = true
-				}
-			}
-		case "r":
-			return m, tea.Batch(m.fetchContainers(), m.fetchStats())
-		case "?":
-			m.showHelp = !m.showHelp
-		case "enter":
-			m.showDetail = !m.showDetail
-		case "esc":
-			m.showDetail = false
-			m.showHelp = false
-			m.showLogs = false
-			m.logLines = nil
-			m.searchMode = false
-			m.logSearch = ""
-			m.confirmAction = ""
-			m.showStress = false
-			m.showMap = false
-			m.showCleanup = false
-		case "C":
-			// Toggle Interactive Prune Dashboard
-			if !m.showLogs && !m.showDetail && !m.showMap {
-				m.showCleanup = !m.showCleanup
-				if m.showCleanup {
-					return m, m.fetchDiskUsage()
-				}
-			}
-		case "E":
-			// Export Logs to /tmp/castle-rock-logs-<container>.txt
-			if m.showLogs && len(m.logLines) > 0 {
-				var content strings.Builder
-				lineCount := 0
-				for _, entry := range m.logLines {
-					if m.logSearch == "" || strings.Contains(strings.ToLower(entry.Text), strings.ToLower(m.logSearch)) {
-						if len(m.logContainers) > 1 {
-							content.WriteString("[" + entry.Container + "] ")
-						}
-						content.WriteString(entry.Text + "\n")
-						lineCount++
-					}
-				}
-				fileName := "/tmp/castle-rock-logs"
-				if len(m.logContainers) == 1 {
-					fileName += "-" + m.logContainers[0]
-				} else {
-					fileName += "-multi"
-				}
-				fileName += fmt.Sprintf("-%d.txt", time.Now().Unix())
-
-				err := os.WriteFile(fileName, []byte(content.String()), 0644)
-				if err != nil {
-					m.events = append([]EventLogEntry{{
-						Time: time.Now(), Icon: "❌", Action: "export fail", Name: err.Error(),
-					}}, m.events...)
-				} else {
-					m.events = append([]EventLogEntry{{
-						Time: time.Now(), Icon: "📤", Action: "export", Name: fmt.Sprintf("%d linhas → %s", lineCount, fileName),
-					}}, m.events...)
-				}
-			}
-		case "L":
-			// Multi-Tailing logs
-			if !m.showLogs && len(m.selectedIDs) > 0 {
-				m.showLogs = true
-				m.logOffset = 0
-				m.logLines = []LogEntry{{Container: "System", Text: "Carregando aggregate logs..."}}
-				var names []string
-				var cmds []tea.Cmd
-				for _, c := range m.containers {
-					if m.selectedIDs[c.ID] {
-						names = append(names, c.Name)
-						logCh, err := m.dockerClient.StreamContainerLogs(m.ctx, c.ID)
-						if err == nil {
-							cmds = append(cmds, m.waitForNextLog(c.Name, logCh))
-						}
-					}
-				}
-				m.logContainers = names
-				return m, tea.Batch(cmds...)
-			}
-		case "l":
-			// Toggle logs do container selecionado
-			if m.showLogs {
-				m.showLogs = false
-				m.logLines = nil
-			} else if m.cursor < len(m.containers) {
-				c := m.containers[m.cursor]
-				m.showLogs = true
-				m.logOffset = 0
-				m.logLines = []LogEntry{{Container: c.Name, Text: "Carregando logs..."}}
-				m.logContainers = []string{c.Name}
-
-				logCh, err := m.dockerClient.StreamContainerLogs(m.ctx, c.ID)
-				if err == nil {
-					return m, m.waitForNextLog(c.Name, logCh)
-				}
-			}
-		case "s":
-			// Stop container — pede confirmação
-			if m.cursor < len(m.containers) {
-				m.confirmAction = "stop"
-			}
-		case "R":
-			// Restart container — pede confirmação (R maiúsculo)
-			if m.cursor < len(m.containers) {
-				m.confirmAction = "restart"
-			}
-		case "x":
-			// Interactive Shell (Exec)
-			if !m.showLogs && !m.showDetail && !m.showMap && m.cursor < len(m.containers) {
-				c := m.containers[m.cursor]
-
-				// O comando docker cli puro cuida de alocar TTY corretamemte, diferentemente
-				// da sdk local do daemon. Envolvemos num ExecProcess do bubbletea para pausar.
-				cmd := exec.Command("docker", "exec", "-it", c.Name, "/bin/sh")
-
-				return m, tea.ExecProcess(cmd, func(err error) tea.Msg {
-					// Se o /bin/sh falhar por não existir (ex ubuntu), tentar fallback pro bash?
-					// Para simplificar, retornamos erro caso o alpine/busybox não tenha `sh`.
-					if err != nil {
-						// Tentar bash se sh deu erro. (Muito rápido, mas pro TUI é limpo)
-						cmdBash := exec.Command("docker", "exec", "-it", c.Name, "/bin/bash")
-						return tea.ExecProcess(cmdBash, func(err2 error) tea.Msg {
-							if err2 != nil {
-								return dockerErrorMsg{err: fmt.Errorf("Shell Exec Falhou (sh/bash): %v", err2)}
-							}
-							return nil
-						})()
-					}
-					return nil
-				})
-			}
-		case "S":
-			// Abre menu de stress test
-			m.showStress = true
-		case "m", "M":
-			// Toggle Service Map (Redes)
-			m.showMap = !m.showMap
-			if m.showMap {
-				edges, err := m.mapper.BuildMap(m.ctx)
-				if err == nil {
-					m.mapData = edges
-				}
-			}
-		}
+		return m.handleKeyMsg(msg)
 
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
@@ -638,6 +383,243 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.confirmAction != "" {
+		switch msg.String() {
+		case "y", "Y":
+			action := m.confirmAction
+			m.confirmAction = ""
+			if m.cursor < len(m.containers) {
+				c := m.containers[m.cursor]
+				return m, m.executeAction(action, c.ID, c.Name)
+			}
+		default:
+			m.confirmAction = ""
+		}
+		return m, nil
+	}
+
+	if m.showStress {
+		switch msg.String() {
+		case "c", "m", "b":
+			m.showStress = false
+			mode := "both"
+			if msg.String() == "c" {
+				mode = "cpu"
+			} else if msg.String() == "m" {
+				mode = "memory"
+			}
+			return m, m.executeStress(mode)
+		default:
+			m.showStress = false
+		}
+		return m, nil
+	}
+
+	if m.showCleanup {
+		switch msg.String() {
+		case "esc", "c", "C":
+			m.showCleanup = false
+			m.pruneFeedback = ""
+		case "i":
+			m.pruning = true
+			m.pruneFeedback = ""
+			return m, m.runPrune("images")
+		case "v":
+			m.pruning = true
+			m.pruneFeedback = ""
+			return m, m.runPrune("volumes")
+		}
+		return m, nil
+	}
+
+	if m.searchMode {
+		switch msg.String() {
+		case "esc", "enter":
+			m.searchMode = false
+		case "backspace":
+			if len(m.logSearch) > 0 {
+				m.logSearch = m.logSearch[:len(m.logSearch)-1]
+			}
+		default:
+			if len(msg.String()) == 1 {
+				m.logSearch += msg.String()
+			}
+		}
+		return m, nil
+	}
+
+	switch msg.String() {
+	case "q", "ctrl+c":
+		m.quitting = true
+		return m, tea.Quit
+	case "/":
+		if m.showLogs {
+			m.searchMode = true
+			return m, nil
+		}
+	case "up", "k":
+		if m.showLogs {
+			m.logOffset++
+		} else {
+			if m.cursor > 0 {
+				m.cursor--
+			}
+		}
+	case "down", "j":
+		if m.showLogs {
+			if m.logOffset > 0 {
+				m.logOffset--
+			}
+		} else {
+			if m.cursor < len(m.containers)-1 {
+				m.cursor++
+			}
+		}
+	case "f":
+		if m.showLogs {
+			m.logOffset = 0
+		}
+	case " ":
+		if !m.showLogs && !m.showDetail && !m.showMap && m.cursor < len(m.containers) {
+			id := m.containers[m.cursor].ID
+			if m.selectedIDs[id] {
+				delete(m.selectedIDs, id)
+			} else {
+				m.selectedIDs[id] = true
+			}
+		}
+	case "r":
+		return m, tea.Batch(m.fetchContainers(), m.fetchStats())
+	case "?":
+		m.showHelp = !m.showHelp
+	case "enter":
+		m.showDetail = !m.showDetail
+	case "esc":
+		m.showDetail = false
+		m.showHelp = false
+		m.showLogs = false
+		m.logLines = nil
+		m.searchMode = false
+		m.logSearch = ""
+		m.confirmAction = ""
+		m.showStress = false
+		m.showMap = false
+		m.showCleanup = false
+	case "C":
+		if !m.showLogs && !m.showDetail && !m.showMap {
+			m.showCleanup = !m.showCleanup
+			if m.showCleanup {
+				return m, m.fetchDiskUsage()
+			}
+		}
+	case "E":
+		if m.showLogs && len(m.logLines) > 0 {
+			var content strings.Builder
+			lineCount := 0
+			for _, entry := range m.logLines {
+				if m.logSearch == "" || strings.Contains(strings.ToLower(entry.Text), strings.ToLower(m.logSearch)) {
+					if len(m.logContainers) > 1 {
+						content.WriteString("[" + entry.Container + "] ")
+					}
+					content.WriteString(entry.Text + "\n")
+					lineCount++
+				}
+			}
+			fileName := "/tmp/castle-rock-logs"
+			if len(m.logContainers) == 1 {
+				fileName += "-" + m.logContainers[0]
+			} else {
+				fileName += "-multi"
+			}
+			fileName += fmt.Sprintf("-%d.txt", time.Now().Unix())
+
+			err := os.WriteFile(fileName, []byte(content.String()), 0644)
+			if err != nil {
+				m.events = append([]EventLogEntry{{
+					Time: time.Now(), Icon: "❌", Action: "export fail", Name: err.Error(),
+				}}, m.events...)
+			} else {
+				m.events = append([]EventLogEntry{{
+					Time: time.Now(), Icon: "📤", Action: "export", Name: fmt.Sprintf("%d linhas → %s", lineCount, fileName),
+				}}, m.events...)
+			}
+		}
+	case "L":
+		if !m.showLogs && len(m.selectedIDs) > 0 {
+			m.showLogs = true
+			m.logOffset = 0
+			m.logLines = []LogEntry{{Container: "System", Text: "Carregando aggregate logs..."}}
+			var names []string
+			var cmds []tea.Cmd
+			for _, c := range m.containers {
+				if m.selectedIDs[c.ID] {
+					names = append(names, c.Name)
+					logCh, err := m.dockerClient.StreamContainerLogs(m.ctx, c.ID)
+					if err == nil {
+						cmds = append(cmds, m.waitForNextLog(c.Name, logCh))
+					}
+				}
+			}
+			m.logContainers = names
+			return m, tea.Batch(cmds...)
+		}
+	case "l":
+		if m.showLogs {
+			m.showLogs = false
+			m.logLines = nil
+		} else if m.cursor < len(m.containers) {
+			c := m.containers[m.cursor]
+			m.showLogs = true
+			m.logOffset = 0
+			m.logLines = []LogEntry{{Container: c.Name, Text: "Carregando logs..."}}
+			m.logContainers = []string{c.Name}
+
+			logCh, err := m.dockerClient.StreamContainerLogs(m.ctx, c.ID)
+			if err == nil {
+				return m, m.waitForNextLog(c.Name, logCh)
+			}
+		}
+	case "s":
+		if m.cursor < len(m.containers) {
+			m.confirmAction = "stop"
+		}
+	case "R":
+		if m.cursor < len(m.containers) {
+			m.confirmAction = "restart"
+		}
+	case "x":
+		if !m.showLogs && !m.showDetail && !m.showMap && m.cursor < len(m.containers) {
+			c := m.containers[m.cursor]
+			cmd := exec.Command("docker", "exec", "-it", c.Name, "/bin/sh")
+			return m, tea.ExecProcess(cmd, func(err error) tea.Msg {
+				if err != nil {
+					cmdBash := exec.Command("docker", "exec", "-it", c.Name, "/bin/bash")
+					return tea.ExecProcess(cmdBash, func(err2 error) tea.Msg {
+						if err2 != nil {
+							return dockerErrorMsg{err: fmt.Errorf("Shell Exec Falhou (sh/bash): %v", err2)}
+						}
+						return nil
+					})()
+				}
+				return nil
+			})
+		}
+	case "S":
+		m.showStress = true
+	case "m", "M":
+		m.showMap = !m.showMap
+		if m.showMap {
+			edges, err := m.mapper.BuildMap(m.ctx)
+			if err == nil {
+				m.mapData = edges
+			}
+		}
+	}
+
+	return m, nil
+}
+
 // ─── View ────────────────────────────────────────────────────────────────────
 
 func (m Model) View() string {
@@ -771,93 +753,99 @@ func (m Model) renderContainerTable() string {
 	b.WriteString("\n")
 
 	for i, c := range m.containers {
-		cursor := "  "
-		style := normalStyle
-		if i == m.cursor {
-			cursor = "▸ "
-			style = selectedStyle
-		}
-
-		state := c.State
-		switch c.State {
-		case "running":
-			state = stateRunning.Render("● up")
-		case "paused":
-			state = statePaused.Render("◉ pause")
-		default:
-			state = stateStopped.Render("○ " + c.State)
-		}
-
-		cpuStr := lipgloss.NewStyle().Foreground(mutedColor).Render("  -  ")
-		memPctStr := lipgloss.NewStyle().Foreground(mutedColor).Render("  -  ")
-		memUseStr := lipgloss.NewStyle().Foreground(mutedColor).Render("   -   ")
-		netStr := lipgloss.NewStyle().Foreground(mutedColor).Render("    -     ")
-
-		if stats, ok := m.stats[c.ID]; ok {
-			cpuStr = formatCPU(stats.CPUPercent)
-			memPctStr = formatMemPercent(stats.MemoryPercent)
-			memUseStr = formatBytes(stats.MemoryUsage)
-			netStr = netStyle.Render(fmt.Sprintf("%s/%s",
-				formatBytesShort(stats.NetworkRx), formatBytesShort(stats.NetworkTx)))
-		}
-
-		// Indicador de alerta no container
-		alertMark := ""
-		for _, a := range m.activeAlerts {
-			if a.ContainerID == c.ID {
-				if a.Severity == "critical" {
-					alertMark = " 🚨"
-				} else {
-					alertMark = " ⚠️"
-				}
-				break
-			}
-		}
-		// Indicador de segurança caso ainda não tenha critical
-		if alertMark != " 🚨" {
-			for _, sa := range m.securityAlerts {
-				if sa.ContainerID == c.ID {
-					if sa.Severity == "critical" {
-						alertMark = " 🛡️ 🚨"
-					} else if alertMark == "" {
-						alertMark = " 🛡️ ⚠️"
-					}
-					break
-				}
-			}
-		}
-
-		// Indicador de Health Check
-		healthMark := ""
-		switch c.HealthStatus {
-		case "healthy":
-			healthMark = " ❤️"
-		case "unhealthy":
-			healthMark = " 🩺"
-		case "starting":
-			healthMark = " ⏳"
-		}
-		alertMark += healthMark
-
-		hostID := truncate(c.HostID, 6)
-		if hostID == "" {
-			hostID = "local"
-		}
-
-		name := truncate(c.Name, 18)
-		id := c.ID
-		if len(id) > 12 {
-			id = id[:12]
-		}
-
-		line := fmt.Sprintf("%s%-6s %-12s %-20s %-7s %-7s %-9s %-10s %s%s",
-			cursor, hostID, id, name, cpuStr, memPctStr, memUseStr, netStr, state, alertMark)
-
-		b.WriteString(style.Render(line))
+		b.WriteString(m.formatContainerRow(i, c))
 		b.WriteString("\n")
 	}
 
 	return b.String()
+}
+
+func (m *Model) formatContainerRow(index int, c logger.ContainerDisplay) string {
+	cursor := "  "
+	style := normalStyle
+	if index == m.cursor {
+		cursor = "▸ "
+		style = selectedStyle
+	}
+
+	var state string
+	switch c.State {
+	case "running":
+		state = stateRunning.Render("● up")
+	case "paused":
+		state = statePaused.Render("◉ pause")
+	default:
+		state = stateStopped.Render("○ " + c.State)
+	}
+
+	cpuStr := lipgloss.NewStyle().Foreground(mutedColor).Render("  -  ")
+	memPctStr := lipgloss.NewStyle().Foreground(mutedColor).Render("  -  ")
+	memUseStr := lipgloss.NewStyle().Foreground(mutedColor).Render("   -   ")
+	netStr := lipgloss.NewStyle().Foreground(mutedColor).Render("    -     ")
+
+	if stats, ok := m.stats[c.ID]; ok {
+		cpuStr = formatCPU(stats.CPUPercent)
+		memPctStr = formatMemPercent(stats.MemoryPercent)
+		memUseStr = formatBytes(stats.MemoryUsage)
+		netStr = netStyle.Render(fmt.Sprintf("%s/%s",
+			formatBytesShort(stats.NetworkRx), formatBytesShort(stats.NetworkTx)))
+	}
+
+	alertMark := m.getContainerAlertMark(c.ID)
+	healthMark := m.getContainerHealthMark(c.HealthStatus)
+	alertMark += healthMark
+
+	hostID := truncate(c.HostID, 6)
+	if hostID == "" {
+		hostID = "local"
+	}
+
+	name := truncate(c.Name, 18)
+	id := c.ID
+	if len(id) > 12 {
+		id = id[:12]
+	}
+
+	return style.Render(fmt.Sprintf("%s%-6s %-12s %-20s %-7s %-7s %-9s %-10s %s%s",
+		cursor, hostID, id, name, cpuStr, memPctStr, memUseStr, netStr, state, alertMark))
+}
+
+func (m *Model) getContainerAlertMark(id string) string {
+	alertMark := ""
+	for _, a := range m.activeAlerts {
+		if a.ContainerID == id {
+			if a.Severity == "critical" {
+				return " 🚨"
+			}
+			alertMark = " ⚠️"
+		}
+	}
+
+	if alertMark != " 🚨" {
+		for _, sa := range m.securityAlerts {
+			if sa.ContainerID == id {
+				if sa.Severity == "critical" {
+					return " 🛡️ 🚨"
+				}
+				if alertMark == "" {
+					alertMark = " 🛡️ ⚠️"
+				}
+			}
+		}
+	}
+	return alertMark
+}
+
+func (m *Model) getContainerHealthMark(healthStatus string) string {
+	switch healthStatus {
+	case "healthy":
+		return " ❤️"
+	case "unhealthy":
+		return " 🩺"
+	case "starting":
+		return " ⏳"
+	}
+	return ""
 }
 
 func (m Model) renderContainerDetail() string {
@@ -891,9 +879,19 @@ func (m Model) renderContainerDetail() string {
 		b.WriteString(fmt.Sprintf(" %-9s %s\n", m.msg.Networks, strings.Join(c.Networks, ", ")))
 	}
 
+	m.appendSecurityAlerts(&b, c.ID, maxW)
+	m.appendCommandAndMounts(&b, c)
+	m.appendRestartAndLimits(&b, c)
+	m.appendHealthAndEnv(&b, c)
+	m.appendStats(&b, c)
+
+	return detail.Render(b.String()) + "\n"
+}
+
+func (m Model) appendSecurityAlerts(b *strings.Builder, containerID string, maxW int) {
 	var cSecAlerts []alerts.Alert
 	for _, a := range m.securityAlerts {
-		if a.ContainerID == c.ID {
+		if a.ContainerID == containerID {
 			cSecAlerts = append(cSecAlerts, a)
 		}
 	}
@@ -932,15 +930,15 @@ func (m Model) renderContainerDetail() string {
 			b.WriteString(wrappedStyle.Render(fmt.Sprintf(" %s %s", icon, desc)) + "\n")
 		}
 	}
+}
 
-	// Entrypoint / Command
+func (m Model) appendCommandAndMounts(b *strings.Builder, c logger.ContainerDisplay) {
 	if c.Entrypoint != "" {
 		b.WriteString(lipgloss.NewStyle().Bold(true).Foreground(secondaryColor).Render("\n ⚙️  Command") + "\n")
 		b.WriteString(lipgloss.NewStyle().Foreground(primaryColor).Render(
 			fmt.Sprintf("   %s", c.Entrypoint)) + "\n")
 	}
 
-	// Volumes & Bind Mounts
 	if len(c.Mounts) > 0 {
 		b.WriteString(lipgloss.NewStyle().Bold(true).Foreground(secondaryColor).Render("\n 📂 Volumes / Mounts") + "\n")
 		for i, mt := range c.Mounts {
@@ -953,8 +951,9 @@ func (m Model) renderContainerDetail() string {
 				fmt.Sprintf("   %s", mt)) + "\n")
 		}
 	}
+}
 
-	// Restart Policy & Count
+func (m Model) appendRestartAndLimits(b *strings.Builder, c logger.ContainerDisplay) {
 	if c.RestartPolicy != "" {
 		b.WriteString(lipgloss.NewStyle().Bold(true).Foreground(secondaryColor).Render("\n 🔄 Restart Policy") + "\n")
 		policyStr := c.RestartPolicy
@@ -965,23 +964,21 @@ func (m Model) renderContainerDetail() string {
 		b.WriteString(fmt.Sprintf("   %s\n", policyStr))
 	}
 
-	// Resource Limits
-	{
-		cpuLabel := lipgloss.NewStyle().Foreground(lipgloss.Color("#BF616A")).Render("unlimited ⚠")
-		memLabel := lipgloss.NewStyle().Foreground(lipgloss.Color("#BF616A")).Render("unlimited ⚠")
-		if c.CPULimit > 0 {
-			cpuLabel = lipgloss.NewStyle().Foreground(lipgloss.Color("#A3BE8C")).Render(
-				fmt.Sprintf("%.1f cores", c.CPULimit))
-		}
-		if c.MemoryLimit > 0 {
-			memLabel = lipgloss.NewStyle().Foreground(lipgloss.Color("#A3BE8C")).Render(
-				formatBytes(uint64(c.MemoryLimit)))
-		}
-		b.WriteString(lipgloss.NewStyle().Bold(true).Foreground(secondaryColor).Render("\n 🚧 Resource Limits") + "\n")
-		b.WriteString(fmt.Sprintf("   CPU: %s   MEM: %s\n", cpuLabel, memLabel))
+	cpuLabel := lipgloss.NewStyle().Foreground(lipgloss.Color("#BF616A")).Render("unlimited ⚠")
+	memLabel := lipgloss.NewStyle().Foreground(lipgloss.Color("#BF616A")).Render("unlimited ⚠")
+	if c.CPULimit > 0 {
+		cpuLabel = lipgloss.NewStyle().Foreground(lipgloss.Color("#A3BE8C")).Render(
+			fmt.Sprintf("%.1f cores", c.CPULimit))
 	}
+	if c.MemoryLimit > 0 {
+		memLabel = lipgloss.NewStyle().Foreground(lipgloss.Color("#A3BE8C")).Render(
+			formatBytes(uint64(c.MemoryLimit)))
+	}
+	b.WriteString(lipgloss.NewStyle().Bold(true).Foreground(secondaryColor).Render("\n 🚧 Resource Limits") + "\n")
+	b.WriteString(fmt.Sprintf("   CPU: %s   MEM: %s\n", cpuLabel, memLabel))
+}
 
-	// Health Check Status
+func (m Model) appendHealthAndEnv(b *strings.Builder, c logger.ContainerDisplay) {
 	if c.HealthStatus != "" {
 		healthIcon := "✅"
 		healthColor := lipgloss.Color("#A3BE8C")
@@ -1001,7 +998,6 @@ func (m Model) renderContainerDetail() string {
 		}
 	}
 
-	// Environment Variables
 	if len(c.Env) > 0 {
 		b.WriteString(lipgloss.NewStyle().Bold(true).Foreground(secondaryColor).Render("\n 🔎 Env Variables") + "\n")
 		for i, env := range c.Env {
@@ -1010,7 +1006,6 @@ func (m Model) renderContainerDetail() string {
 					fmt.Sprintf("   ... +%d more", len(c.Env)-15)) + "\n")
 				break
 			}
-			// Colore KEY=VALUE de forma distinta
 			parts := strings.SplitN(env, "=", 2)
 			if len(parts) == 2 {
 				key := lipgloss.NewStyle().Foreground(primaryColor).Render(parts[0])
@@ -1024,7 +1019,9 @@ func (m Model) renderContainerDetail() string {
 			}
 		}
 	}
+}
 
+func (m Model) appendStats(b *strings.Builder, c logger.ContainerDisplay) {
 	if stats, ok := m.stats[c.ID]; ok {
 		b.WriteString(lipgloss.NewStyle().Bold(true).Foreground(secondaryColor).Render("\n 📊 "+m.msg.Metrics) + "\n")
 		b.WriteString(fmt.Sprintf(" CPU:      %s\n", formatCPU(stats.CPUPercent)))
@@ -1033,8 +1030,6 @@ func (m Model) renderContainerDetail() string {
 		b.WriteString(fmt.Sprintf(" %-9s %-12s %-9s %s\n",
 			m.msg.NetworkDown, formatBytes(stats.NetworkRx), m.msg.NetworkUp, formatBytes(stats.NetworkTx)))
 	}
-
-	return detail.Render(b.String()) + "\n"
 }
 
 func (m Model) renderLogPanel() string {
@@ -1047,29 +1042,7 @@ func (m Model) renderLogPanel() string {
 		maxLines = 15
 	}
 
-	var filtered []LogEntry
-	for _, entry := range m.logLines {
-		if m.logSearch == "" || strings.Contains(strings.ToLower(entry.Text), strings.ToLower(m.logSearch)) {
-			// Regex simples para formatar Timestamps (ISO8601 do Docker) e colorir JSON
-			text := entry.Text
-
-			// Color Timestamp se existir
-			if len(text) > 30 && text[4] == '-' && text[7] == '-' && text[10] == 'T' {
-				ts := text[:30]
-				rest := text[30:]
-				text = lipgloss.NewStyle().Foreground(lipgloss.Color("#5C6370")).Render(ts) + rest
-			}
-
-			// Tenta highlight de chaves JSON bem simples para logs
-			if strings.Contains(text, `":`) {
-				text = strings.ReplaceAll(text, `"level":"error"`, lipgloss.NewStyle().Foreground(lipgloss.Color("#E06C75")).Render(`"level":"error"`))
-				text = strings.ReplaceAll(text, `"level":"warn"`, lipgloss.NewStyle().Foreground(lipgloss.Color("#E5C07B")).Render(`"level":"warn"`))
-				text = strings.ReplaceAll(text, `"level":"info"`, lipgloss.NewStyle().Foreground(lipgloss.Color("#61AFEF")).Render(`"level":"info"`))
-			}
-
-			filtered = append(filtered, LogEntry{Container: entry.Container, Text: text})
-		}
-	}
+	filtered := m.filterAndFormatLogs()
 
 	start := 0
 	if len(filtered) > maxLines+m.logOffset {
@@ -1084,12 +1057,10 @@ func (m Model) renderLogPanel() string {
 	var b strings.Builder
 	for _, entry := range filtered[start:end] {
 		truncated := entry.Text
-		// TUI width limit approx
-		if len(truncated) > m.width+50 { // tolerance for ANSI codes
+		if len(truncated) > m.width+50 {
 			truncated = truncated[:m.width+50] + "..."
 		}
 
-		// Se houver mais de um container sendo exibido, prefixa com o nome
 		prefix := ""
 		if len(m.logContainers) > 1 {
 			prefix = lipgloss.NewStyle().Foreground(primaryColor).Render(fmt.Sprintf("[%s] ", entry.Container))
@@ -1103,6 +1074,36 @@ func (m Model) renderLogPanel() string {
 		maxW = 40
 	}
 
+	footer := m.buildLogFooter()
+	panel := logPanelStyle.Width(maxW).MarginLeft(2)
+	return title + "\n" + panel.Render(b.String()) + footer
+}
+
+func (m Model) filterAndFormatLogs() []LogEntry {
+	var filtered []LogEntry
+	for _, entry := range m.logLines {
+		if m.logSearch == "" || strings.Contains(strings.ToLower(entry.Text), strings.ToLower(m.logSearch)) {
+			text := entry.Text
+
+			if len(text) > 30 && text[4] == '-' && text[7] == '-' && text[10] == 'T' {
+				ts := text[:30]
+				rest := text[30:]
+				text = lipgloss.NewStyle().Foreground(lipgloss.Color("#5C6370")).Render(ts) + rest
+			}
+
+			if strings.Contains(text, `":`) {
+				text = strings.ReplaceAll(text, `"level":"error"`, lipgloss.NewStyle().Foreground(lipgloss.Color("#E06C75")).Render(`"level":"error"`))
+				text = strings.ReplaceAll(text, `"level":"warn"`, lipgloss.NewStyle().Foreground(lipgloss.Color("#E5C07B")).Render(`"level":"warn"`))
+				text = strings.ReplaceAll(text, `"level":"info"`, lipgloss.NewStyle().Foreground(lipgloss.Color("#61AFEF")).Render(`"level":"info"`))
+			}
+
+			filtered = append(filtered, LogEntry{Container: entry.Container, Text: text})
+		}
+	}
+	return filtered
+}
+
+func (m Model) buildLogFooter() string {
 	footer := ""
 	if m.searchMode {
 		footer = "\n  " + lipgloss.NewStyle().Foreground(primaryColor).Render("🔍 Buscar: "+m.logSearch+"█")
@@ -1113,9 +1114,7 @@ func (m Model) renderLogPanel() string {
 	if m.logOffset > 0 {
 		footer += lipgloss.NewStyle().Foreground(warningColor).Render(fmt.Sprintf("  [Histórico offset: %d]", m.logOffset))
 	}
-
-	panel := logPanelStyle.Width(maxW).MarginLeft(2)
-	return title + "\n" + panel.Render(b.String()) + footer
+	return footer
 }
 
 func (m Model) renderAlerts() string {

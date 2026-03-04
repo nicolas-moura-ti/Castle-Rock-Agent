@@ -397,8 +397,7 @@ func PrintContainerTable(containers []ContainerDisplay) {
 
 	for i, c := range containers {
 		// Estado com cor
-		stateColor := colorBrightGreen
-		stateIcon := "●"
+		var stateColor, stateIcon string
 		switch c.State {
 		case "running":
 			stateColor = colorBrightGreen

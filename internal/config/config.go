@@ -250,30 +250,39 @@ func Load(path string) (Config, error) {
 // Em Docker/K8s, variáveis de ambiente são o mecanismo padrão
 // para injetar configuração runtime sem reconstruir a imagem.
 func applyEnvOverrides(cfg *Config) {
+	applyGeneralEnv(cfg)
+	applyPrometheusEnv(cfg)
+	applyStatsEnv(cfg)
+	applyClusterEnv(cfg)
+	applyAlertsAndPruneEnv(cfg)
+}
+
+func applyGeneralEnv(cfg *Config) {
 	if v := os.Getenv("CASTLE_ROCK_LOG_LEVEL"); v != "" {
 		cfg.LogLevel = v
 	}
-
 	if v := os.Getenv("CASTLE_ROCK_LANGUAGE"); v != "" {
 		cfg.Language = v
 	}
+}
 
+func applyPrometheusEnv(cfg *Config) {
 	if v := os.Getenv("CASTLE_ROCK_PROMETHEUS_PORT"); v != "" {
 		if port, err := strconv.Atoi(v); err == nil {
 			cfg.Prometheus.Port = port
 		}
 	}
-
 	if v := os.Getenv("CASTLE_ROCK_PROMETHEUS_ENABLED"); v != "" {
 		cfg.Prometheus.Enabled = v == "true" || v == "1"
 	}
+}
 
+func applyStatsEnv(cfg *Config) {
 	if v := os.Getenv("CASTLE_ROCK_STATS_INTERVAL"); v != "" {
 		if d, err := time.ParseDuration(v); err == nil {
 			cfg.Stats.Interval = d
 		}
 	}
-
 	if v := os.Getenv("CASTLE_ROCK_STATS_INCLUDE_CONTAINERS"); v != "" {
 		parts := strings.Split(v, ",")
 		var includes []string
@@ -285,27 +294,27 @@ func applyEnvOverrides(cfg *Config) {
 		}
 		cfg.Stats.IncludeContainers = includes
 	}
+}
 
+func applyClusterEnv(cfg *Config) {
 	if v := os.Getenv("CASTLE_ROCK_CLUSTER_MODE"); v != "" {
 		cfg.Cluster.Mode = v
 	}
-
 	if v := os.Getenv("CASTLE_ROCK_CLUSTER_LEADER_URL"); v != "" {
 		cfg.Cluster.LeaderURL = v
 	}
-
 	if v := os.Getenv("CASTLE_ROCK_CLUSTER_HOST_ID"); v != "" {
 		cfg.Cluster.HostID = v
 	}
+}
 
+func applyAlertsAndPruneEnv(cfg *Config) {
 	if v := os.Getenv("CASTLE_ROCK_ALERTS_ENABLED"); v != "" {
 		cfg.Alerts.Enabled = v == "true" || v == "1"
 	}
-
 	if v := os.Getenv("CASTLE_ROCK_PRUNE_ENABLED"); v != "" {
 		cfg.Prune.Enabled = v == "true" || v == "1"
 	}
-
 	if v := os.Getenv("CASTLE_ROCK_PRUNE_DISK_TRIGGER"); v != "" {
 		if th, err := strconv.ParseFloat(v, 64); err == nil {
 			cfg.Prune.TriggerDiskPercent = th
