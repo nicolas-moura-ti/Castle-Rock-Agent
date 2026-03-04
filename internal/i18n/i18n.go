@@ -123,7 +123,7 @@ var Pt = Messages{
 	SecHostNetwork:       "Rodando em modo --network=host (Isolamento de rede quebrado com o sistema principal)",
 }
 
-// Get retorna as strings carregadas baseada na lang env (en, pt).
+// Get returns loaded strings based on env lang (en, pt).
 func Get(lang string) Messages {
 	if lang == "pt" || lang == "pt-BR" {
 		return Pt

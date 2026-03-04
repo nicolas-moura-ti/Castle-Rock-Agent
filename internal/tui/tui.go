@@ -224,166 +224,195 @@ func (m Model) Init() tea.Cmd {
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-
 	case tea.KeyMsg:
 		return m.handleKeyMsg(msg)
-
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-
 	case containerListMsg:
-		m.containers = msg.containers
-		m.lastUpdate = time.Now()
-		if m.cursor >= len(m.containers) && len(m.containers) > 0 {
-			m.cursor = len(m.containers) - 1
-		}
-		if m.auditor != nil {
-			oldAlertsCount := len(m.securityAlerts)
-			m.securityAlerts = m.auditor.Audit(m.ctx, m.containers)
-
-			// Simple notification logic if new alerts appeared (just an event log entry)
-			if len(m.securityAlerts) > oldAlertsCount {
-				m.events = append([]EventLogEntry{{
-					Time:   time.Now(),
-					Icon:   "🛡️ ",
-					Action: "SEC-AUDIT",
-					Name:   fmt.Sprintf("%d issues found", len(m.securityAlerts)),
-				}}, m.events...)
-			}
-		}
-
+		return m.handleContainerListMsg(msg)
 	case statsMsg:
-		m.stats = msg.stats
-		// Avalia alertas
-		if m.alertEngine != nil {
-			newAlerts := m.alertEngine.Evaluate(msg.stats)
-			m.activeAlerts = m.alertEngine.GetActiveAlerts()
-			for _, a := range newAlerts {
-				icon := "⚠️ "
-				if a.Severity == "critical" {
-					icon = "🚨"
-				}
-				m.events = append([]EventLogEntry{{
-					Time:   time.Now(),
-					Icon:   icon,
-					Action: "ALERT",
-					Name:   alerts.FormatAlert(a),
-				}}, m.events...)
-			}
-		}
-
+		return m.handleStatsMsg(msg)
 	case dockerEventMsg:
-		m.eventCount++
-		icon := "📋"
-		switch msg.event.Action {
-		case "start":
-			icon = "🟢"
-		case "stop":
-			icon = "🟡"
-		case "die":
-			icon = "🔴"
-		case "create":
-			icon = "📦"
-		case "destroy":
-			icon = "🗑️ "
-		case "pause":
-			icon = "⏸️ "
-		case "unpause":
-			icon = "▶️ "
-		}
-		m.events = append([]EventLogEntry{{
-			Time: time.Now(), Icon: icon, Action: msg.event.Action, Name: msg.event.ContainerName,
-		}}, m.events...)
-		if m.store != nil {
-			m.store.SaveEvent(m.ctx, msg.event.Action, msg.event.ContainerName, "")
-		}
-		if len(m.events) > 50 {
-			m.events = m.events[:50]
-		}
-		return m, tea.Batch(m.fetchContainers(), m.fetchStats(), m.watchNextDockerEvent())
-
+		return m.handleDockerEventMsg(msg)
 	case dockerErrorMsg:
 		m.events = append([]EventLogEntry{{
 			Time: time.Now(), Icon: "❌", Action: "error", Name: msg.err.Error(),
 		}}, m.events...)
-
 	case logLineMsg:
-		m.logLines = append(m.logLines, LogEntry{Container: msg.container, Text: msg.line})
-		if len(m.logLines) > 1000 {
-			m.logLines = m.logLines[len(m.logLines)-1000:]
-		}
-		if msg.nextCh != nil {
-			return m, m.waitForNextLog(msg.container, msg.nextCh)
-		}
-
+		return m.handleLogLineMsg(msg)
 	case actionResultMsg:
-		icon := "✅"
-		action := msg.action
-		if !msg.success {
-			icon = "❌"
-			action = msg.action + " FAILED"
-		}
-		m.events = append([]EventLogEntry{{
-			Time: time.Now(), Icon: icon, Action: action, Name: msg.container,
-		}}, m.events...)
-		// Re-fetch após ação
-		return m, tea.Batch(m.fetchContainers(), m.fetchStats())
-
+		return m.handleActionResultMsg(msg)
 	case stressResultMsg:
-		icon := "⚡"
-		name := "stress-" + msg.mode + " (30s)"
-		if !msg.success {
-			icon = "❌"
-			name = "stress FAILED: " + msg.err.Error()
-		}
-		m.events = append([]EventLogEntry{{
-			Time: time.Now(), Icon: icon, Action: "stress", Name: name,
-		}}, m.events...)
-		return m, tea.Batch(m.fetchContainers(), m.fetchStats())
-
+		return m.handleStressResultMsg(msg)
 	case diskUsageMsg:
 		m.diskUsage = msg.usage
-
 	case pruneResultMsg:
-		m.pruning = false
-		icon := "🧹 "
-		if msg.err != nil {
-			m.pruneFeedback = fmt.Sprintf("❌ Erro ao limpar %s: %s", msg.target, msg.err.Error())
-			m.events = append([]EventLogEntry{{
-				Time: time.Now(), Icon: "❌", Action: "prune fail", Name: msg.err.Error(),
-			}}, m.events...)
-		} else {
-			reclaimedStr := formatBytes(msg.reclaimed)
-			m.pruneFeedback = fmt.Sprintf("✅ Faxina Concluída! Você recuperou %s de espaço livre.", reclaimedStr)
-			m.events = append([]EventLogEntry{{
-				Time: time.Now(), Icon: icon, Action: "prune " + msg.target, Name: fmt.Sprintf("Liberou %s", reclaimedStr),
-			}}, m.events...)
-		}
-		// Atualiza o dashboard logo após prune
-		return m, m.fetchDiskUsage()
-
+		return m.handlePruneResultMsg(msg)
 	case hostStatsMsg:
 		m.hostCPU = msg.cpu
 		m.hostMem = msg.mem
-
 	case tickMsg:
-		m.lastUpdate = time.Time(msg)
-		if !m.showLogs && !m.showMap && m.confirmAction == "" {
-			return m, tea.Batch(
-				m.fetchContainers(),
-				m.fetchStats(),
-				m.fetchHostStats(),
-				m.tickCmd(),
-			)
-		}
-		return m, m.tickCmd()
+		return m.handleTickMsg(msg)
 	}
-
 	return m, nil
 }
 
+func (m Model) handleContainerListMsg(msg containerListMsg) (tea.Model, tea.Cmd) {
+	m.containers = msg.containers
+	m.lastUpdate = time.Now()
+	if m.cursor >= len(m.containers) && len(m.containers) > 0 {
+		m.cursor = len(m.containers) - 1
+	}
+	if m.auditor != nil {
+		oldAlertsCount := len(m.securityAlerts)
+		m.securityAlerts = m.auditor.Audit(m.ctx, m.containers)
+		if len(m.securityAlerts) > oldAlertsCount {
+			m.events = append([]EventLogEntry{{
+				Time:   time.Now(),
+				Icon:   "🛡️ ",
+				Action: "SEC-AUDIT",
+				Name:   fmt.Sprintf("%d issues found", len(m.securityAlerts)),
+			}}, m.events...)
+		}
+	}
+	return m, nil
+}
+
+func (m Model) handleStatsMsg(msg statsMsg) (tea.Model, tea.Cmd) {
+	m.stats = msg.stats
+	if m.alertEngine != nil {
+		newAlerts := m.alertEngine.Evaluate(msg.stats)
+		m.activeAlerts = m.alertEngine.GetActiveAlerts()
+		for _, a := range newAlerts {
+			icon := "⚠️ "
+			if a.Severity == "critical" {
+				icon = "🚨"
+			}
+			m.events = append([]EventLogEntry{{
+				Time:   time.Now(),
+				Icon:   icon,
+				Action: "ALERT",
+				Name:   alerts.FormatAlert(a),
+			}}, m.events...)
+		}
+	}
+	return m, nil
+}
+
+func (m Model) handleDockerEventMsg(msg dockerEventMsg) (tea.Model, tea.Cmd) {
+	m.eventCount++
+	icon := dockerEventIcon(msg.event.Action)
+	m.events = append([]EventLogEntry{{
+		Time: time.Now(), Icon: icon, Action: msg.event.Action, Name: msg.event.ContainerName,
+	}}, m.events...)
+	if m.store != nil {
+		m.store.SaveEvent(m.ctx, msg.event.Action, msg.event.ContainerName, "")
+	}
+	if len(m.events) > 50 {
+		m.events = m.events[:50]
+	}
+	return m, tea.Batch(m.fetchContainers(), m.fetchStats(), m.watchNextDockerEvent())
+}
+
+func dockerEventIcon(action string) string {
+	switch action {
+	case "start":
+		return "🟢"
+	case "stop":
+		return "🟡"
+	case "die":
+		return "🔴"
+	case "create":
+		return "📦"
+	case "destroy":
+		return "🗑️ "
+	case "pause":
+		return "⏸️ "
+	case "unpause":
+		return "▶️ "
+	default:
+		return "📋"
+	}
+}
+
+func (m Model) handleLogLineMsg(msg logLineMsg) (tea.Model, tea.Cmd) {
+	m.logLines = append(m.logLines, LogEntry{Container: msg.container, Text: msg.line})
+	if len(m.logLines) > 1000 {
+		m.logLines = m.logLines[len(m.logLines)-1000:]
+	}
+	if msg.nextCh != nil {
+		return m, m.waitForNextLog(msg.container, msg.nextCh)
+	}
+	return m, nil
+}
+
+func (m Model) handleActionResultMsg(msg actionResultMsg) (tea.Model, tea.Cmd) {
+	icon := "✅"
+	action := msg.action
+	if !msg.success {
+		icon = "❌"
+		action = msg.action + " FAILED"
+	}
+	m.events = append([]EventLogEntry{{
+		Time: time.Now(), Icon: icon, Action: action, Name: msg.container,
+	}}, m.events...)
+	return m, tea.Batch(m.fetchContainers(), m.fetchStats())
+}
+
+func (m Model) handleStressResultMsg(msg stressResultMsg) (tea.Model, tea.Cmd) {
+	icon := "⚡"
+	name := "stress-" + msg.mode + " (30s)"
+	if !msg.success {
+		icon = "❌"
+		name = "stress FAILED: " + msg.err.Error()
+	}
+	m.events = append([]EventLogEntry{{
+		Time: time.Now(), Icon: icon, Action: "stress", Name: name,
+	}}, m.events...)
+	return m, tea.Batch(m.fetchContainers(), m.fetchStats())
+}
+
+func (m Model) handlePruneResultMsg(msg pruneResultMsg) (tea.Model, tea.Cmd) {
+	m.pruning = false
+	if msg.err != nil {
+		m.pruneFeedback = fmt.Sprintf("❌ Error cleaning %s: %s", msg.target, msg.err.Error())
+		m.events = append([]EventLogEntry{{
+			Time: time.Now(), Icon: "❌", Action: "prune fail", Name: msg.err.Error(),
+		}}, m.events...)
+	} else {
+		reclaimedStr := formatBytes(msg.reclaimed)
+		m.pruneFeedback = fmt.Sprintf("✅ Cleanup complete! Reclaimed %s of free space.", reclaimedStr)
+		m.events = append([]EventLogEntry{{
+			Time: time.Now(), Icon: "🧹 ", Action: "prune " + msg.target, Name: fmt.Sprintf("Freed %s", reclaimedStr),
+		}}, m.events...)
+	}
+	return m, m.fetchDiskUsage()
+}
+
+func (m Model) handleTickMsg(msg tickMsg) (tea.Model, tea.Cmd) {
+	m.lastUpdate = time.Time(msg)
+	if !m.showLogs && !m.showMap && m.confirmAction == "" {
+		return m, tea.Batch(
+			m.fetchContainers(),
+			m.fetchStats(),
+			m.fetchHostStats(),
+			m.tickCmd(),
+		)
+	}
+	return m, m.tickCmd()
+}
+
+// ─── Key Handlers ────────────────────────────────────────────────────────────
+
 func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m, cmd, handled := m.handleModalKeys(msg); handled {
+		return m, cmd
+	}
+	return m.handleNormalKeys(msg)
+}
+
+func (m Model) handleModalKeys(msg tea.KeyMsg) (Model, tea.Cmd, bool) {
 	if m.confirmAction != "" {
 		switch msg.String() {
 		case "y", "Y":
@@ -391,12 +420,12 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.confirmAction = ""
 			if m.cursor < len(m.containers) {
 				c := m.containers[m.cursor]
-				return m, m.executeAction(action, c.ID, c.Name)
+				return m, m.executeAction(action, c.ID, c.Name), true
 			}
 		default:
 			m.confirmAction = ""
 		}
-		return m, nil
+		return m, nil, true
 	}
 
 	if m.showStress {
@@ -409,11 +438,11 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			} else if msg.String() == "m" {
 				mode = "memory"
 			}
-			return m, m.executeStress(mode)
+			return m, m.executeStress(mode), true
 		default:
 			m.showStress = false
 		}
-		return m, nil
+		return m, nil, true
 	}
 
 	if m.showCleanup {
@@ -424,13 +453,13 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "i":
 			m.pruning = true
 			m.pruneFeedback = ""
-			return m, m.runPrune("images")
+			return m, m.runPrune("images"), true
 		case "v":
 			m.pruning = true
 			m.pruneFeedback = ""
-			return m, m.runPrune("volumes")
+			return m, m.runPrune("volumes"), true
 		}
-		return m, nil
+		return m, nil, true
 	}
 
 	if m.searchMode {
@@ -446,35 +475,50 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.logSearch += msg.String()
 			}
 		}
-		return m, nil
+		return m, nil, true
 	}
 
+	return m, nil, false
+}
+
+func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q", "ctrl+c":
 		m.quitting = true
 		return m, tea.Quit
+	case "/", "up", "k", "down", "j", "f", " ":
+		return m.handleNavigationKeys(msg)
+	case "l", "L", "E":
+		return m.handleLogKeys(msg)
+	case "s", "R", "x", "S":
+		return m.handleActionKeys(msg)
+	case "r":
+		return m, tea.Batch(m.fetchContainers(), m.fetchStats())
+	case "?", "enter", "esc", "C", "m", "M":
+		return m.handleViewKeys(msg)
+	}
+	return m, nil
+}
+
+func (m Model) handleNavigationKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
 	case "/":
 		if m.showLogs {
 			m.searchMode = true
-			return m, nil
 		}
 	case "up", "k":
 		if m.showLogs {
 			m.logOffset++
-		} else {
-			if m.cursor > 0 {
-				m.cursor--
-			}
+		} else if m.cursor > 0 {
+			m.cursor--
 		}
 	case "down", "j":
 		if m.showLogs {
 			if m.logOffset > 0 {
 				m.logOffset--
 			}
-		} else {
-			if m.cursor < len(m.containers)-1 {
-				m.cursor++
-			}
+		} else if m.cursor < len(m.containers)-1 {
+			m.cursor++
 		}
 	case "f":
 		if m.showLogs {
@@ -489,8 +533,136 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.selectedIDs[id] = true
 			}
 		}
-	case "r":
-		return m, tea.Batch(m.fetchContainers(), m.fetchStats())
+	}
+	return m, nil
+}
+
+func (m Model) handleLogKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "E":
+		return m.exportLogs()
+	case "L":
+		return m.startMultiTailLogs()
+	case "l":
+		return m.toggleSingleContainerLogs()
+	}
+	return m, nil
+}
+
+func (m Model) exportLogs() (tea.Model, tea.Cmd) {
+	if !m.showLogs || len(m.logLines) == 0 {
+		return m, nil
+	}
+	var content strings.Builder
+	lineCount := 0
+	for _, entry := range m.logLines {
+		if m.logSearch == "" || strings.Contains(strings.ToLower(entry.Text), strings.ToLower(m.logSearch)) {
+			if len(m.logContainers) > 1 {
+				content.WriteString("[" + entry.Container + "] ")
+			}
+			content.WriteString(entry.Text + "\n")
+			lineCount++
+		}
+	}
+	fileName := "/tmp/castle-rock-logs"
+	if len(m.logContainers) == 1 {
+		fileName += "-" + m.logContainers[0]
+	} else {
+		fileName += "-multi"
+	}
+	fileName += fmt.Sprintf("-%d.txt", time.Now().Unix())
+
+	err := os.WriteFile(fileName, []byte(content.String()), 0644)
+	if err != nil {
+		m.events = append([]EventLogEntry{{
+			Time: time.Now(), Icon: "❌", Action: "export fail", Name: err.Error(),
+		}}, m.events...)
+	} else {
+		m.events = append([]EventLogEntry{{
+			Time: time.Now(), Icon: "📤", Action: "export", Name: fmt.Sprintf("%d lines → %s", lineCount, fileName),
+		}}, m.events...)
+	}
+	return m, nil
+}
+
+func (m Model) startMultiTailLogs() (tea.Model, tea.Cmd) {
+	if m.showLogs || len(m.selectedIDs) == 0 {
+		return m, nil
+	}
+	m.showLogs = true
+	m.logOffset = 0
+	m.logLines = []LogEntry{{Container: "System", Text: "Loading aggregate logs..."}}
+	var names []string
+	var cmds []tea.Cmd
+	for _, c := range m.containers {
+		if m.selectedIDs[c.ID] {
+			names = append(names, c.Name)
+			logCh, err := m.dockerClient.StreamContainerLogs(m.ctx, c.ID)
+			if err == nil {
+				cmds = append(cmds, m.waitForNextLog(c.Name, logCh))
+			}
+		}
+	}
+	m.logContainers = names
+	return m, tea.Batch(cmds...)
+}
+
+func (m Model) toggleSingleContainerLogs() (tea.Model, tea.Cmd) {
+	if m.showLogs {
+		m.showLogs = false
+		m.logLines = nil
+		return m, nil
+	}
+	if m.cursor >= len(m.containers) {
+		return m, nil
+	}
+	c := m.containers[m.cursor]
+	m.showLogs = true
+	m.logOffset = 0
+	m.logLines = []LogEntry{{Container: c.Name, Text: "Loading logs..."}}
+	m.logContainers = []string{c.Name}
+	logCh, err := m.dockerClient.StreamContainerLogs(m.ctx, c.ID)
+	if err == nil {
+		return m, m.waitForNextLog(c.Name, logCh)
+	}
+	return m, nil
+}
+
+func (m Model) handleActionKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "s":
+		if m.cursor < len(m.containers) {
+			m.confirmAction = "stop"
+		}
+	case "R":
+		if m.cursor < len(m.containers) {
+			m.confirmAction = "restart"
+		}
+	case "x":
+		if !m.showLogs && !m.showDetail && !m.showMap && m.cursor < len(m.containers) {
+			c := m.containers[m.cursor]
+			cmd := exec.Command("docker", "exec", "-it", c.Name, "/bin/sh")
+			return m, tea.ExecProcess(cmd, func(err error) tea.Msg {
+				if err != nil {
+					cmdBash := exec.Command("docker", "exec", "-it", c.Name, "/bin/bash")
+					return tea.ExecProcess(cmdBash, func(err2 error) tea.Msg {
+						if err2 != nil {
+							return dockerErrorMsg{err: fmt.Errorf("shell exec failed (sh/bash): %v", err2)}
+						}
+						return nil
+					})()
+				}
+				return nil
+			})
+		}
+	case "S":
+		m.showStress = true
+	}
+	return m, nil
+}
+
+func (m Model) handleViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
 	case "?":
 		m.showHelp = !m.showHelp
 	case "enter":
@@ -513,100 +685,6 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				return m, m.fetchDiskUsage()
 			}
 		}
-	case "E":
-		if m.showLogs && len(m.logLines) > 0 {
-			var content strings.Builder
-			lineCount := 0
-			for _, entry := range m.logLines {
-				if m.logSearch == "" || strings.Contains(strings.ToLower(entry.Text), strings.ToLower(m.logSearch)) {
-					if len(m.logContainers) > 1 {
-						content.WriteString("[" + entry.Container + "] ")
-					}
-					content.WriteString(entry.Text + "\n")
-					lineCount++
-				}
-			}
-			fileName := "/tmp/castle-rock-logs"
-			if len(m.logContainers) == 1 {
-				fileName += "-" + m.logContainers[0]
-			} else {
-				fileName += "-multi"
-			}
-			fileName += fmt.Sprintf("-%d.txt", time.Now().Unix())
-
-			err := os.WriteFile(fileName, []byte(content.String()), 0644)
-			if err != nil {
-				m.events = append([]EventLogEntry{{
-					Time: time.Now(), Icon: "❌", Action: "export fail", Name: err.Error(),
-				}}, m.events...)
-			} else {
-				m.events = append([]EventLogEntry{{
-					Time: time.Now(), Icon: "📤", Action: "export", Name: fmt.Sprintf("%d linhas → %s", lineCount, fileName),
-				}}, m.events...)
-			}
-		}
-	case "L":
-		if !m.showLogs && len(m.selectedIDs) > 0 {
-			m.showLogs = true
-			m.logOffset = 0
-			m.logLines = []LogEntry{{Container: "System", Text: "Carregando aggregate logs..."}}
-			var names []string
-			var cmds []tea.Cmd
-			for _, c := range m.containers {
-				if m.selectedIDs[c.ID] {
-					names = append(names, c.Name)
-					logCh, err := m.dockerClient.StreamContainerLogs(m.ctx, c.ID)
-					if err == nil {
-						cmds = append(cmds, m.waitForNextLog(c.Name, logCh))
-					}
-				}
-			}
-			m.logContainers = names
-			return m, tea.Batch(cmds...)
-		}
-	case "l":
-		if m.showLogs {
-			m.showLogs = false
-			m.logLines = nil
-		} else if m.cursor < len(m.containers) {
-			c := m.containers[m.cursor]
-			m.showLogs = true
-			m.logOffset = 0
-			m.logLines = []LogEntry{{Container: c.Name, Text: "Carregando logs..."}}
-			m.logContainers = []string{c.Name}
-
-			logCh, err := m.dockerClient.StreamContainerLogs(m.ctx, c.ID)
-			if err == nil {
-				return m, m.waitForNextLog(c.Name, logCh)
-			}
-		}
-	case "s":
-		if m.cursor < len(m.containers) {
-			m.confirmAction = "stop"
-		}
-	case "R":
-		if m.cursor < len(m.containers) {
-			m.confirmAction = "restart"
-		}
-	case "x":
-		if !m.showLogs && !m.showDetail && !m.showMap && m.cursor < len(m.containers) {
-			c := m.containers[m.cursor]
-			cmd := exec.Command("docker", "exec", "-it", c.Name, "/bin/sh")
-			return m, tea.ExecProcess(cmd, func(err error) tea.Msg {
-				if err != nil {
-					cmdBash := exec.Command("docker", "exec", "-it", c.Name, "/bin/bash")
-					return tea.ExecProcess(cmdBash, func(err2 error) tea.Msg {
-						if err2 != nil {
-							return dockerErrorMsg{err: fmt.Errorf("Shell Exec Falhou (sh/bash): %v", err2)}
-						}
-						return nil
-					})()
-				}
-				return nil
-			})
-		}
-	case "S":
-		m.showStress = true
 	case "m", "M":
 		m.showMap = !m.showMap
 		if m.showMap {
@@ -616,7 +694,6 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 		}
 	}
-
 	return m, nil
 }
 

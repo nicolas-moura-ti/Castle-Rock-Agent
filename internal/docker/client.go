@@ -1,15 +1,14 @@
-// Package docker fornece um wrapper sobre a SDK oficial do Docker.
+// Package docker provides a wrapper over the official Docker SDK.
 //
-// Este package encapsula toda a interação com o Docker daemon, seguindo
-// o princípio de Inversão de Dependência: o código de negócio (collector)
-// não depende diretamente da SDK do Docker, mas sim de abstrações
-// definidas neste package.
+// This package encapsulates all interaction with the Docker daemon, following
+// the Dependency Inversion Principle: business logic (collector) does not
+// depend directly on the Docker SDK, but on abstractions defined here.
 //
-// Por que usar um wrapper?
-//   - Facilita testes unitários (pode-se mockar a interface)
-//   - Centraliza configuração e tratamento de erros
-//   - Permite trocar a implementação sem afetar o resto do sistema
-//   - Encapsula detalhes da API do Docker (versionamento, autenticação)
+// Why use a wrapper?
+//   - Makes unit testing easier (interfaces can be mocked)
+//   - Centralizes configuration and error handling
+//   - Allows swapping the implementation without affecting the rest of the system
+//   - Encapsulates Docker API details (versioning, authentication)
 package docker
 
 import (
@@ -20,7 +19,7 @@ import (
 	"sync"
 	"time"
 
-	// SDK oficial do Docker — esta é a biblioteca mantida pela Docker Inc.
+	// Official Docker SDK — maintained by Docker Inc.
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
@@ -32,49 +31,49 @@ import (
 	"github.com/nicolas-moura-ti/castle-rock-agent/pkg/models"
 )
 
-// Client encapsula o client oficial do Docker, adicionando métodos
-// de alto nível específicos para o Castle Rock Agent.
+// Client wraps the official Docker client, adding high-level methods
+// specific to the Castle Rock Agent.
 //
-// Por que não usar o client.Client diretamente?
-//   - O client.Client tem dezenas de métodos que não precisamos
-//   - Nosso Client expõe apenas a interface mínima necessária
-//   - Segue o princípio de Interface Segregation (SOLID)
+// Why not use client.Client directly?
+//   - client.Client has dozens of methods we don't need
+//   - Our Client exposes only the minimal required interface
+//   - Follows the Interface Segregation Principle (SOLID)
 type Client struct {
-	// cli é o client real da SDK do Docker.
-	// Mantemos como campo não-exportado (minúsculo) para encapsulamento.
+	// cli is the real Docker SDK client.
+	// Kept as an unexported field for encapsulation.
 	cli *client.Client
 
 	// includeContainers is a list of container names/substrings to monitor.
 	includeContainers []string
 }
 
-// NewClient cria uma nova instância do Client conectada ao Docker daemon local.
+// NewClient creates a new Client instance connected to the local Docker daemon.
 //
-// Usa client.NewClientWithOpts com as seguintes opções:
-//   - FromEnv(): lê configurações de variáveis de ambiente (DOCKER_HOST, etc.)
-//   - WithAPIVersionNegotiation(): negocia automaticamente a versão da API
-//     com o daemon, evitando erros de incompatibilidade de versão.
+// Uses client.NewClientWithOpts with the following options:
+//   - FromEnv(): reads configuration from env variables (DOCKER_HOST, etc.)
+//   - WithAPIVersionNegotiation(): automatically negotiates the API version
+//     with the daemon, avoiding version incompatibility errors.
 //
-// PADRÃO GO: Funções construtoras são nomeadas New<Tipo> por convenção.
-// Elas retornam (*Tipo, error) — sempre verifique o erro no chamador.
+// GO PATTERN: Constructor functions are named New<Type> by convention.
+// They return (*Type, error) — always check the error at the call site.
 func NewClient() (*Client, error) {
-	// client.NewClientWithOpts aceita um número variável de opções
-	// (variadic function), permitindo configuração flexível.
+	// client.NewClientWithOpts accepts a variable number of options
+	// (variadic function), allowing flexible configuration.
 	//
-	// WithAPIVersionNegotiation é ESSENCIAL em produção:
-	//   - Sem ela, o client usa uma versão fixa da API
-	//   - Se o daemon tiver uma versão diferente, todas as chamadas falham
-	//   - Com negociação, o client descobre a versão do daemon e se adapta
+	// WithAPIVersionNegotiation is ESSENTIAL in production:
+	//   - Without it, the client uses a fixed API version
+	//   - If the daemon has a different version, all calls fail
+	//   - With negotiation, the client discovers the daemon version and adapts
 	cli, err := client.NewClientWithOpts(
 		client.FromEnv,
 		client.WithAPIVersionNegotiation(),
 	)
 	if err != nil {
-		// Usamos fmt.Errorf com o verbo %w para "wrapping" de erros.
-		// %w preserva o erro original, permitindo que o chamador use
-		// errors.Is() e errors.As() para inspecionar a causa raiz.
-		// Isso é fundamental para debugging em produção.
-		return nil, fmt.Errorf("docker.NewClient: falha ao criar client: %w", err)
+		// Use fmt.Errorf with the %w verb for error wrapping.
+		// %w preserves the original error, allowing the caller to use
+		// errors.Is() and errors.As() to inspect the root cause.
+		// This is fundamental for production debugging.
+		return nil, fmt.Errorf("docker.NewClient: failed to create client: %w", err)
 	}
 
 	return &Client{cli: cli}, nil
@@ -98,10 +97,10 @@ func (c *Client) isMonitored(name string) bool {
 	return false
 }
 
-// Close fecha a conexão com o Docker daemon.
+// Close closes the connection to the Docker daemon.
 //
-// SEMPRE chame Close() quando terminar de usar o client.
-// O padrão idiomático em Go é usar defer imediatamente após a criação:
+// ALWAYS call Close() when done using the client.
+// The idiomatic Go pattern is to use defer right after creation:
 //
 //	client, err := docker.NewClient()
 //	if err != nil { ... }
@@ -498,17 +497,17 @@ func (c *Client) GetAllContainerStats(ctx context.Context) (map[string]models.Co
 	return results, nil
 }
 
-// getContainerStats coleta métricas de UM container via Docker Stats API.
+// getContainerStats collects metrics for ONE container via Docker Stats API.
 //
-// CÁLCULO DE CPU%:
+// CPU% CALCULATION:
 //
-//	O Docker retorna contadores acumulados (total de nanosegundos de CPU
-//	usados desde o start do container). Para calcular o percentual,
-//	precisaríamos de dois snapshots e calcular o delta. Como usamos
-//	Stream:false (snapshot único), calculamos uma aproximação usando
-//	os contadores do sistema.
+//	The Docker daemon returns accumulated counters (total CPU nanoseconds
+//	used since container start). To calculate percentage,
+//	we would need two snapshots to compute the delta. Since we use
+//	Stream:false (single snapshot), we compute an approximation using
+//	the system counters.
 //
-//	Fórmula oficial (mesma usada pelo `docker stats`):
+//	Official formula (same used by `docker stats`):
 //	  cpuDelta = container_cpu_usage - pre_container_cpu_usage
 //	  systemDelta = system_cpu_usage - pre_system_cpu_usage
 //	  cpu% = (cpuDelta / systemDelta) * numCPUs * 100
@@ -594,14 +593,14 @@ func calculateCPUPercent(stats *types.StatsJSON) float64 {
 
 // GetSystemInfo retorna informações detalhadas sobre o Docker daemon.
 //
-// Estas informações são essenciais para observabilidade:
-//   - Versão do servidor e da API
-//   - Sistema operacional e arquitetura do host
-//   - Memória total disponível
-//   - Quantidade de containers e imagens
+// This information is essential for observability:
+//   - Server and API version
+//   - Host operating system and architecture
+//   - Total available memory
+//   - Number of containers and images
 //
-// Em um agente de produção, estas informações seriam exportadas como
-// métricas (Prometheus gauges) e usadas para dashboards de infraestrutura.
+// In a production agent, this information would be exported as
+// metrics (Prometheus gauges) and used for infrastructure dashboards.
 func (c *Client) GetSystemInfo(ctx context.Context) (map[string]string, error) {
 	// ServerVersion retorna a versão do Docker daemon.
 	// É uma chamada leve (HTTP GET /version) e útil para health check.
@@ -672,13 +671,13 @@ func (c *Client) ListRunningContainers(ctx context.Context) ([]models.ContainerI
 	return result, nil
 }
 
-// ListRunningContainersDetailed retorna informações detalhadas de todos
-// os containers em execução, incluindo labels, redes, comando e tempo
-// de criação. Usado para logging avançado.
+// ListRunningContainersDetailed returns detailed information for all
+// running containers, including labels, networks, command and creation
+// time. Used for advanced logging.
 //
-// Esta versão é mais pesada que ListRunningContainers porque coleta
-// dados adicionais. Use-a para display; use a versão simples para
-// coleta de métricas onde performance é crítica.
+// This version is heavier than ListRunningContainers because it collects
+// additional data. Use it for display; use the simpler version for
+// metrics collection where performance is critical.
 func (c *Client) ListRunningContainersDetailed(ctx context.Context) ([]logger.ContainerDisplay, error) {
 	containers, err := c.cli.ContainerList(ctx, container.ListOptions{
 		All: false,
@@ -702,68 +701,79 @@ func (c *Client) ListRunningContainersDetailed(ctx context.Context) ([]logger.Co
 	return result, nil
 }
 
-// enrichContainerDetails adquire metadados do ContainerInspect e preenche o display
+// enrichContainerDetails acquires metadata from ContainerInspect and fills the display struct.
 func (c *Client) enrichContainerDetails(ctx context.Context, id string, cd *logger.ContainerDisplay) {
 	inspect, err := c.cli.ContainerInspect(ctx, id)
 	if err != nil {
 		return
 	}
 
-	if inspect.Config != nil {
-		cd.Env = inspect.Config.Env
+	c.enrichConfigDetails(&inspect, cd)
+	c.enrichHealthDetails(&inspect, cd)
+	c.enrichHostConfigDetails(&inspect, cd)
+	c.enrichMountDetails(&inspect, cd)
+}
 
-		if len(inspect.Config.Entrypoint) > 0 {
-			cd.Entrypoint = strings.Join(inspect.Config.Entrypoint, " ")
-		}
-		if len(inspect.Config.Cmd) > 0 {
-			if cd.Entrypoint != "" {
-				cd.Entrypoint += " " + strings.Join(inspect.Config.Cmd, " ")
-			} else {
-				cd.Entrypoint = strings.Join(inspect.Config.Cmd, " ")
-			}
-		}
-		if len(cd.Entrypoint) > 80 {
-			cd.Entrypoint = cd.Entrypoint[:77] + "..."
+func (c *Client) enrichConfigDetails(inspect *types.ContainerJSON, cd *logger.ContainerDisplay) {
+	if inspect.Config == nil {
+		return
+	}
+	cd.Env = inspect.Config.Env
+	if len(inspect.Config.Entrypoint) > 0 {
+		cd.Entrypoint = strings.Join(inspect.Config.Entrypoint, " ")
+	}
+	if len(inspect.Config.Cmd) > 0 {
+		if cd.Entrypoint != "" {
+			cd.Entrypoint += " " + strings.Join(inspect.Config.Cmd, " ")
+		} else {
+			cd.Entrypoint = strings.Join(inspect.Config.Cmd, " ")
 		}
 	}
+	if len(cd.Entrypoint) > 80 {
+		cd.Entrypoint = cd.Entrypoint[:77] + "..."
+	}
+}
 
-	if inspect.State != nil && inspect.State.Health != nil {
-		cd.HealthStatus = string(inspect.State.Health.Status)
-		if len(inspect.State.Health.Log) > 0 {
-			last := inspect.State.Health.Log[len(inspect.State.Health.Log)-1]
-			cd.HealthLog = strings.TrimSpace(last.Output)
-			if len(cd.HealthLog) > 120 {
-				cd.HealthLog = cd.HealthLog[:117] + "..."
-			}
+func (c *Client) enrichHealthDetails(inspect *types.ContainerJSON, cd *logger.ContainerDisplay) {
+	if inspect.State == nil || inspect.State.Health == nil {
+		return
+	}
+	cd.HealthStatus = string(inspect.State.Health.Status)
+	if len(inspect.State.Health.Log) > 0 {
+		last := inspect.State.Health.Log[len(inspect.State.Health.Log)-1]
+		cd.HealthLog = strings.TrimSpace(last.Output)
+		if len(cd.HealthLog) > 120 {
+			cd.HealthLog = cd.HealthLog[:117] + "..."
 		}
 	}
+}
 
-	if inspect.HostConfig != nil {
-		cd.RestartPolicy = string(inspect.HostConfig.RestartPolicy.Name)
-		if inspect.HostConfig.RestartPolicy.MaximumRetryCount > 0 {
-			cd.RestartPolicy += fmt.Sprintf(":%d", inspect.HostConfig.RestartPolicy.MaximumRetryCount)
-		}
-
-		if inspect.HostConfig.NanoCPUs > 0 {
-			cd.CPULimit = float64(inspect.HostConfig.NanoCPUs) / 1e9
-		}
-		if inspect.HostConfig.Memory > 0 {
-			cd.MemoryLimit = inspect.HostConfig.Memory
-		}
+func (c *Client) enrichHostConfigDetails(inspect *types.ContainerJSON, cd *logger.ContainerDisplay) {
+	if inspect.HostConfig == nil {
+		return
 	}
-
+	cd.RestartPolicy = string(inspect.HostConfig.RestartPolicy.Name)
+	if inspect.HostConfig.RestartPolicy.MaximumRetryCount > 0 {
+		cd.RestartPolicy += fmt.Sprintf(":%d", inspect.HostConfig.RestartPolicy.MaximumRetryCount)
+	}
+	if inspect.HostConfig.NanoCPUs > 0 {
+		cd.CPULimit = float64(inspect.HostConfig.NanoCPUs) / 1e9
+	}
+	if inspect.HostConfig.Memory > 0 {
+		cd.MemoryLimit = inspect.HostConfig.Memory
+	}
 	if inspect.RestartCount > 0 {
 		cd.RestartCount = inspect.RestartCount
 	}
+}
 
-	if len(inspect.Mounts) > 0 {
-		for _, mt := range inspect.Mounts {
-			label := fmt.Sprintf("%s → %s (%s)", mt.Source, mt.Destination, mt.Type)
-			if len(label) > 80 {
-				label = label[:77] + "..."
-			}
-			cd.Mounts = append(cd.Mounts, label)
+func (c *Client) enrichMountDetails(inspect *types.ContainerJSON, cd *logger.ContainerDisplay) {
+	for _, mt := range inspect.Mounts {
+		label := fmt.Sprintf("%s → %s (%s)", mt.Source, mt.Destination, mt.Type)
+		if len(label) > 80 {
+			label = label[:77] + "..."
 		}
+		cd.Mounts = append(cd.Mounts, label)
 	}
 }
 

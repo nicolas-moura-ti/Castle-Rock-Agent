@@ -13,21 +13,21 @@ import (
 	"github.com/nicolas-moura-ti/castle-rock-agent/pkg/models"
 )
 
-// StartSender inicia a rotina que coleta os dados do Docker local
-// e envia (HTTP POST) para o Leader em intervalos definidos.
+// StartSender starts the routine that collects local Docker data
+// and sends it (HTTP POST) to the Leader at defined intervals.
 func StartSender(ctx context.Context, dockerClient *docker.Client, cfg config.Config, log *slog.Logger) {
-	// Garante que só roda no modo worker
+	// Only runs in worker mode
 	if cfg.Cluster.Mode != "worker" {
 		return
 	}
 
-	log.Info("Iniciando Worker Sender",
+	log.Info("Starting Worker Sender",
 		slog.String("leader_url", cfg.Cluster.LeaderURL),
 		slog.String("host_id", cfg.Cluster.HostID),
 		slog.Duration("interval", cfg.Stats.Interval),
 	)
 
-	// Cria HTTP client com timeout garantido
+	// Creates HTTP client with guaranteed timeout
 	httpClient := &http.Client{
 		Timeout: 5 * time.Second,
 	}
@@ -38,31 +38,31 @@ func StartSender(ctx context.Context, dockerClient *docker.Client, cfg config.Co
 	for {
 		select {
 		case <-ctx.Done():
-			log.Info("Worker Sender encerrado")
+			log.Info("Worker Sender stopped")
 			return
 		case <-ticker.C:
-			// Coleta lista de containers rodando
+			// Collect list of running containers
 			containers, err := dockerClient.ListRunningContainers(ctx)
 			if err != nil {
-				log.Error("Sender: Erro ao listar containers", slog.String("error", err.Error()))
+				log.Error("Sender: error listing containers", slog.String("error", err.Error()))
 				continue
 			}
 
-			// Coleta métricas completas e em paralelo via WaitGroup (GetAllContainerStats já faz isso)
+			// Collect full metrics in parallel via WaitGroup (GetAllContainerStats already does this)
 			metricsMap, err := dockerClient.GetAllContainerStats(ctx)
 			if err != nil {
-				log.Error("Sender: Erro ao obter estatísticas", slog.String("error", err.Error()))
+				log.Error("Sender: error fetching stats", slog.String("error", err.Error()))
 				continue
 			}
 
-			// Prepara o array final de métricas processadas
+			// Prepare final array of processed metrics
 			var metricsList []models.ContainerMetrics
 			for _, metric := range metricsMap {
 				metric.HostID = cfg.Cluster.HostID
 				metricsList = append(metricsList, metric)
 			}
 
-			// Injeta o HostID em todos os registros de Container
+			// Inject HostID into all Container records
 			for i := range containers {
 				containers[i].HostID = cfg.Cluster.HostID
 			}
@@ -81,20 +81,20 @@ func StartSender(ctx context.Context, dockerClient *docker.Client, cfg config.Co
 func sendPushPayload(ctx context.Context, client *http.Client, url string, payload models.PushPayload, log *slog.Logger) {
 	data, err := json.Marshal(payload)
 	if err != nil {
-		log.Error("Sender: erro ao parear payload JSON", slog.String("error", err.Error()))
+		log.Error("Sender: error marshaling payload JSON", slog.String("error", err.Error()))
 		return
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(data))
 	if err != nil {
-		log.Error("Sender: erro ao criar request", slog.String("error", err.Error()))
+		log.Error("Sender: error creating request", slog.String("error", err.Error()))
 		return
 	}
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Warn("Sender: falha de comunicação (Líder inativo?)",
+		log.Warn("Sender: communication failure (Leader inactive?)",
 			slog.String("url", url),
 			slog.String("error", err.Error()),
 		)
@@ -103,7 +103,7 @@ func sendPushPayload(ctx context.Context, client *http.Client, url string, paylo
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted {
-		log.Warn("Sender: envio rejeitado pelo líder",
+		log.Warn("Sender: push rejected by leader",
 			slog.Int("status_code", resp.StatusCode),
 		)
 	}

@@ -1,4 +1,4 @@
-// Package security implementa auditoria de segurança preditiva em containers.
+// Package security implements predictive security auditing for containers.
 package security
 
 import (
@@ -13,18 +13,18 @@ import (
 	"github.com/nicolas-moura-ti/castle-rock-agent/internal/logger"
 )
 
-// Auditor analisa containers vivos em busca de configurações
-// arriscadas ou anti-patterns de segurança.
+// Auditor analyzes running containers looking for risky configurations
+// or security anti-patterns.
 type Auditor struct {
 	dockerClient *docker.Client
 
-	// Cache para não rodar um 'docker inspect' a cada segundo
-	// Chave: ContainerID
+	// Cache to avoid running 'docker inspect' every second.
+	// Key: ContainerID
 	cache map[string][]alerts.Alert
 	mu    sync.RWMutex
 }
 
-// NewAuditor cria um novo auditor integrado ao cliente do Docker.
+// NewAuditor creates a new auditor integrated with the Docker client.
 func NewAuditor(client *docker.Client) *Auditor {
 	return &Auditor{
 		dockerClient: client,
@@ -32,9 +32,9 @@ func NewAuditor(client *docker.Client) *Auditor {
 	}
 }
 
-// Audit varre a lista de containers fornecida.
-// Utiliza um cache por ContainerID (como containers são imutáveis,
-// a configuração não muda a menos que o container seja recriado, o que muda o ID).
+// Audit scans the provided container list.
+// Uses a cache keyed by ContainerID (containers are immutable so
+// the configuration won't change unless the container is recreated, changing the ID).
 func (a *Auditor) Audit(ctx context.Context, containers []logger.ContainerDisplay) []alerts.Alert {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -74,176 +74,141 @@ func (a *Auditor) Audit(ctx context.Context, containers []logger.ContainerDispla
 	return activeAlerts
 }
 
-// evaluateSecurityRules avalia todas as regras de segurança preditiva em um container
+// evaluateSecurityRules evaluates all predictive security rules on a container.
 func (a *Auditor) evaluateSecurityRules(c logger.ContainerDisplay, inspectJSON types.ContainerJSON, now time.Time) []alerts.Alert {
 	var secAlerts []alerts.Alert
+	secAlerts = a.checkPrivilegedMode(secAlerts, c, inspectJSON, now)
+	secAlerts = a.checkRootUser(secAlerts, c, inspectJSON, now)
+	secAlerts = a.checkDBPortExposed(secAlerts, c, inspectJSON, now)
+	secAlerts = a.checkSensitiveCaps(secAlerts, c, inspectJSON, now)
+	secAlerts = a.checkResourceQuotas(secAlerts, c, inspectJSON, now)
+	secAlerts = a.checkWritableRootFS(secAlerts, c, inspectJSON, now)
+	secAlerts = a.checkInsecurePorts(secAlerts, c, inspectJSON, now)
+	secAlerts = a.checkNoNewPrivileges(secAlerts, c, inspectJSON, now)
+	secAlerts = a.checkHostNetworking(secAlerts, c, inspectJSON, now)
+	return secAlerts
+}
 
-	if inspectJSON.HostConfig != nil && inspectJSON.HostConfig.Privileged {
-		secAlerts = append(secAlerts, alerts.Alert{
-			RuleName:      "Sec: Privileged Mode",
-			ContainerID:   c.ID,
-			ContainerName: c.Name,
-			Metric:        "security_privileged",
-			CurrentValue:  1,
-			Threshold:     0,
-			Severity:      "critical",
-			ActiveSince:   now,
-			FiredAt:       now,
+func (a *Auditor) checkPrivilegedMode(result []alerts.Alert, c logger.ContainerDisplay, j types.ContainerJSON, now time.Time) []alerts.Alert {
+	if j.HostConfig != nil && j.HostConfig.Privileged {
+		return append(result, alerts.Alert{
+			RuleName: "Sec: Privileged Mode", ContainerID: c.ID, ContainerName: c.Name,
+			Metric: "security_privileged", CurrentValue: 1, Severity: "critical", ActiveSince: now, FiredAt: now,
 		})
 	}
+	return result
+}
 
+func (a *Auditor) checkRootUser(result []alerts.Alert, c logger.ContainerDisplay, j types.ContainerJSON, now time.Time) []alerts.Alert {
 	user := ""
-	if inspectJSON.Config != nil {
-		user = inspectJSON.Config.User
+	if j.Config != nil {
+		user = j.Config.User
 	}
 	if user == "" || user == "root" || user == "0" {
-		secAlerts = append(secAlerts, alerts.Alert{
-			RuleName:      "Sec: Root User",
-			ContainerID:   c.ID,
-			ContainerName: c.Name,
-			Metric:        "security_root_user",
-			CurrentValue:  1,
-			Threshold:     0,
-			Severity:      "warning",
-			ActiveSince:   now,
-			FiredAt:       now,
+		return append(result, alerts.Alert{
+			RuleName: "Sec: Root User", ContainerID: c.ID, ContainerName: c.Name,
+			Metric: "security_root_user", CurrentValue: 1, Severity: "warning", ActiveSince: now, FiredAt: now,
 		})
 	}
+	return result
+}
 
-	if inspectJSON.NetworkSettings != nil {
-		for port, bindings := range inspectJSON.NetworkSettings.Ports {
-			portStr := string(port)
-			isDBPort := strings.HasPrefix(portStr, "3306/") ||
-				strings.HasPrefix(portStr, "5432/") ||
-				strings.HasPrefix(portStr, "27017/") ||
-				strings.HasPrefix(portStr, "6379/")
-
-			if isDBPort {
-				for _, b := range bindings {
-					if b.HostIP == "0.0.0.0" || b.HostIP == "" || b.HostIP == "::" {
-						secAlerts = append(secAlerts, alerts.Alert{
-							RuleName:      "Sec: DB Port Exposed globally",
-							ContainerID:   c.ID,
-							ContainerName: c.Name,
-							Metric:        "security_db_port",
-							CurrentValue:  float64(port.Int()),
-							Threshold:     0,
-							Severity:      "critical",
-							ActiveSince:   now,
-							FiredAt:       now,
-						})
-						break
-					}
+func (a *Auditor) checkDBPortExposed(result []alerts.Alert, c logger.ContainerDisplay, j types.ContainerJSON, now time.Time) []alerts.Alert {
+	if j.NetworkSettings == nil {
+		return result
+	}
+	for port, bindings := range j.NetworkSettings.Ports {
+		portStr := string(port)
+		isDBPort := strings.HasPrefix(portStr, "3306/") ||
+			strings.HasPrefix(portStr, "5432/") ||
+			strings.HasPrefix(portStr, "27017/") ||
+			strings.HasPrefix(portStr, "6379/")
+		if isDBPort {
+			for _, b := range bindings {
+				if b.HostIP == "0.0.0.0" || b.HostIP == "" || b.HostIP == "::" {
+					return append(result, alerts.Alert{
+						RuleName: "Sec: DB Port Exposed globally", ContainerID: c.ID, ContainerName: c.Name,
+						Metric: "security_db_port", CurrentValue: float64(port.Int()), Severity: "critical", ActiveSince: now, FiredAt: now,
+					})
 				}
 			}
 		}
 	}
+	return result
+}
 
-	if inspectJSON.HostConfig != nil {
-		for _, cap := range inspectJSON.HostConfig.CapAdd {
-			if cap == "SYS_ADMIN" || cap == "NET_ADMIN" {
-				secAlerts = append(secAlerts, alerts.Alert{
-					RuleName:      "Sec: Sensitive CAP_ADD",
-					ContainerID:   c.ID,
-					ContainerName: c.Name,
-					Metric:        "security_sensitive_cap",
-					CurrentValue:  1,
-					Threshold:     0,
-					Severity:      "warning",
-					ActiveSince:   now,
-					FiredAt:       now,
-				})
-				break
-			}
-		}
+func (a *Auditor) checkSensitiveCaps(result []alerts.Alert, c logger.ContainerDisplay, j types.ContainerJSON, now time.Time) []alerts.Alert {
+	if j.HostConfig == nil {
+		return result
 	}
-
-	if inspectJSON.HostConfig != nil {
-		if inspectJSON.HostConfig.Memory == 0 || inspectJSON.HostConfig.NanoCPUs == 0 {
-			secAlerts = append(secAlerts, alerts.Alert{
-				RuleName:      "Sec: No Resource Quotas",
-				ContainerID:   c.ID,
-				ContainerName: c.Name,
-				Metric:        "security_no_quotas",
-				CurrentValue:  1,
-				Threshold:     0,
-				Severity:      "warning",
-				ActiveSince:   now,
-				FiredAt:       now,
+	for _, cap := range j.HostConfig.CapAdd {
+		if cap == "SYS_ADMIN" || cap == "NET_ADMIN" {
+			return append(result, alerts.Alert{
+				RuleName: "Sec: Sensitive CAP_ADD", ContainerID: c.ID, ContainerName: c.Name,
+				Metric: "security_sensitive_cap", CurrentValue: 1, Severity: "warning", ActiveSince: now, FiredAt: now,
 			})
 		}
 	}
+	return result
+}
 
-	if inspectJSON.HostConfig != nil && !inspectJSON.HostConfig.ReadonlyRootfs {
-		secAlerts = append(secAlerts, alerts.Alert{
-			RuleName:      "Sec: Writable RootFS",
-			ContainerID:   c.ID,
-			ContainerName: c.Name,
-			Metric:        "security_writable_rootfs",
-			CurrentValue:  1,
-			Threshold:     0,
-			Severity:      "warning",
-			ActiveSince:   now,
-			FiredAt:       now,
+func (a *Auditor) checkResourceQuotas(result []alerts.Alert, c logger.ContainerDisplay, j types.ContainerJSON, now time.Time) []alerts.Alert {
+	if j.HostConfig != nil && (j.HostConfig.Memory == 0 || j.HostConfig.NanoCPUs == 0) {
+		return append(result, alerts.Alert{
+			RuleName: "Sec: No Resource Quotas", ContainerID: c.ID, ContainerName: c.Name,
+			Metric: "security_no_quotas", CurrentValue: 1, Severity: "warning", ActiveSince: now, FiredAt: now,
 		})
 	}
+	return result
+}
 
-	if inspectJSON.NetworkSettings != nil {
-		for port := range inspectJSON.NetworkSettings.Ports {
-			portStr := string(port)
-			if strings.HasPrefix(portStr, "22/") || strings.HasPrefix(portStr, "23/") {
-				secAlerts = append(secAlerts, alerts.Alert{
-					RuleName:      "Sec: Insecure Port Exposed",
-					ContainerID:   c.ID,
-					ContainerName: c.Name,
-					Metric:        "security_insecure_port",
-					CurrentValue:  1,
-					Threshold:     0,
-					Severity:      "critical",
-					ActiveSince:   now,
-					FiredAt:       now,
-				})
-				break
-			}
-		}
+func (a *Auditor) checkWritableRootFS(result []alerts.Alert, c logger.ContainerDisplay, j types.ContainerJSON, now time.Time) []alerts.Alert {
+	if j.HostConfig != nil && !j.HostConfig.ReadonlyRootfs {
+		return append(result, alerts.Alert{
+			RuleName: "Sec: Writable RootFS", ContainerID: c.ID, ContainerName: c.Name,
+			Metric: "security_writable_rootfs", CurrentValue: 1, Severity: "warning", ActiveSince: now, FiredAt: now,
+		})
 	}
+	return result
+}
 
-	hasNoNewPrivs := false
-	if inspectJSON.HostConfig != nil {
-		for _, opt := range inspectJSON.HostConfig.SecurityOpt {
-			if strings.Contains(opt, "no-new-privileges:true") || strings.Contains(opt, "no-new-privileges") {
-				hasNoNewPrivs = true
-				break
-			}
-		}
-		if !hasNoNewPrivs {
-			secAlerts = append(secAlerts, alerts.Alert{
-				RuleName:      "Sec: Missing No-New-Privileges",
-				ContainerID:   c.ID,
-				ContainerName: c.Name,
-				Metric:        "security_no_new_privs",
-				CurrentValue:  1,
-				Threshold:     0,
-				Severity:      "warning",
-				ActiveSince:   now,
-				FiredAt:       now,
+func (a *Auditor) checkInsecurePorts(result []alerts.Alert, c logger.ContainerDisplay, j types.ContainerJSON, now time.Time) []alerts.Alert {
+	if j.NetworkSettings == nil {
+		return result
+	}
+	for port := range j.NetworkSettings.Ports {
+		portStr := string(port)
+		if strings.HasPrefix(portStr, "22/") || strings.HasPrefix(portStr, "23/") {
+			return append(result, alerts.Alert{
+				RuleName: "Sec: Insecure Port Exposed", ContainerID: c.ID, ContainerName: c.Name,
+				Metric: "security_insecure_port", CurrentValue: 1, Severity: "critical", ActiveSince: now, FiredAt: now,
 			})
 		}
 	}
+	return result
+}
 
-	if inspectJSON.HostConfig != nil && string(inspectJSON.HostConfig.NetworkMode) == "host" {
-		secAlerts = append(secAlerts, alerts.Alert{
-			RuleName:      "Sec: Host Networking Mode",
-			ContainerID:   c.ID,
-			ContainerName: c.Name,
-			Metric:        "security_host_network",
-			CurrentValue:  1,
-			Threshold:     0,
-			Severity:      "critical",
-			ActiveSince:   now,
-			FiredAt:       now,
+func (a *Auditor) checkNoNewPrivileges(result []alerts.Alert, c logger.ContainerDisplay, j types.ContainerJSON, now time.Time) []alerts.Alert {
+	if j.HostConfig == nil {
+		return result
+	}
+	for _, opt := range j.HostConfig.SecurityOpt {
+		if strings.Contains(opt, "no-new-privileges:true") || strings.Contains(opt, "no-new-privileges") {
+			return result
+		}
+	}
+	return append(result, alerts.Alert{
+		RuleName: "Sec: Missing No-New-Privileges", ContainerID: c.ID, ContainerName: c.Name,
+		Metric: "security_no_new_privs", CurrentValue: 1, Severity: "warning", ActiveSince: now, FiredAt: now,
+	})
+}
+
+func (a *Auditor) checkHostNetworking(result []alerts.Alert, c logger.ContainerDisplay, j types.ContainerJSON, now time.Time) []alerts.Alert {
+	if j.HostConfig != nil && string(j.HostConfig.NetworkMode) == "host" {
+		return append(result, alerts.Alert{
+			RuleName: "Sec: Host Networking Mode", ContainerID: c.ID, ContainerName: c.Name,
+			Metric: "security_host_network", CurrentValue: 1, Severity: "critical", ActiveSince: now, FiredAt: now,
 		})
 	}
-
-	return secAlerts
+	return result
 }

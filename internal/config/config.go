@@ -212,11 +212,11 @@ func Load(path string) (Config, error) {
 		return cfg, fmt.Errorf("config.Load: erro ao ler %s: %w", path, err)
 	}
 
-	// Decodifica YAML.
-	// yaml.Unmarshal faz merge: campos não presentes no YAML
-	// mantêm o valor default do struct.
+	// Decodes YAML.
+	// yaml.Unmarshal performs a merge: fields not present in the YAML
+	// keep their default struct value.
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return cfg, fmt.Errorf("config.Load: erro ao parsear YAML: %w", err)
+		return cfg, fmt.Errorf("config.Load: error parsing YAML: %w", err)
 	}
 
 	// Aplica overrides de variáveis de ambiente (maior precedência)

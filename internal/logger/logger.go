@@ -1,23 +1,23 @@
-// Package logger fornece um sistema de logging estruturado e colorido
-// para o Castle Rock Agent.
+// Package logger provides a structured and colorized logging system
+// for the Castle Rock Agent.
 //
-// ARQUITETURA DE LOGGING:
+// LOGGING ARCHITECTURE:
 //
-//	Este package utiliza log/slog (Go 1.21+), o logger estruturado da
-//	biblioteca padrão do Go. slog é a evolução do antigo log package,
-//	oferecendo:
+//	This package uses log/slog (Go 1.21+), the structured logger from
+//	the Go standard library. slog is the evolution of the old log package,
+//	offering:
 //
-//	- Logs estruturados com key-value pairs (não apenas strings)
-//	- Níveis de log nativos (DEBUG, INFO, WARN, ERROR)
-//	- Handlers customizáveis (JSON para produção, texto colorido para dev)
-//	- Performance otimizada com lazy evaluation de argumentos
-//	- Integração nativa com context.Context
+//	- Structured logs with key-value pairs (not just strings)
+//	- Native log levels (DEBUG, INFO, WARN, ERROR)
+//	- Customizable handlers (JSON for production, colored text for dev)
+//	- Optimized performance with lazy argument evaluation
+//	- Native integration with context.Context
 //
-// POR QUE SLOG EM VEZ DE LOGRUS/ZAP?
-//   - slog é parte da standard library — sem dependência externa
-//   - API estável e mantida pelo time core do Go
-//   - Performance comparável ao uber-go/zap
-//   - Em projetos novos, a recomendação da comunidade Go é usar slog
+// WHY SLOG INSTEAD OF LOGRUS/ZAP?
+//   - slog is part of the standard library — no external dependency
+//   - Stable API maintained by the Go core team
+//   - Performance comparable to uber-go/zap
+//   - For new projects, the Go community recommendation is to use slog
 //
 // CORES NO TERMINAL:
 //
@@ -174,9 +174,9 @@ func (h *PrettyHandler) Enabled(_ context.Context, level slog.Level) bool {
 //   - Mensagem em destaque (bold)
 //   - Atributos formatados como key=value com cores diferenciadas
 func (h *PrettyHandler) Handle(_ context.Context, r slog.Record) error {
-	// Formata o timestamp com milissegundos.
-	// O formato "15:04:05.000" segue a convenção Go de reference time:
-	// Mon Jan 2 15:04:05 MST 2006 (o "momento de referência" do Go).
+	// Formats the timestamp with milliseconds.
+	// The format "15:04:05.000" follows the Go reference time convention:
+	// Mon Jan 2 15:04:05 MST 2006 (Go's "reference moment").
 	timeStr := r.Time.Format("2006-01-02 15:04:05.000")
 
 	// Determina a cor e o label baseado no nível de log.
@@ -336,9 +336,9 @@ func Setup(level string) *slog.Logger {
 
 // PrintBanner exibe o banner de inicialização do agente.
 //
-// Um banner profissional comunica identidade e versão do software.
-// Em produção, isso ajuda a identificar qual versão está rodando
-// quando se faz troubleshooting em logs históricos.
+// A professional banner communicates software identity and version.
+// In production, this helps identify which version is running
+// when troubleshooting historical logs.
 func PrintBanner(version, goVersion string) {
 	banner := fmt.Sprintf(`
 %s%s┌─────────────────────────────────────────────────────────┐%s
@@ -427,7 +427,7 @@ func PrintContainerTable(containers []ContainerDisplay) {
 		printField("Status", c.Status)
 		printField("Estado", fmt.Sprintf("%s%s%s", stateColor, c.State, colorReset))
 		if c.Command != "" {
-			printField("Comando", c.Command)
+			printField("Command", c.Command)
 		}
 		if c.Ports != "" {
 			printField("Portas", c.Ports)
