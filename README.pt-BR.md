@@ -593,6 +593,7 @@ Variáveis de ambiente têm **prioridade máxima** sobre o arquivo YAML:
 | `CASTLE_ROCK_PROMETHEUS_PORT` | Porta do Prometheus | `9110` |
 | `CASTLE_ROCK_PROMETHEUS_ENABLED` | Ativar/desativar Prometheus | `true` |
 | `CASTLE_ROCK_STATS_INTERVAL` | Intervalo de coleta | `5s` |
+| `CASTLE_ROCK_STATS_INCLUDE_CONTAINERS` | Lista de nomes/fragmentos de containers a monitorar (separados por vírgula). Vazio monitora todos. | `""` |
 | `CASTLE_ROCK_ALERTS_ENABLED` | Ativar/desativar alertas | `true` |
 | `CASTLE_ROCK_MODE` | `headless` = sem TUI (Docker/K8s) | `` (TUI) |
 | `CASTLE_ROCK_CLUSTER_MODE` | `standalone`, `leader`, `worker` | `standalone` |
@@ -612,6 +613,24 @@ Variáveis de ambiente têm **prioridade máxima** sobre o arquivo YAML:
 1. Defaults hardcoded (código Go)
 2. configs/config.yaml (override parcial)
 3. Variáveis de ambiente CASTLE_ROCK_* (override final)
+```
+
+### 🎯 Monitoramento Seletivo (Filtro de Containers)
+
+Você pode filtrar quais containers o agente deve monitorar. Isso é extremamente útil se você quer observar apenas serviços específicos (ex: seu banco de dados e sua API principal) sem poluir o Prometheus e o Grafana com sidecars ou outros containers barulhentos do host.
+
+Para monitorar containers específicos, defina uma lista de nomes ou trechos de nomes (como `postgres` ou `api`). Somente containers que contenham pelo menos uma dessas strings em seus nomes serão monitorados e aparecerão na TUI. Se a lista estiver vazia (o padrão), *todos* os containers em execução são monitorados normalmente.
+
+**Via config.yaml**:
+```yaml
+stats:
+  interval: 5s
+  include_containers: ["postgres", "redis", "minha-api"]
+```
+
+**Via Variável de Ambiente**:
+```bash
+CASTLE_ROCK_STATS_INCLUDE_CONTAINERS="postgres,redis,minha-api"
 ```
 
 ---

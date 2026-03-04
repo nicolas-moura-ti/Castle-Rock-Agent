@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -77,6 +78,10 @@ type PrometheusConfig struct {
 type StatsConfig struct {
 	// Interval é o intervalo entre coletas (ex: "5s", "10s", "1m").
 	Interval time.Duration `yaml:"interval"`
+
+	// IncludeContainers is a list of container names/substrings to monitor.
+	// If empty, all containers are monitored.
+	IncludeContainers []string `yaml:"include_containers"`
 }
 
 // ClusterConfig gerencia o modo distribuído (Leader/Worker).
@@ -141,7 +146,8 @@ func DefaultConfig() Config {
 			Port:    9110,
 		},
 		Stats: StatsConfig{
-			Interval: 5 * time.Second,
+			Interval:          5 * time.Second,
+			IncludeContainers: []string{},
 		},
 		Cluster: ClusterConfig{
 			Mode:      "standalone",
@@ -266,6 +272,18 @@ func applyEnvOverrides(cfg *Config) {
 		if d, err := time.ParseDuration(v); err == nil {
 			cfg.Stats.Interval = d
 		}
+	}
+
+	if v := os.Getenv("CASTLE_ROCK_STATS_INCLUDE_CONTAINERS"); v != "" {
+		parts := strings.Split(v, ",")
+		var includes []string
+		for _, p := range parts {
+			trimmed := strings.TrimSpace(p)
+			if trimmed != "" {
+				includes = append(includes, trimmed)
+			}
+		}
+		cfg.Stats.IncludeContainers = includes
 	}
 
 	if v := os.Getenv("CASTLE_ROCK_CLUSTER_MODE"); v != "" {

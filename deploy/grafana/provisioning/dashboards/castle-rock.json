@@ -547,13 +547,13 @@
             "mode": "palette-classic"
           },
           "custom": {
-            "axisLabel": "Bytes Recebidos",
+            "axisLabel": "Bytes/s Recebidos",
             "lineWidth": 2,
             "fillOpacity": 15,
             "showPoints": "never",
             "lineInterpolation": "smooth"
           },
-          "unit": "decbytes"
+          "unit": "Bps"
         }
       },
       "gridPos": {
@@ -567,7 +567,7 @@
       "type": "timeseries",
       "targets": [
         {
-          "expr": "castle_rock_container_network_rx_bytes",
+          "expr": "rate(castle_rock_container_network_rx_bytes[5m])",
           "legendFormat": "{{container_name}} ↓"
         }
       ]
@@ -582,13 +582,13 @@
             "mode": "palette-classic"
           },
           "custom": {
-            "axisLabel": "Bytes Transmitidos",
+            "axisLabel": "Bytes/s Transmitidos",
             "lineWidth": 2,
             "fillOpacity": 15,
             "showPoints": "never",
             "lineInterpolation": "smooth"
           },
-          "unit": "decbytes"
+          "unit": "Bps"
         }
       },
       "gridPos": {
@@ -602,7 +602,7 @@
       "type": "timeseries",
       "targets": [
         {
-          "expr": "castle_rock_container_network_tx_bytes",
+          "expr": "rate(castle_rock_container_network_tx_bytes[5m])",
           "legendFormat": "{{container_name}} ↑"
         }
       ]
@@ -633,7 +633,7 @@
             "showPoints": "never",
             "lineInterpolation": "smooth"
           },
-          "unit": "decbytes"
+          "unit": "Bps"
         }
       },
       "gridPos": {
@@ -647,7 +647,7 @@
       "type": "timeseries",
       "targets": [
         {
-          "expr": "castle_rock_container_block_read_bytes",
+          "expr": "rate(castle_rock_container_block_read_bytes[5m])",
           "legendFormat": "{{container_name}} read"
         }
       ]
@@ -667,7 +667,7 @@
             "showPoints": "never",
             "lineInterpolation": "smooth"
           },
-          "unit": "decbytes"
+          "unit": "Bps"
         }
       },
       "gridPos": {
@@ -681,7 +681,7 @@
       "type": "timeseries",
       "targets": [
         {
-          "expr": "castle_rock_container_block_write_bytes",
+          "expr": "rate(castle_rock_container_block_write_bytes[5m])",
           "legendFormat": "{{container_name}} write"
         }
       ]

@@ -476,7 +476,7 @@
                         "showPoints": "never",
                         "lineInterpolation": "smooth"
                     },
-                    "unit": "decbytes"
+                    "unit": "Bps"
                 }
             },
             "gridPos": {
@@ -490,11 +490,11 @@
             "type": "timeseries",
             "targets": [
                 {
-                    "expr": "castle_rock_container_network_rx_bytes{container_name=\"$container\"}",
+                    "expr": "rate(castle_rock_container_network_rx_bytes{container_name=\"$container\"}[5m])",
                     "legendFormat": "↓ Download (RX)"
                 },
                 {
-                    "expr": "castle_rock_container_network_tx_bytes{container_name=\"$container\"}",
+                    "expr": "rate(castle_rock_container_network_tx_bytes{container_name=\"$container\"}[5m])",
                     "legendFormat": "↑ Upload (TX)"
                 }
             ]
@@ -525,7 +525,7 @@
                         "showPoints": "never",
                         "lineInterpolation": "smooth"
                     },
-                    "unit": "decbytes"
+                    "unit": "Bps"
                 }
             },
             "gridPos": {
@@ -539,11 +539,11 @@
             "type": "timeseries",
             "targets": [
                 {
-                    "expr": "castle_rock_container_block_read_bytes{container_name=\"$container\"}",
+                    "expr": "rate(castle_rock_container_block_read_bytes{container_name=\"$container\"}[5m])",
                     "legendFormat": "📖 Leitura"
                 },
                 {
-                    "expr": "castle_rock_container_block_write_bytes{container_name=\"$container\"}",
+                    "expr": "rate(castle_rock_container_block_write_bytes{container_name=\"$container\"}[5m])",
                     "legendFormat": "📝 Escrita"
                 }
             ]

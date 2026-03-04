@@ -43,6 +43,9 @@ type Client struct {
 	// cli é o client real da SDK do Docker.
 	// Mantemos como campo não-exportado (minúsculo) para encapsulamento.
 	cli *client.Client
+
+	// includeContainers is a list of container names/substrings to monitor.
+	includeContainers []string
 }
 
 // NewClient cria uma nova instância do Client conectada ao Docker daemon local.
@@ -75,6 +78,24 @@ func NewClient() (*Client, error) {
 	}
 
 	return &Client{cli: cli}, nil
+}
+
+// SetIncludeContainers configuration on the client.
+func (c *Client) SetIncludeContainers(includes []string) {
+	c.includeContainers = includes
+}
+
+// isMonitored checks if the container should be monitored.
+func (c *Client) isMonitored(name string) bool {
+	if len(c.includeContainers) == 0 {
+		return true // No filter, monitor all
+	}
+	for _, include := range c.includeContainers {
+		if strings.Contains(name, include) {
+			return true
+		}
+	}
+	return false
 }
 
 // Close fecha a conexão com o Docker daemon.
@@ -396,6 +417,10 @@ func (c *Client) WatchEvents(ctx context.Context) (<-chan DockerEvent, <-chan er
 				// Extrai o nome do container do atributo "name" do evento.
 				name := msg.Actor.Attributes["name"]
 
+				if !c.isMonitored(name) {
+					continue
+				}
+
 				eventCh <- DockerEvent{
 					Action:        string(msg.Action),
 					ContainerID:   msg.Actor.ID[:12],
@@ -436,12 +461,22 @@ func (c *Client) GetAllContainerStats(ctx context.Context) (map[string]models.Co
 	var wg sync.WaitGroup
 
 	for _, cont := range containerList {
+		// Nome do container (sem prefixo "/")
+		name := ""
+		if len(cont.Names) > 0 {
+			name = strings.TrimPrefix(cont.Names[0], "/")
+		}
+
+		if !c.isMonitored(name) {
+			continue
+		}
+
 		wg.Add(1)
 
 		// Lança uma goroutine para cada container.
-		// Capturamos 'cont' como parâmetro para evitar race condition
+		// Capturamos 'cont' e 'name' como parâmetros para evitar race condition
 		// (variável de loop compartilhada).
-		go func(ctr types.Container) {
+		go func(ctr types.Container, cName string) {
 			defer wg.Done()
 
 			stats, err := c.getContainerStats(ctx, ctr.ID)
@@ -449,19 +484,14 @@ func (c *Client) GetAllContainerStats(ctx context.Context) (map[string]models.Co
 				return // Ignora containers que falharam (podem ter parado)
 			}
 
-			// Nome do container (sem prefixo "/")
-			name := ""
-			if len(ctr.Names) > 0 {
-				name = strings.TrimPrefix(ctr.Names[0], "/")
-			}
 			stats.ContainerID = ctr.ID[:12]
-			stats.ContainerName = name
+			stats.ContainerName = cName
 			stats.Image = ctr.Image
 
 			mu.Lock()
 			results[ctr.ID[:12]] = stats
 			mu.Unlock()
-		}(cont)
+		}(cont, name)
 	}
 
 	wg.Wait()
@@ -632,8 +662,11 @@ func (c *Client) ListRunningContainers(ctx context.Context) ([]models.ContainerI
 	// a performance. Em um agente de observabilidade, cada alocação conta.
 	result := make([]models.ContainerInfo, 0, len(containers))
 
-	for _, c := range containers {
-		result = append(result, toContainerInfo(c))
+	for _, ctr := range containers {
+		info := toContainerInfo(ctr)
+		if c.isMonitored(info.Name) {
+			result = append(result, info)
+		}
 	}
 
 	return result, nil
@@ -658,6 +691,9 @@ func (c *Client) ListRunningContainersDetailed(ctx context.Context) ([]logger.Co
 
 	for _, ct := range containers {
 		cd := toContainerDisplay(ct)
+		if !c.isMonitored(cd.Name) {
+			continue
+		}
 
 		// Enriquece com dados do Inspect (Env, Health)
 		inspect, err := c.cli.ContainerInspect(ctx, ct.ID)

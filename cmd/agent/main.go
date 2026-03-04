@@ -62,6 +62,8 @@ func main() {
 		return
 	}
 
+	dockerClient.SetIncludeContainers(cfg.Stats.IncludeContainers)
+
 	defer func() {
 		if err := dockerClient.Close(); err != nil {
 			log.Warn("Erro ao fechar Docker client",

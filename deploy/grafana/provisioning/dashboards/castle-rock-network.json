@@ -206,7 +206,7 @@
                         "lineInterpolation": "smooth",
                         "gradientMode": "scheme"
                     },
-                    "unit": "decbytes"
+                    "unit": "Bps"
                 }
             },
             "gridPos": {
@@ -220,7 +220,7 @@
             "type": "timeseries",
             "targets": [
                 {
-                    "expr": "castle_rock_container_network_rx_bytes",
+                    "expr": "rate(castle_rock_container_network_rx_bytes[5m])",
                     "legendFormat": "{{container_name}}"
                 }
             ],
@@ -295,7 +295,7 @@
                         "lineInterpolation": "smooth",
                         "gradientMode": "scheme"
                     },
-                    "unit": "decbytes"
+                    "unit": "Bps"
                 }
             },
             "gridPos": {
@@ -309,7 +309,7 @@
             "type": "timeseries",
             "targets": [
                 {
-                    "expr": "castle_rock_container_network_tx_bytes",
+                    "expr": "rate(castle_rock_container_network_tx_bytes[5m])",
                     "legendFormat": "{{container_name}}"
                 }
             ],
@@ -401,11 +401,11 @@
             "type": "timeseries",
             "targets": [
                 {
-                    "expr": "castle_rock_container_network_rx_bytes",
+                    "expr": "rate(castle_rock_container_network_rx_bytes[5m])",
                     "legendFormat": "{{container_name}} ↓ RX"
                 },
                 {
-                    "expr": "castle_rock_container_network_tx_bytes",
+                    "expr": "rate(castle_rock_container_network_tx_bytes[5m])",
                     "legendFormat": "{{container_name}} ↑ TX"
                 }
             ]

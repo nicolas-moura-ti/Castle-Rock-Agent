@@ -34,6 +34,11 @@ stats:
   # ENV: CASTLE_ROCK_STATS_INTERVAL
   interval: 5s
 
+  # Lista de nomes ou palavras-chave para filtrar os containers a serem monitorados.
+  # Se vazio, monitora todos.
+  # ENV: CASTLE_ROCK_STATS_INCLUDE_CONTAINERS
+  include_containers: []
+
 # ── Cluster (Multi-Host) ─────────────────────────────────────────
 cluster:
   # Modos disponíveis: "standalone" (padrão), "leader", "worker"

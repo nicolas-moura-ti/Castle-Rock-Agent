@@ -4,7 +4,7 @@ apiVersion: 1
 providers:
   - name: 'Castle Rock'
     orgId: 1
-    folder: 'Castle Rock Agent'
+    folder: 'Castle Rock Agent Default'
     type: file
     disableDeletion: false
     editable: true
