@@ -1,9 +1,9 @@
-// Package tui implementa a interface interativa do Castle Rock Agent
-// usando o framework Bubble Tea (charmbracelet/bubbletea).
+// Package tui implements the interactive interface of Castle Rock Agent
+// using the Bubble Tea framework (charmbracelet/bubbletea).
 //
-// BUBBLE TEA — ARQUITETURA ELM:
+// BUBBLE TEA — ELM ARCHITECTURE:
 //
-//	Model → Update → View (ciclo unidirecional)
+//	Model → Update → View (unidirectional cycle)
 //
 // FEATURES:
 //   - Container table with real-time metrics (CPU/MEM/NET)
@@ -133,17 +133,17 @@ type Model struct {
 	// Logs
 	logLines      []LogEntry
 	showLogs      bool
-	logContainers []string        // lista de nomes sendo exibidos
-	logOffset     int             // distancia do fim (0 = tail)
+	logContainers []string        // list of container names being displayed
+	logOffset     int             // distance from end (0 = tail)
 	logSearch     string          // grep filter
-	searchMode    bool            // digitando a busca
-	selectedIDs   map[string]bool // containers selecionados (space)
+	searchMode    bool            // typing in search bar
+	selectedIDs   map[string]bool // selected containers (space)
 
 	// Container actions
 	confirmAction string // "stop" or "restart" — empty = no pending confirmation
 
 	// Stress test
-	showStress bool // mostra o menu de stress test
+	showStress bool // shows the stress test menu
 
 	// Cleanup / Prune
 	showCleanup   bool
@@ -743,7 +743,7 @@ func (m Model) View() string {
 		return b.String()
 	}
 
-	// Menu de stress test
+	// Stress test menu
 	if m.showStress {
 		b.WriteString(m.renderHeader())
 		b.WriteString("\n\n")
@@ -767,7 +767,7 @@ func (m Model) View() string {
 		b.WriteString("\n\n")
 		c := m.containers[m.cursor]
 		b.WriteString(confirmStyle.Render(
-			fmt.Sprintf("  ⚠️  %s container '%s'? (y = confirmar, qualquer tecla = cancelar)  ",
+			fmt.Sprintf("  ⚠️  %s container '%s'? (y = confirm, any key = cancel)  ",
 				m.confirmAction, c.Name),
 		))
 		b.WriteString("\n")
@@ -1215,9 +1215,9 @@ func (m Model) filterAndFormatLogs() []LogEntry {
 func (m Model) buildLogFooter() string {
 	footer := ""
 	if m.searchMode {
-		footer = "\n  " + lipgloss.NewStyle().Foreground(primaryColor).Render("🔍 Buscar: "+m.logSearch+"█")
+		footer = "\n  " + lipgloss.NewStyle().Foreground(primaryColor).Render("🔍 Search: "+m.logSearch+"█")
 	} else if m.logSearch != "" {
-		footer = "\n  " + lipgloss.NewStyle().Foreground(mutedColor).Render("Filtro ativo: "+m.logSearch)
+		footer = "\n  " + lipgloss.NewStyle().Foreground(mutedColor).Render("Active filter: "+m.logSearch)
 	}
 
 	if m.logOffset > 0 {
@@ -1326,7 +1326,7 @@ func (m Model) renderCleanupPanel() string {
 	b.WriteString("\n\n")
 
 	if m.pruning {
-		b.WriteString(lipgloss.NewStyle().Foreground(mutedColor).MarginLeft(4).Render("⏳ Processando faxina no Docker daemon... aguarde."))
+		b.WriteString(lipgloss.NewStyle().Foreground(mutedColor).MarginLeft(4).Render("⏳ Processing Docker daemon cleanup... please wait."))
 		b.WriteString("\n")
 		return b.String()
 	}
@@ -1336,15 +1336,15 @@ func (m Model) renderCleanupPanel() string {
 		b.WriteString("\n\n")
 	}
 
-	imgColor := lipgloss.Color("#A3BE8C")              // verde
+	imgColor := lipgloss.Color("#A3BE8C")              // green
 	if m.diskUsage.ImagesReclaimable > 1024*1024*500 { // >500MB
-		imgColor = lipgloss.Color("#EBCB8B") // amarelo
+		imgColor = lipgloss.Color("#EBCB8B") // yellow
 	}
 	if m.diskUsage.ImagesReclaimable > 1024*1024*1024*2 { // >2GB
-		imgColor = lipgloss.Color("#BF616A") // vermelho
+		imgColor = lipgloss.Color("#BF616A") // red
 	}
 
-	volColor := lipgloss.Color("#A3BE8C") // verde
+	volColor := lipgloss.Color("#A3BE8C") // green
 	if m.diskUsage.VolumesReclaimable > 1024*1024*500 {
 		volColor = lipgloss.Color("#EBCB8B")
 	}
@@ -1353,10 +1353,10 @@ func (m Model) renderCleanupPanel() string {
 	}
 
 	b.WriteString("    📦 ")
-	b.WriteString(lipgloss.NewStyle().Bold(true).Render("Imagens Órfãs (Dangling): "))
+	b.WriteString(lipgloss.NewStyle().Bold(true).Render("Dangling Images: "))
 	b.WriteString(lipgloss.NewStyle().Foreground(imgColor).Render(formatBytes(uint64(m.diskUsage.ImagesReclaimable))))
 	b.WriteString("\n")
-	b.WriteString(lipgloss.NewStyle().Foreground(mutedColor).MarginLeft(7).Render("Imagens sem tag que não estão sendo usadas por nenhum container."))
+	b.WriteString(lipgloss.NewStyle().Foreground(mutedColor).MarginLeft(7).Render("Untagged images not used by any container."))
 	b.WriteString("\n\n")
 
 	b.WriteString("    💾 ")
@@ -1367,13 +1367,13 @@ func (m Model) renderCleanupPanel() string {
 	b.WriteString("\n\n\n")
 
 	b.WriteString("    " + lipgloss.NewStyle().Background(lipgloss.Color("#4C566A")).Foreground(lipgloss.Color("#ECEFF4")).Padding(0, 1).Render(" Actions: "))
-	b.WriteString("  [i] Limpar Imagens  │  [v] Limpar Volumes  │  [ESC] Voltar")
+	b.WriteString("  [i] Clean Images  │  [v] Clean Volumes  │  [ESC] Back")
 	b.WriteString("\n")
 
 	return b.String()
 }
 
-// ─── Comandos (tea.Cmd) ──────────────────────────────────────────────────────
+// ─── Commands (tea.Cmd) ──────────────────────────────────────────────────────
 
 func (m Model) fetchContainers() tea.Cmd {
 	return func() tea.Msg {
@@ -1382,7 +1382,7 @@ func (m Model) fetchContainers() tea.Cmd {
 			return dockerErrorMsg{err: err}
 		}
 
-		// Adiciona HostID local
+		// Adds HostID for local containers
 		for i := range containers {
 			containers[i].HostID = m.cfg.Cluster.HostID
 			if containers[i].HostID == "" {
@@ -1390,7 +1390,7 @@ func (m Model) fetchContainers() tea.Cmd {
 			}
 		}
 
-		// Funde com containers remotos do Receiver
+		// Merge with remote containers from the Receiver
 		if m.receiver != nil {
 			remotes := m.receiver.GetAllContainers()
 			for _, r := range remotes {
@@ -1417,7 +1417,7 @@ func (m Model) fetchStats() tea.Cmd {
 			return dockerErrorMsg{err: err}
 		}
 
-		// Funde com stats remotos do Receiver
+		// Merge with remote stats from the Receiver
 		if m.receiver != nil {
 			remoteStats := m.receiver.GetAllMetrics()
 			for _, rs := range remoteStats {
@@ -1557,7 +1557,7 @@ func (m Model) executeStress(mode string) tea.Cmd {
 	}
 }
 
-// ─── Formatação ──────────────────────────────────────────────────────────────
+// ─── Formatting ──────────────────────────────────────────────────────────────
 
 func formatCPU(p float64) string {
 	s := fmt.Sprintf("%.1f%%", p)

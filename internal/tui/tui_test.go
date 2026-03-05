@@ -1,10 +1,10 @@
-// Package tui — testes unitários para funções de formatação.
+// Package tui — unit tests for formatting functions.
 //
-// TESTES EM GO:
-//   - Arquivos de teste terminam com _test.go
-//   - Funções de teste começam com Test e recebem *testing.T
-//   - Executar: go test ./internal/tui/ -v
-//   - Cobertura: go test ./internal/tui/ -cover
+// TESTING IN GO:
+//   - Test files end with _test.go
+//   - Test functions start with Test and receive *testing.T
+//   - Run: go test ./internal/tui/ -v
+//   - Coverage: go test ./internal/tui/ -cover
 package tui
 
 import "testing"

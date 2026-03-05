@@ -1,4 +1,4 @@
-// Package alerts — testes unitários para o motor de alertas.
+// Package alerts — unit tests for the alert engine.
 package alerts
 
 import (
@@ -9,7 +9,7 @@ import (
 	"github.com/nicolas-moura-ti/castle-rock-agent/pkg/models"
 )
 
-// TestEvaluateCondition testa os operadores de comparação.
+// TestEvaluateCondition tests comparison operators.
 func TestEvaluateCondition(t *testing.T) {
 	engine := NewEngine(nil)
 
@@ -43,7 +43,7 @@ func TestEvaluateCondition(t *testing.T) {
 	}
 }
 
-// TestGetMetricValue testa a extração de valores de métricas.
+// TestGetMetricValue tests metric value extraction.
 func TestGetMetricValue(t *testing.T) {
 	engine := NewEngine(nil)
 
@@ -77,8 +77,8 @@ func TestGetMetricValue(t *testing.T) {
 	}
 }
 
-// TestEvaluateNoAlert verifica que nenhum alerta é disparado
-// quando as condições não são atingidas.
+// TestEvaluateNoAlert verifies that no alert is fired
+// when the conditions are not met.
 func TestEvaluateNoAlert(t *testing.T) {
 	rules := []config.AlertRule{
 		{
@@ -107,8 +107,8 @@ func TestEvaluateNoAlert(t *testing.T) {
 	}
 }
 
-// TestEvaluateAlertFires verifica que um alerta é disparado
-// quando a condição persiste por tempo suficiente.
+// TestEvaluateAlertFires verifies that an alert fires
+// when the condition persists long enough.
 func TestEvaluateAlertFires(t *testing.T) {
 	rules := []config.AlertRule{
 		{
@@ -116,7 +116,7 @@ func TestEvaluateAlertFires(t *testing.T) {
 			Metric:    "cpu_percent",
 			Operator:  ">",
 			Threshold: 80.0,
-			Duration:  0, // Duration 0 = dispara imediatamente
+			Duration:  0, // Duration 0 = fires immediately
 			Severity:  "critical",
 		},
 	}
@@ -131,10 +131,10 @@ func TestEvaluateAlertFires(t *testing.T) {
 		},
 	}
 
-	// Primeira avaliação: registra início da condição
+	// First evaluation: records the start of the condition
 	engine.Evaluate(stats)
 
-	// Segunda avaliação: como duration=0, deve disparar
+	// Second evaluation: since duration=0, should fire
 	alerts := engine.Evaluate(stats)
 	if len(alerts) != 1 {
 		t.Fatalf("Expected 1 alert, got %d", len(alerts))
@@ -146,15 +146,15 @@ func TestEvaluateAlertFires(t *testing.T) {
 		t.Errorf("Alert severity = %q, want %q", alerts[0].Severity, "critical")
 	}
 
-	// Terceira avaliação: não deve repetir o alerta
+	// Third evaluation: should not repeat the alert
 	alerts = engine.Evaluate(stats)
 	if len(alerts) != 0 {
 		t.Errorf("Expected 0 repeated alerts, got %d", len(alerts))
 	}
 }
 
-// TestAlertResolvesWhenConditionClears verifica que alertas
-// são resolvidos quando a condição deixa de ser verdadeira.
+// TestAlertResolvesWhenConditionClears verifies that alerts
+// are resolved when the condition is no longer true.
 func TestAlertResolvesWhenConditionClears(t *testing.T) {
 	rules := []config.AlertRule{
 		{
@@ -169,7 +169,7 @@ func TestAlertResolvesWhenConditionClears(t *testing.T) {
 
 	engine := NewEngine(rules)
 
-	// CPU alta — deve disparar
+	// High CPU — should fire
 	highStats := map[string]models.ContainerMetrics{
 		"abc123": {ContainerID: "abc123", ContainerName: "test", CPUPercent: 95.0},
 	}
@@ -180,7 +180,7 @@ func TestAlertResolvesWhenConditionClears(t *testing.T) {
 		t.Fatalf("Expected 1 active alert after high CPU")
 	}
 
-	// CPU normaliza — alerta deve resolver
+	// CPU normalizes — alert should resolve
 	normalStats := map[string]models.ContainerMetrics{
 		"abc123": {ContainerID: "abc123", ContainerName: "test", CPUPercent: 30.0},
 	}

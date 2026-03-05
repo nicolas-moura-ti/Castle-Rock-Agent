@@ -1,4 +1,4 @@
-// Package config — testes unitários para o loader de configuração.
+// Package config — unit tests for the configuration loader.
 package config
 
 import (
@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// TestDefaultConfig verifica que os valores padrão são sensatos.
+// TestDefaultConfig verifies that default values are sensible.
 func TestDefaultConfig(t *testing.T) {
 	cfg := DefaultConfig()
 
@@ -31,8 +31,8 @@ func TestDefaultConfig(t *testing.T) {
 	}
 }
 
-// TestLoadNonExistentFile verifica que um arquivo inexistente
-// retorna a configuração padrão sem erro.
+// TestLoadNonExistentFile verifies that a nonexistent file
+// returns the default configuration without error.
 func TestLoadNonExistentFile(t *testing.T) {
 	cfg, err := Load("/tmp/nonexistent-castle-rock-test.yaml")
 	if err != nil {
@@ -43,7 +43,7 @@ func TestLoadNonExistentFile(t *testing.T) {
 	}
 }
 
-// TestLoadValidYAML verifica o parsing de um arquivo YAML válido.
+// TestLoadValidYAML verifies parsing of a valid YAML file.
 func TestLoadValidYAML(t *testing.T) {
 	content := `
 log_level: "debug"
@@ -88,7 +88,7 @@ alerts:
 	}
 }
 
-// TestEnvOverrides verifica que variáveis de ambiente têm precedência.
+// TestEnvOverrides verifies that environment variables take precedence.
 func TestEnvOverrides(t *testing.T) {
 	// Set env vars
 	os.Setenv("CASTLE_ROCK_LOG_LEVEL", "error")

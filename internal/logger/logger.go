@@ -74,7 +74,7 @@ const (
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PRETTY HANDLER (Handler Customizado para slog)
+// PRETTY HANDLER (Custom Handler for slog)
 // ─────────────────────────────────────────────────────────────────────────────
 //
 // slog.Handler is an interface that defines HOW logs are formatted and
@@ -138,7 +138,7 @@ type PrettyHandlerOptions struct {
 // NewPrettyHandler creates a new PrettyHandler that writes colorized
 // and formatted logs to the specified writer.
 //
-// Exemplo de uso:
+// Usage example:
 //
 //	handler := logger.NewPrettyHandler(os.Stderr, &logger.PrettyHandlerOptions{
 //	    Level: slog.LevelDebug,
@@ -179,22 +179,22 @@ func (h *PrettyHandler) Handle(_ context.Context, r slog.Record) error {
 	// Mon Jan 2 15:04:05 MST 2006 (Go's "reference moment").
 	timeStr := r.Time.Format("2006-01-02 15:04:05.000")
 
-	// Determina a cor e o label baseado no nível de log.
+	// Determine the color and label based on the log level.
 	levelStr, levelColor := h.formatLevel(r.Level)
 
-	// Constrói a linha de log com cores ANSI.
+	// Build the log line with ANSI colors.
 	var b strings.Builder
 
-	// Timestamp em dim para não competir visualmente com a mensagem
+	// Timestamp in dim so it doesn't visually compete with the message
 	fmt.Fprintf(&b, "%s%s%s ", colorDim, timeStr, colorReset)
 
-	// Nível com cor e largura fixa (5 chars) para alinhamento
+	// Level with color and fixed width (5 chars) for alignment
 	fmt.Fprintf(&b, "%s%-5s%s ", levelColor, levelStr, colorReset)
 
-	// Separador vertical para clareza visual
+	// Vertical separator for visual clarity
 	fmt.Fprintf(&b, "%s│%s ", colorDim, colorReset)
 
-	// Mensagem principal em bold
+	// Main message in bold
 	fmt.Fprintf(&b, "%s%s%s", colorBold, r.Message, colorReset)
 
 	// Add pre-defined attributes (from WithAttrs)
@@ -222,11 +222,11 @@ func (h *PrettyHandler) Handle(_ context.Context, r slog.Record) error {
 // WithAttrs returns a new handler with additional attributes.
 //
 // This method implements the "contextual logger" pattern:
-// permite criar loggers especializados que sempre incluem
-// certos campos. Exemplo:
+// it allows creating specialized loggers that always include
+// certain fields. Example:
 //
 //	dockerLogger := logger.With("component", "docker")
-//	dockerLogger.Info("connected") // sempre inclui component=docker
+//	dockerLogger.Info("connected") // always includes component=docker
 func (h *PrettyHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 	newAttrs := make([]slog.Attr, len(h.attrs), len(h.attrs)+len(attrs))
 	copy(newAttrs, h.attrs)
@@ -240,7 +240,7 @@ func (h *PrettyHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 	}
 }
 
-// WithGroup retorna um novo handler com um prefixo de grupo.
+// WithGroup returns a new handler with a group prefix.
 func (h *PrettyHandler) WithGroup(name string) slog.Handler {
 	newGroup := name
 	if h.group != "" {
@@ -328,14 +328,14 @@ func Setup(level string) *slog.Logger {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// FUNÇÕES DE DISPLAY (Output Formatado)
+// DISPLAY FUNCTIONS (Formatted Output)
 // ─────────────────────────────────────────────────────────────────────────────
 //
-// Estas funções não são logs estruturados — são output visual formatado
-// para o terminal. Usamos fmt.Fprintf para output direto em vez de slog
-// porque são displays de dados, não eventos de log.
+// These functions are not structured logs — they are formatted visual output
+// for the terminal. We use fmt.Fprintf for direct output instead of slog
+// because they are data displays, not log events.
 
-// PrintBanner exibe o banner de inicialização do agente.
+// PrintBanner displays the agent startup banner.
 //
 // A professional banner communicates software identity and version.
 // In production, this helps identify which version is running
