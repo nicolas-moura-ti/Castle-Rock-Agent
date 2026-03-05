@@ -447,9 +447,9 @@ func (c *Client) WatchEvents(ctx context.Context) (<-chan DockerEvent, <-chan er
 //	We collect stats from all containers in parallel using goroutines
 //	+ sync.WaitGroup. This reduces total latency from N*RTT to ~1*RTT
 //	(where RTT is the round-trip time of one API call).
-func (c *Client) GetAllContainerStats(ctx context.Context) (map[string]models.ContainerMetrics, error) {
+func (c *Client) GetAllContainerStats(ctx context.Context, all bool) (map[string]models.ContainerMetrics, error) {
 	// First, list running containers
-	containerList, err := c.cli.ContainerList(ctx, container.ListOptions{All: false})
+	containerList, err := c.cli.ContainerList(ctx, container.ListOptions{All: all})
 	if err != nil {
 		return nil, fmt.Errorf("docker.GetAllContainerStats: failed to list: %w", err)
 	}
@@ -645,12 +645,12 @@ func (c *Client) GetSystemInfo(ctx context.Context) (map[string]string, error) {
 //   - Multi-value return is the Go standard for operations that can fail
 //   - Never return (nil, nil) — always return data OR error
 //   - On success with empty list, return ([]ContainerInfo{}, nil)
-func (c *Client) ListRunningContainers(ctx context.Context) ([]models.ContainerInfo, error) {
+func (c *Client) ListRunningContainers(ctx context.Context, all bool) ([]models.ContainerInfo, error) {
 	// container.ListOptions filters which containers to return.
 	// All: false returns only running containers.
 	// To include stopped containers, use All: true.
 	containers, err := c.cli.ContainerList(ctx, container.ListOptions{
-		All: false, // Only running containers
+		All: all,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("docker.ListRunningContainers: failed to list: %w", err)
@@ -678,9 +678,9 @@ func (c *Client) ListRunningContainers(ctx context.Context) ([]models.ContainerI
 // This version is heavier than ListRunningContainers because it collects
 // additional data. Use it for display; use the simpler version for
 // metrics collection where performance is critical.
-func (c *Client) ListRunningContainersDetailed(ctx context.Context) ([]logger.ContainerDisplay, error) {
+func (c *Client) ListRunningContainersDetailed(ctx context.Context, all bool) ([]logger.ContainerDisplay, error) {
 	containers, err := c.cli.ContainerList(ctx, container.ListOptions{
-		All: false,
+		All: all,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("docker.ListRunningContainersDetailed: failed to list: %w", err)

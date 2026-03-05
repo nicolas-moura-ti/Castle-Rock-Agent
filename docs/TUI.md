@@ -17,7 +17,7 @@ When running `make run`, the agent opens a fullscreen dashboard designed for sea
   │  16:04:15 🔴 die        old-container               │
   ╰──────────────────────────────────────────────────────╯
 
-  ↑↓ nav │ space select │ enter details │ l log 1 │ L log N │ x shell │ C prune │ s stop │ R restart │ S stress │ M map │ ? help │ q quit
+  ↑↓ nav │ space select │ enter details │ l log 1 │ L log N │ a all │ x shell │ C prune │ s stop │ R restart │ S stress │ M map │ ? help │ q quit
 ```
 
 > 💡 **Context-Sensitive Help Bar:** The bottom bar automatically changes its shortcuts depending on the current screen. For example, when viewing logs it shows `↑↓ scroll │ / grep │ f tail │ E export │ Esc back`. When on the Prune Dashboard it shows `[i] images │ [v] volumes │ Esc back`.
@@ -31,6 +31,7 @@ When running `make run`, the agent opens a fullscreen dashboard designed for sea
 | `↑` / `k` | Navigate up (or scroll up logs) |
 | `↓` / `j` | Navigate down (or scroll down logs) |
 | `Enter` | Expand container details (metrics, labels, networks, ports) |
+| `a` / `A` | Toggle visibility of stopped/inactive containers |
 | `l` | Toggle real-time logs for the **selected** container |
 | `Space` | Select/Deselect container for Multi-Tailing |
 | `Shift+L` | Toggle aggregated logs for **all selected** containers |

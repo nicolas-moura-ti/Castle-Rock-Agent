@@ -17,7 +17,7 @@ Quando você roda `make run`, o agente abre um dashboard fullscreen, desenvolvid
   │  16:04:15 🔴 die        old-container               │
   ╰──────────────────────────────────────────────────────╯
 
-  ↑↓ nav │ space select │ enter details │ l log 1 │ L log N │ x shell │ C prune │ s stop │ R restart │ S stress │ M map │ ? help │ q quit
+  ↑↓ nav │ space select │ enter details │ l log 1 │ L log N │ a all │ x shell │ C prune │ s stop │ R restart │ S stress │ M map │ ? help │ q quit
 ```
 
 > 💡 **Barra de Ajuda Contextual:** A barra inferior muda seus atalhos automaticamente dependendo da tela atual. Por exemplo, ao visualizar logs, ela mostra `↑↓ scroll │ / grep │ f tail │ E export │ Esc back`. No Dashboard de Prune, mostra `[i] images │ [v] volumes │ Esc back`.
@@ -31,6 +31,7 @@ Quando você roda `make run`, o agente abre um dashboard fullscreen, desenvolvid
 | `↑` / `k` | Navegar para cima (ou scroll nos logs) |
 | `↓` / `j` | Navegar para baixo (ou scroll nos logs) |
 | `Enter` | Expandir detalhes curados do container (métricas, labels, networks, ports) |
+| `a` / `A` | Ligar/desligar a visualização de containers inativos/parados |
 | `l` | Ligar/desligar logs em tempo real do container **selecionado** |
 | `Espaço` | Selecionar/Deselecionar um container para Multi-Tailing |
 | `Shift+L` | Juntar logs de **todos os selecionados** em um lugar só |

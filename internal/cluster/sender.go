@@ -42,14 +42,14 @@ func StartSender(ctx context.Context, dockerClient *docker.Client, cfg config.Co
 			return
 		case <-ticker.C:
 			// Collect list of running containers
-			containers, err := dockerClient.ListRunningContainers(ctx)
+			containers, err := dockerClient.ListRunningContainers(ctx, true)
 			if err != nil {
 				log.Error("Sender: error listing containers", slog.String("error", err.Error()))
 				continue
 			}
 
 			// Collect full metrics in parallel via WaitGroup (GetAllContainerStats already does this)
-			metricsMap, err := dockerClient.GetAllContainerStats(ctx)
+			metricsMap, err := dockerClient.GetAllContainerStats(ctx, true)
 			if err != nil {
 				log.Error("Sender: error fetching stats", slog.String("error", err.Error()))
 				continue

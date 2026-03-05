@@ -251,7 +251,7 @@ func (e *Exporter) Start(ctx context.Context) {
 
 // collect executes a metrics collection and updates Prometheus gauges.
 func (e *Exporter) collect(ctx context.Context) {
-	stats, err := e.dockerClient.GetAllContainerStats(ctx)
+	stats, err := e.dockerClient.GetAllContainerStats(ctx, true)
 	if err != nil {
 		e.log.Debug("failed to collect stats for prometheus",
 			slog.String("error", err.Error()),

@@ -138,6 +138,7 @@ type Model struct {
 	logSearch     string          // grep filter
 	searchMode    bool            // typing in search bar
 	selectedIDs   map[string]bool // selected containers (space)
+	showAll       bool            // show stopped containers (toggle with 'a')
 
 	// Container actions
 	confirmAction string // "stop" or "restart" — empty = no pending confirmation
@@ -479,15 +480,10 @@ func (m Model) handleCleanupKeys(msg tea.KeyMsg) (Model, tea.Cmd, bool) {
 
 func (m Model) handleSearchKeys(msg tea.KeyMsg) (Model, tea.Cmd, bool) {
 	switch msg.String() {
-	case "esc", "enter":
-		m.searchMode = false
-	case "backspace":
-		if len(m.logSearch) > 0 {
-			m.logSearch = m.logSearch[:len(m.logSearch)-1]
-		}
-	default:
-		if len(msg.String()) == 1 {
-			m.logSearch += msg.String()
+	case "esc":
+		if m.searchMode {
+			m.searchMode = false
+			m.logSearch = ""
 		}
 	}
 	return m, nil, true
@@ -495,6 +491,9 @@ func (m Model) handleSearchKeys(msg tea.KeyMsg) (Model, tea.Cmd, bool) {
 
 func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
+	case "a", "A":
+		m.showAll = !m.showAll
+		return m, tea.Batch(m.fetchContainers(), m.fetchStats())
 	case "q", "ctrl+c":
 		m.quitting = true
 		return m, tea.Quit
@@ -1299,7 +1298,7 @@ func (m Model) renderHelpBar() string {
 	case m.confirmAction != "":
 		bar = "  y confirm │ Esc cancel"
 	default:
-		bar = "  ↑↓ nav │ space select │ enter details │ l log 1 │ L log N │ x shell │ C prune │ s stop │ R restart │ S stress │ M map │ ? help │ q quit"
+		bar = "  ↑↓ nav │ space select │ enter details │ l log 1 │ L log N │ a all │ x shell │ C prune │ s stop │ R restart │ S stress │ M map │ ? help │ q quit"
 	}
 
 	if m.showHelp {
@@ -1377,7 +1376,7 @@ func (m Model) renderCleanupPanel() string {
 
 func (m Model) fetchContainers() tea.Cmd {
 	return func() tea.Msg {
-		containers, err := m.dockerClient.ListRunningContainersDetailed(m.ctx)
+		containers, err := m.dockerClient.ListRunningContainersDetailed(m.ctx, m.showAll)
 		if err != nil {
 			return dockerErrorMsg{err: err}
 		}
@@ -1412,7 +1411,7 @@ func (m Model) fetchContainers() tea.Cmd {
 
 func (m Model) fetchStats() tea.Cmd {
 	return func() tea.Msg {
-		stats, err := m.dockerClient.GetAllContainerStats(m.ctx)
+		stats, err := m.dockerClient.GetAllContainerStats(m.ctx, m.showAll)
 		if err != nil {
 			return dockerErrorMsg{err: err}
 		}
