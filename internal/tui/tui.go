@@ -855,8 +855,8 @@ func (m Model) renderContainerTable() string {
 	}
 
 	var b strings.Builder
-	header := fmt.Sprintf("  %-3s %-6s %-12s %-20s %-7s %-7s %-9s %-10s %s",
-		"", m.msg.TableHost, "ID", m.msg.TableName, "CPU%", "MEM%", "MEM", "NET", m.msg.TableState)
+	header := fmt.Sprintf("  %-6s %-12s %-20s %-7s %-7s %-9s %-10s %s",
+		m.msg.TableHost, "ID", m.msg.TableName, "CPU%", "MEM%", "MEM", "NET", m.msg.TableState)
 	b.WriteString(headerStyle.Render(header))
 	b.WriteString("\n")
 
@@ -914,8 +914,13 @@ func (m *Model) formatContainerRow(index int, c logger.ContainerDisplay) string 
 		id = id[:12]
 	}
 
-	return style.Render(fmt.Sprintf("%s%-6s %-12s %-20s %-7s %-7s %-9s %-10s %s%s",
-		cursor, hostID, id, name, cpuStr, memPctStr, memUseStr, netStr, state, alertMark))
+	alignedCPU := lipgloss.NewStyle().Width(7).Render(cpuStr)
+	alignedMemPct := lipgloss.NewStyle().Width(7).Render(memPctStr)
+	alignedMemUse := lipgloss.NewStyle().Width(9).Render(memUseStr)
+	alignedNet := lipgloss.NewStyle().Width(10).Render(netStr)
+
+	return style.Render(fmt.Sprintf("%s%-6s %-12s %-20s %s %s %s %s %s%s",
+		cursor, hostID, id, name, alignedCPU, alignedMemPct, alignedMemUse, alignedNet, state, alertMark))
 }
 
 func (m *Model) getContainerAlertMark(id string) string {
