@@ -89,6 +89,7 @@ type ClusterConfig struct {
 	Mode      string `yaml:"mode"`       // "standalone", "leader", "worker"
 	LeaderURL string `yaml:"leader_url"` // HTTP endpoint for metrics submission (worker mode)
 	HostID    string `yaml:"host_id"`    // Unique identifier for this node
+	Token     string `yaml:"token"`      // Authentication token for cluster communication
 }
 
 // AlertsConfig configures the alert system.
@@ -153,6 +154,7 @@ func DefaultConfig() Config {
 			Mode:      "standalone",
 			LeaderURL: "http://127.0.0.1:9110/api/v1/push",
 			HostID:    "", // If empty, uses os.Hostname() at runtime
+			Token:     "", // Empty by default (requires configuration for secure use)
 		},
 		Alerts: AlertsConfig{
 			Enabled: true,
@@ -305,6 +307,9 @@ func applyClusterEnv(cfg *Config) {
 	}
 	if v := os.Getenv("CASTLE_ROCK_CLUSTER_HOST_ID"); v != "" {
 		cfg.Cluster.HostID = v
+	}
+	if v := os.Getenv("CASTLE_ROCK_CLUSTER_TOKEN"); v != "" {
+		cfg.Cluster.Token = v
 	}
 }
 
