@@ -206,7 +206,12 @@ func (e *Exporter) Start(ctx context.Context) {
 		}
 
 		addr := fmt.Sprintf(":%d", e.port)
-		server := &http.Server{Addr: addr, Handler: mux}
+		server := &http.Server{
+			Addr:         addr,
+			Handler:      mux,
+			ReadTimeout:  5 * time.Second,
+			WriteTimeout: 10 * time.Second,
+		}
 
 		e.log.Info("prometheus metrics server started",
 			slog.String("endpoint", fmt.Sprintf("http://localhost%s/metrics", addr)),
