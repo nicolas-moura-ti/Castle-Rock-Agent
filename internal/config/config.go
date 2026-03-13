@@ -86,9 +86,10 @@ type StatsConfig struct {
 
 // ClusterConfig manages the distributed mode (Leader/Worker).
 type ClusterConfig struct {
-	Mode      string `yaml:"mode"`       // "standalone", "leader", "worker"
-	LeaderURL string `yaml:"leader_url"` // HTTP endpoint for metrics submission (worker mode)
-	HostID    string `yaml:"host_id"`    // Unique identifier for this node
+	Mode         string `yaml:"mode"`          // "standalone", "leader", "worker"
+	LeaderURL    string `yaml:"leader_url"`    // HTTP endpoint for metrics submission (worker mode)
+	HostID       string `yaml:"host_id"`       // Unique identifier for this node
+	SharedSecret string `yaml:"shared_secret"` // Secret key for AES payload encryption
 }
 
 // AlertsConfig configures the alert system.
@@ -305,6 +306,9 @@ func applyClusterEnv(cfg *Config) {
 	}
 	if v := os.Getenv("CASTLE_ROCK_CLUSTER_HOST_ID"); v != "" {
 		cfg.Cluster.HostID = v
+	}
+	if v := os.Getenv("CASTLE_ROCK_CLUSTER_SHARED_SECRET"); v != "" {
+		cfg.Cluster.SharedSecret = v
 	}
 }
 

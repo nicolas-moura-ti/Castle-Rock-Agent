@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"encoding/json"
+	"io"
 	"log/slog"
 	"net/http"
 	"sync"
@@ -20,16 +21,18 @@ type HostData struct {
 // All read/write access is thread-safe (protected by RWMutex) since it can be
 // accessed simultaneously by the TUI, Prometheus exporter and HTTP receive routine.
 type Receiver struct {
-	mu    sync.RWMutex
-	hosts map[string]HostData
-	log   *slog.Logger
+	mu           sync.RWMutex
+	hosts        map[string]HostData
+	log          *slog.Logger
+	sharedSecret string
 }
 
 // NewReceiver creates a new Receiver instance.
-func NewReceiver(log *slog.Logger) *Receiver {
+func NewReceiver(log *slog.Logger, sharedSecret string) *Receiver {
 	return &Receiver{
-		hosts: make(map[string]HostData),
-		log:   log,
+		hosts:        make(map[string]HostData),
+		log:          log,
+		sharedSecret: sharedSecret,
 	}
 }
 
@@ -41,8 +44,40 @@ func (r *Receiver) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 	defer req.Body.Close()
 
+	body, err := io.ReadAll(req.Body)
+	if err != nil {
+		r.log.Warn("receiver: failed to read body", slog.String("error", err.Error()))
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	isEncrypted := req.Header.Get("X-CastleRock-Encrypted") == "true"
+
+	if r.sharedSecret != "" {
+		if !isEncrypted {
+			r.log.Warn("receiver: rejected cleartext payload (SharedSecret is enforced)")
+			http.Error(w, "Forbidden: Encryption Required", http.StatusForbidden)
+			return
+		}
+
+		decryptedBody, err := Decrypt(body, r.sharedSecret)
+		if err != nil {
+			r.log.Warn("receiver: failed to decrypt payload", slog.String("error", err.Error()))
+			http.Error(w, "Forbidden: Decryption Failed", http.StatusForbidden)
+			return
+		}
+		body = decryptedBody
+	} else {
+		if isEncrypted {
+			r.log.Warn("receiver: rejected encrypted payload (no SharedSecret configured locally)")
+			http.Error(w, "Forbidden: Decryption Key Missing", http.StatusForbidden)
+			return
+		}
+		r.log.Warn("receiver: accepted cleartext payload (no SharedSecret configured)")
+	}
+
 	var payload models.PushPayload
-	if err := json.NewDecoder(req.Body).Decode(&payload); err != nil {
+	if err := json.Unmarshal(body, &payload); err != nil {
 		r.log.Warn("receiver: failed to decode JSON", slog.String("error", err.Error()))
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return

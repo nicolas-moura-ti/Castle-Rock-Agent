@@ -73,16 +73,28 @@ func StartSender(ctx context.Context, dockerClient *docker.Client, cfg config.Co
 				Metrics:    metricsList,
 			}
 
-			sendPushPayload(ctx, httpClient, cfg.Cluster.LeaderURL, payload, log)
+			sendPushPayload(ctx, httpClient, cfg.Cluster.LeaderURL, cfg.Cluster.SharedSecret, payload, log)
 		}
 	}
 }
 
-func sendPushPayload(ctx context.Context, client *http.Client, url string, payload models.PushPayload, log *slog.Logger) {
+func sendPushPayload(ctx context.Context, client *http.Client, url string, secret string, payload models.PushPayload, log *slog.Logger) {
 	data, err := json.Marshal(payload)
 	if err != nil {
 		log.Error("Sender: error marshaling payload JSON", slog.String("error", err.Error()))
 		return
+	}
+
+	encrypted := false
+	if secret != "" {
+		data, err = Encrypt(data, secret)
+		if err != nil {
+			log.Error("Sender: error encrypting payload", slog.String("error", err.Error()))
+			return
+		}
+		encrypted = true
+	} else {
+		log.Warn("Sender: pushing metrics in cleartext (SharedSecret is not set)")
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(data))
@@ -90,7 +102,13 @@ func sendPushPayload(ctx context.Context, client *http.Client, url string, paylo
 		log.Error("Sender: error creating request", slog.String("error", err.Error()))
 		return
 	}
-	req.Header.Set("Content-Type", "application/json")
+
+	if encrypted {
+		req.Header.Set("Content-Type", "application/octet-stream")
+		req.Header.Set("X-CastleRock-Encrypted", "true")
+	} else {
+		req.Header.Set("Content-Type", "application/json")
+	}
 
 	resp, err := client.Do(req)
 	if err != nil {
