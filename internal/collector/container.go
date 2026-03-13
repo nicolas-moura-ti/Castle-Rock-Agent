@@ -14,6 +14,7 @@ package collector
 
 import (
 	"context"
+	"time"
 
 	"github.com/nicolas-moura-ti/castle-rock-agent/internal/config"
 	"github.com/nicolas-moura-ti/castle-rock-agent/internal/docker"
@@ -49,17 +50,19 @@ type Collector interface {
 // In the future, this struct will be expanded with necessary dependencies
 // (Docker client, configuration, etc.).
 type ContainerCollector struct {
-	client *docker.Client
-	cfg    config.Config
+	dockerClient *docker.Client
+	cfg          config.Config
+	interval     time.Duration
 }
 
 // NewContainerCollector creates a new ContainerCollector instance.
 //
 // Follows the Go constructor pattern New<Type>.
-func NewContainerCollector(client *docker.Client, cfg config.Config) *ContainerCollector {
+func NewContainerCollector(dockerClient *docker.Client, cfg config.Config, interval time.Duration) *ContainerCollector {
 	return &ContainerCollector{
-		client: client,
-		cfg:    cfg,
+		dockerClient: dockerClient,
+		cfg:          cfg,
+		interval:     interval,
 	}
 }
 
@@ -69,14 +72,14 @@ func NewContainerCollector(client *docker.Client, cfg config.Config) *ContainerC
 // The Docker Stats API provides real-time CPU, memory,
 // network I/O and disk metrics for each container.
 func (c *ContainerCollector) Collect(ctx context.Context) ([]models.ContainerMetrics, error) {
-	statsMap, err := c.client.GetAllContainerStats(ctx, false)
+	statsMap, err := c.dockerClient.GetAllContainerStats(ctx, false)
 	if err != nil {
 		return nil, err
 	}
 
 	metrics := make([]models.ContainerMetrics, 0, len(statsMap))
-	for _, metric := range statsMap {
-		metrics = append(metrics, metric)
+	for _, m := range statsMap {
+		metrics = append(metrics, m)
 	}
 
 	return metrics, nil
