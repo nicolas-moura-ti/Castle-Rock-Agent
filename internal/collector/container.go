@@ -16,6 +16,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/nicolas-moura-ti/castle-rock-agent/internal/config"
 	"github.com/nicolas-moura-ti/castle-rock-agent/internal/docker"
 	"github.com/nicolas-moura-ti/castle-rock-agent/pkg/models"
 )
@@ -50,15 +51,17 @@ type Collector interface {
 // (Docker client, configuration, etc.).
 type ContainerCollector struct {
 	dockerClient *docker.Client
+	cfg          config.Config
 	interval     time.Duration
 }
 
 // NewContainerCollector creates a new ContainerCollector instance.
 //
 // Follows the Go constructor pattern New<Type>.
-func NewContainerCollector(dockerClient *docker.Client, interval time.Duration) *ContainerCollector {
+func NewContainerCollector(dockerClient *docker.Client, cfg config.Config, interval time.Duration) *ContainerCollector {
 	return &ContainerCollector{
 		dockerClient: dockerClient,
+		cfg:          cfg,
 		interval:     interval,
 	}
 }
