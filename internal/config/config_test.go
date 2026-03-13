@@ -52,6 +52,8 @@ prometheus:
   port: 8080
 stats:
   interval: 10s
+cluster:
+  token: "my-secret-yaml-token"
 alerts:
   enabled: false
 `
@@ -86,6 +88,9 @@ alerts:
 	if cfg.Alerts.Enabled {
 		t.Error("Alerts should be disabled")
 	}
+	if cfg.Cluster.Token != "my-secret-yaml-token" {
+		t.Errorf("Cluster.Token = %q, want %q", cfg.Cluster.Token, "my-secret-yaml-token")
+	}
 }
 
 // TestEnvOverrides verifies that environment variables take precedence.
@@ -93,8 +98,10 @@ func TestEnvOverrides(t *testing.T) {
 	// Set env vars
 	os.Setenv("CASTLE_ROCK_LOG_LEVEL", "error")
 	os.Setenv("CASTLE_ROCK_PROMETHEUS_PORT", "3000")
+	os.Setenv("CASTLE_ROCK_CLUSTER_TOKEN", "env-secret-token")
 	defer os.Unsetenv("CASTLE_ROCK_LOG_LEVEL")
 	defer os.Unsetenv("CASTLE_ROCK_PROMETHEUS_PORT")
+	defer os.Unsetenv("CASTLE_ROCK_CLUSTER_TOKEN")
 
 	cfg, err := Load("/tmp/nonexistent.yaml")
 	if err != nil {
@@ -106,5 +113,8 @@ func TestEnvOverrides(t *testing.T) {
 	}
 	if cfg.Prometheus.Port != 3000 {
 		t.Errorf("Prometheus.Port = %d, want %d (from env)", cfg.Prometheus.Port, 3000)
+	}
+	if cfg.Cluster.Token != "env-secret-token" {
+		t.Errorf("Cluster.Token = %q, want %q (from env)", cfg.Cluster.Token, "env-secret-token")
 	}
 }

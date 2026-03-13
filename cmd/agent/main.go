@@ -92,7 +92,7 @@ func main() {
 	// ─────────────────────────────────────────────────────────────────────
 	var receiver *cluster.Receiver
 	if cfg.Cluster.Mode == "leader" {
-		receiver = cluster.NewReceiver(log)
+		receiver = cluster.NewReceiver(log, cfg.Cluster.Token)
 		log.Info("cluster receiver active", slog.String("host_id", cfg.Cluster.HostID))
 	}
 

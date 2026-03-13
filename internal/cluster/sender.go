@@ -73,12 +73,12 @@ func StartSender(ctx context.Context, dockerClient *docker.Client, cfg config.Co
 				Metrics:    metricsList,
 			}
 
-			sendPushPayload(ctx, httpClient, cfg.Cluster.LeaderURL, payload, log)
+			sendPushPayload(ctx, httpClient, cfg.Cluster.LeaderURL, cfg.Cluster.Token, payload, log)
 		}
 	}
 }
 
-func sendPushPayload(ctx context.Context, client *http.Client, url string, payload models.PushPayload, log *slog.Logger) {
+func sendPushPayload(ctx context.Context, client *http.Client, url string, token string, payload models.PushPayload, log *slog.Logger) {
 	data, err := json.Marshal(payload)
 	if err != nil {
 		log.Error("Sender: error marshaling payload JSON", slog.String("error", err.Error()))
@@ -91,6 +91,9 @@ func sendPushPayload(ctx context.Context, client *http.Client, url string, paylo
 		return
 	}
 	req.Header.Set("Content-Type", "application/json")
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
 
 	resp, err := client.Do(req)
 	if err != nil {
