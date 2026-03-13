@@ -14,7 +14,9 @@ package collector
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/nicolas-moura-ti/castle-rock-agent/internal/docker"
 	"github.com/nicolas-moura-ti/castle-rock-agent/pkg/models"
 )
 
@@ -47,27 +49,35 @@ type Collector interface {
 // In the future, this struct will be expanded with necessary dependencies
 // (Docker client, configuration, etc.).
 type ContainerCollector struct {
-	// TODO: Add dependencies when implementing real collection.
-	// Example:
-	//   dockerClient *docker.Client
-	//   interval     time.Duration
+	dockerClient *docker.Client
 }
 
 // NewContainerCollector creates a new ContainerCollector instance.
 //
 // Follows the Go constructor pattern New<Type>.
-func NewContainerCollector() *ContainerCollector {
-	return &ContainerCollector{}
+func NewContainerCollector(client *docker.Client) *ContainerCollector {
+	return &ContainerCollector{
+		dockerClient: client,
+	}
 }
 
 // Collect implements the Collector interface.
-//
-// TODO: Implement real metric collection via Docker Stats API.
-// The Docker Stats API provides real-time CPU, memory,
-// network I/O and disk metrics for each container.
 func (c *ContainerCollector) Collect(ctx context.Context) ([]models.ContainerMetrics, error) {
-	// Placeholder — will be implemented in the next iteration.
-	return nil, nil
+	if c.dockerClient == nil {
+		return nil, fmt.Errorf("collector: docker client is not initialized")
+	}
+
+	statsMap, err := c.dockerClient.GetAllContainerStats(ctx, false)
+	if err != nil {
+		return nil, fmt.Errorf("collector: failed to get container stats: %w", err)
+	}
+
+	metrics := make([]models.ContainerMetrics, 0, len(statsMap))
+	for _, m := range statsMap {
+		metrics = append(metrics, m)
+	}
+
+	return metrics, nil
 }
 
 // Name returns the name of this collector.
