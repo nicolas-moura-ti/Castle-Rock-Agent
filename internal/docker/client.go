@@ -686,19 +686,35 @@ func (c *Client) ListRunningContainersDetailed(ctx context.Context, all bool) ([
 		return nil, fmt.Errorf("docker.ListRunningContainersDetailed: failed to list: %w", err)
 	}
 
-	result := make([]logger.ContainerDisplay, 0, len(containers))
-
+	// First pass: filter monitored containers and create base display structs
+	monitored := make([]logger.ContainerDisplay, 0, len(containers))
+	ids := make([]string, 0, len(containers))
 	for _, ct := range containers {
 		cd := toContainerDisplay(ct)
-		if !c.isMonitored(cd.Name) {
-			continue
+		if c.isMonitored(cd.Name) {
+			monitored = append(monitored, cd)
+			ids = append(ids, ct.ID)
 		}
-
-		c.enrichContainerDetails(ctx, ct.ID, &cd)
-		result = append(result, cd)
 	}
 
-	return result, nil
+	if len(monitored) == 0 {
+		return monitored, nil
+	}
+
+	// Second pass: fetch details concurrently
+	var wg sync.WaitGroup
+	wg.Add(len(monitored))
+
+	for i := range monitored {
+		go func(idx int) {
+			defer wg.Done()
+			c.enrichContainerDetails(ctx, ids[idx], &monitored[idx])
+		}(i)
+	}
+
+	wg.Wait()
+
+	return monitored, nil
 }
 
 // enrichContainerDetails acquires metadata from ContainerInspect and fills the display struct.
