@@ -14,6 +14,7 @@ package collector
 
 import (
 	"context"
+	"errors"
 
 	"github.com/nicolas-moura-ti/castle-rock-agent/pkg/models"
 )
@@ -67,7 +68,7 @@ func NewContainerCollector() *ContainerCollector {
 // network I/O and disk metrics for each container.
 func (c *ContainerCollector) Collect(ctx context.Context) ([]models.ContainerMetrics, error) {
 	// Placeholder — will be implemented in the next iteration.
-	return nil, nil
+	return nil, errors.New("not implemented")
 }
 
 // Name returns the name of this collector.
