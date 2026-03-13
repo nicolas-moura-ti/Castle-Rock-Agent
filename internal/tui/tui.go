@@ -671,20 +671,7 @@ func (m Model) handleActionKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "x":
 		if !m.showLogs && !m.showDetail && !m.showMap && m.cursor < len(m.containers) {
-			c := m.containers[m.cursor]
-			cmd := exec.Command("docker", "exec", "-it", c.Name, "/bin/sh")
-			return m, tea.ExecProcess(cmd, func(err error) tea.Msg {
-				if err != nil {
-					cmdBash := exec.Command("docker", "exec", "-it", c.Name, "/bin/bash")
-					return tea.ExecProcess(cmdBash, func(err2 error) tea.Msg {
-						if err2 != nil {
-							return dockerErrorMsg{err: fmt.Errorf("shell exec failed (sh/bash): %v", err2)}
-						}
-						return nil
-					})()
-				}
-				return nil
-			})
+			return m, m.executeShell()
 		}
 	case "S":
 		m.showStress = true
@@ -1559,6 +1546,23 @@ func (m Model) executeStress(mode string) tea.Cmd {
 			err:     err,
 		}
 	}
+}
+
+func (m Model) executeShell() tea.Cmd {
+	c := m.containers[m.cursor]
+	cmd := exec.Command("docker", "exec", "-it", c.Name, "/bin/sh")
+	return tea.ExecProcess(cmd, func(err error) tea.Msg {
+		if err != nil {
+			cmdBash := exec.Command("docker", "exec", "-it", c.Name, "/bin/bash")
+			return tea.ExecProcess(cmdBash, func(err2 error) tea.Msg {
+				if err2 != nil {
+					return dockerErrorMsg{err: fmt.Errorf("shell exec failed (sh/bash): %v", err2)}
+				}
+				return nil
+			})()
+		}
+		return nil
+	})
 }
 
 // ─── Formatting ──────────────────────────────────────────────────────────────
