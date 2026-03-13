@@ -43,6 +43,8 @@ func (a *Auditor) Audit(ctx context.Context, containers []logger.ContainerDispla
 	activeIDs := make(map[string]bool)
 	now := time.Now()
 
+	var toInspect []logger.ContainerDisplay
+
 	for _, c := range containers {
 		activeIDs[c.ID] = true
 
@@ -54,15 +56,40 @@ func (a *Auditor) Audit(ctx context.Context, containers []logger.ContainerDispla
 			continue
 		}
 
-		inspectJSON, err := a.dockerClient.InspectContainer(ctx, c.ID)
-		if err != nil {
-			continue
+		toInspect = append(toInspect, c)
+	}
+
+	if len(toInspect) > 0 {
+		var wg sync.WaitGroup
+		var newAlertsMu sync.Mutex
+		newAlerts := make(map[string][]alerts.Alert)
+
+		for _, c := range toInspect {
+			wg.Add(1)
+			go func(c logger.ContainerDisplay) {
+				defer wg.Done()
+
+				inspectJSON, err := a.dockerClient.InspectContainer(ctx, c.ID)
+				if err != nil {
+					return
+				}
+
+				secAlerts := a.evaluateSecurityRules(c, inspectJSON, now)
+
+				newAlertsMu.Lock()
+				newAlerts[c.ID] = secAlerts
+				newAlertsMu.Unlock()
+			}(c)
 		}
 
-		secAlerts := a.evaluateSecurityRules(c, inspectJSON, now)
+		wg.Wait()
 
-		a.cache[c.ID] = secAlerts
-		activeAlerts = append(activeAlerts, secAlerts...)
+		for _, c := range toInspect {
+			if secAlerts, ok := newAlerts[c.ID]; ok {
+				a.cache[c.ID] = secAlerts
+				activeAlerts = append(activeAlerts, secAlerts...)
+			}
+		}
 	}
 
 	for id := range a.cache {
