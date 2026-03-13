@@ -180,15 +180,35 @@ func (c *Client) ListNetworks(ctx context.Context) ([]network.Inspect, error) {
 		return nil, fmt.Errorf("docker.ListNetworks: %w", err)
 	}
 
-	var results []network.Inspect
-	for _, n := range nets {
-		// Inspect each one to get dynamically connected containers
-		insp, err := c.cli.NetworkInspect(ctx, n.ID, network.InspectOptions{})
-		if err == nil {
-			results = append(results, insp)
+	results := make([]network.Inspect, len(nets))
+	var wg sync.WaitGroup
+
+	for i, n := range nets {
+		wg.Add(1)
+		// Launch a goroutine for each network inspect
+		// We capture 'n' as a parameter to avoid race condition
+		go func(i int, netID string) {
+			defer wg.Done()
+
+			// Inspect each one to get dynamically connected containers
+			insp, err := c.cli.NetworkInspect(ctx, netID, network.InspectOptions{})
+			if err == nil {
+				results[i] = insp
+			}
+		}(i, n.ID)
+	}
+
+	wg.Wait()
+
+	// Filter out failed inspections (empty structs)
+	var filteredResults []network.Inspect
+	for _, res := range results {
+		if res.ID != "" {
+			filteredResults = append(filteredResults, res)
 		}
 	}
-	return results, nil
+
+	return filteredResults, nil
 }
 
 // StreamContainerLogs returns a channel with the last lines of log
