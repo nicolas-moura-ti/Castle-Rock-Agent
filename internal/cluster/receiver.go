@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"encoding/json"
+	"io"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -19,21 +20,22 @@ type HostData struct {
 }
 
 // Receiver is the HTTP server integrated in the Leader to receive data from Workers.
-// All read/write access is thread-safe (protected by RWMutex) since it can be
-// accessed simultaneously by the TUI, Prometheus exporter and HTTP receive routine.
 type Receiver struct {
-	mu    sync.RWMutex
-	hosts map[string]HostData
-	log   *slog.Logger
-	token string
+	mu           sync.RWMutex
+	hosts        map[string]HostData
+	log          *slog.Logger
+	sharedSecret string // Usado para descriptografia AES
+	token        string // Usado para o header Authorization: Bearer
 }
 
 // NewReceiver creates a new Receiver instance.
-func NewReceiver(log *slog.Logger, token string) *Receiver {
+// Resolvido: Unificando o uso do segredo para Token e Encryption.
+func NewReceiver(log *slog.Logger, secret string) *Receiver {
 	return &Receiver{
-		hosts: make(map[string]HostData),
-		log:   log,
-		token: token,
+		hosts:        make(map[string]HostData),
+		log:          log,
+		sharedSecret: secret,
+		token:        secret,
 	}
 }
 
@@ -44,6 +46,7 @@ func (r *Receiver) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	// 1. Validação do Token (Authorization Header)
 	if r.token != "" {
 		authHeader := req.Header.Get("Authorization")
 		if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
@@ -53,6 +56,7 @@ func (r *Receiver) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 
 		providedToken := strings.TrimPrefix(authHeader, "Bearer ")
+		// Uso de subtle.ConstantTimeCompare previne ataques de timing
 		if subtle.ConstantTimeCompare([]byte(providedToken), []byte(r.token)) != 1 {
 			r.log.Warn("receiver: invalid token provided")
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -62,8 +66,42 @@ func (r *Receiver) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	defer req.Body.Close()
 
+	body, err := io.ReadAll(req.Body)
+	if err != nil {
+		r.log.Warn("receiver: failed to read body", slog.String("error", err.Error()))
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	// 2. Lógica de Descriptografia (da branch fix/encrypt)
+	isEncrypted := req.Header.Get("X-CastleRock-Encrypted") == "true"
+
+	if r.sharedSecret != "" {
+		if !isEncrypted {
+			r.log.Warn("receiver: rejected cleartext payload (SharedSecret is enforced)")
+			http.Error(w, "Forbidden: Encryption Required", http.StatusForbidden)
+			return
+		}
+
+		// Assume-se que a função Decrypt existe no pacote cluster
+		decryptedBody, err := Decrypt(body, r.sharedSecret)
+		if err != nil {
+			r.log.Warn("receiver: failed to decrypt payload", slog.String("error", err.Error()))
+			http.Error(w, "Forbidden: Decryption Failed", http.StatusForbidden)
+			return
+		}
+		body = decryptedBody
+	} else {
+		if isEncrypted {
+			r.log.Warn("receiver: rejected encrypted payload (no SharedSecret configured locally)")
+			http.Error(w, "Forbidden: Decryption Key Missing", http.StatusForbidden)
+			return
+		}
+	}
+
+	// 3. Processamento do JSON
 	var payload models.PushPayload
-	if err := json.NewDecoder(req.Body).Decode(&payload); err != nil {
+	if err := json.Unmarshal(body, &payload); err != nil {
 		r.log.Warn("receiver: failed to decode JSON", slog.String("error", err.Error()))
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return
@@ -94,7 +132,6 @@ func (r *Receiver) GetAllMetrics() []models.ContainerMetrics {
 	now := time.Now()
 
 	for hostID, data := range r.hosts {
-		// Fault tolerance: ignore Workers that haven't communicated in over 30s.
 		if now.Sub(data.LastUpdate) > 30*time.Second {
 			r.log.Debug("receiver: inactive host ignored", slog.String("host", hostID))
 			continue
