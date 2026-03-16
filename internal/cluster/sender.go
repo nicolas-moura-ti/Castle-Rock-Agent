@@ -73,13 +73,13 @@ func StartSender(ctx context.Context, dockerClient *docker.Client, cfg config.Co
 				Metrics:    metricsList,
 			}
 
-			// Resolvido: Chamada utilizando SharedSecret para suporte a criptografia
-			sendPushPayload(ctx, httpClient, cfg.Cluster.LeaderURL, cfg.Cluster.SharedSecret, payload, log)
+			// Resolvido: Passando Token e Segredo independentes
+			sendPushPayload(ctx, httpClient, cfg.Cluster.LeaderURL, cfg.Cluster.SharedSecret, cfg.Cluster.AuthToken, payload, log)
 		}
 	}
 }
 
-func sendPushPayload(ctx context.Context, client *http.Client, url string, secret string, payload models.PushPayload, log *slog.Logger) {
+func sendPushPayload(ctx context.Context, client *http.Client, url string, secret string, authToken string, payload models.PushPayload, log *slog.Logger) {
 	data, err := json.Marshal(payload)
 	if err != nil {
 		log.Error("Sender: error marshaling payload JSON", slog.String("error", err.Error()))
@@ -113,6 +113,11 @@ func sendPushPayload(ctx context.Context, client *http.Client, url string, secre
 		req.Header.Set("X-CastleRock-Encrypted", "true")
 	} else {
 		req.Header.Set("Content-Type", "application/json")
+	}
+
+	// 1. Correção de Vulnerabilidade: Autenticação separada de criptografia
+	if authToken != "" {
+		req.Header.Set("Authorization", "Bearer "+authToken)
 	}
 
 	resp, err := client.Do(req)

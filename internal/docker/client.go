@@ -759,7 +759,25 @@ func (c *Client) enrichConfigDetails(inspect *types.ContainerJSON, cd *logger.Co
 	if inspect.Config == nil {
 		return
 	}
-	cd.Env = inspect.Config.Env
+	var redactedEnv []string
+	for _, env := range inspect.Config.Env {
+		// Split by first "="
+		parts := strings.SplitN(env, "=", 2)
+		if len(parts) == 2 {
+			k := strings.ToUpper(parts[0])
+			if strings.Contains(k, "PASS") || strings.Contains(k, "KEY") ||
+				strings.Contains(k, "SECRET") || strings.Contains(k, "TOKEN") ||
+				strings.Contains(k, "AUTH") {
+				redactedEnv = append(redactedEnv, parts[0]+"=[REDACTED]")
+			} else {
+				redactedEnv = append(redactedEnv, env)
+			}
+		} else {
+			redactedEnv = append(redactedEnv, env)
+		}
+	}
+	cd.Env = redactedEnv
+
 	if len(inspect.Config.Entrypoint) > 0 {
 		cd.Entrypoint = strings.Join(inspect.Config.Entrypoint, " ")
 	}

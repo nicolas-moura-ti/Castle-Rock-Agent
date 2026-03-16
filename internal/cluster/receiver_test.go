@@ -15,8 +15,9 @@ import (
 func TestReceiver_ServeHTTP(t *testing.T) {
 	// Create a dummy logger to discard output during tests
 	logger := slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), nil))
-	token := "secret-token"
-	receiver := NewReceiver(logger, token)
+	token := "secret-key"
+	// Use empty secret so it accepts unencrypted JSON requests for these tests
+	receiver := NewReceiver(logger, "", token)
 
 	tests := []struct {
 		name           string
@@ -94,7 +95,7 @@ func TestReceiver_ServeHTTP(t *testing.T) {
 
 func TestReceiver_GetAllMetrics(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), nil))
-	receiver := NewReceiver(logger, "")
+	receiver := NewReceiver(logger, "", "")
 
 	// Insert active host
 	receiver.hosts["active-host"] = HostData{
@@ -123,7 +124,7 @@ func TestReceiver_GetAllMetrics(t *testing.T) {
 
 func TestReceiver_GetAllContainers(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), nil))
-	receiver := NewReceiver(logger, "")
+	receiver := NewReceiver(logger, "", "")
 
 	// Insert active host
 	receiver.hosts["active-host"] = HostData{

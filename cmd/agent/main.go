@@ -92,9 +92,11 @@ func main() {
 	// ─────────────────────────────────────────────────────────────────────
 	var receiver *cluster.Receiver
 	if cfg.Cluster.Mode == "leader" {
-		// Resolvido: Utilizando SharedSecret da branch de fix para suportar criptografia
-		receiver = cluster.NewReceiver(log, cfg.Cluster.SharedSecret)
-		log.Info("cluster receiver active", slog.String("host_id", cfg.Cluster.HostID))
+		receiver = cluster.NewReceiver(log, cfg.Cluster.SharedSecret, cfg.Cluster.AuthToken)
+		log.Info("Starting in LEADER mode. Will receive metrics on /api/v1/push",
+			slog.Bool("auth_token_enabled", cfg.Cluster.AuthToken != ""),
+			slog.Bool("aes_encryption_enabled", cfg.Cluster.SharedSecret != ""),
+			slog.String("host_id", cfg.Cluster.HostID))
 	}
 
 	// ─────────────────────────────────────────────────────────────────────

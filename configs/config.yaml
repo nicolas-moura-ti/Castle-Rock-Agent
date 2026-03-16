@@ -50,6 +50,12 @@ cluster:
   # ID/Hostname desta máquina
   # ENV: CASTLE_ROCK_CLUSTER_HOST_ID
   host_id: ""
+  # Chave secreta de criptografia (AES)
+  # ENV: CASTLE_ROCK_CLUSTER_SHARED_SECRET
+  shared_secret: ""
+  # Token de autenticação Bearer da API
+  # ENV: CASTLE_ROCK_CLUSTER_AUTH_TOKEN
+  auth_token: ""
 
 # ── Alertas ──────────────────────────────────────────────────────
 alerts:

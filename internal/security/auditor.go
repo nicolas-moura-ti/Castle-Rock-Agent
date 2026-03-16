@@ -176,7 +176,9 @@ func (a *Auditor) checkSensitiveCaps(result []alerts.Alert, c logger.ContainerDi
 		return result
 	}
 	for _, cap := range j.HostConfig.CapAdd {
-		if cap == "SYS_ADMIN" || cap == "NET_ADMIN" {
+		if cap == "SYS_ADMIN" || cap == "NET_ADMIN" ||
+			cap == "SYS_PTRACE" || cap == "DAC_OVERRIDE" ||
+			cap == "SYS_RAWIO" || cap == "SYS_MODULE" {
 			return append(result, alerts.Alert{
 				RuleName: "Sec: Sensitive CAP_ADD", ContainerID: c.ID, ContainerName: c.Name,
 				Metric: "security_sensitive_cap", CurrentValue: 1, Severity: "warning", ActiveSince: now, FiredAt: now,

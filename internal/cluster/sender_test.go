@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -16,8 +17,25 @@ import (
 	"github.com/nicolas-moura-ti/castle-rock-agent/pkg/models"
 )
 
+type syncBuffer struct {
+	b bytes.Buffer
+	m sync.Mutex
+}
+
+func (s *syncBuffer) Write(p []byte) (n int, err error) {
+	s.m.Lock()
+	defer s.m.Unlock()
+	return s.b.Write(p)
+}
+
+func (s *syncBuffer) String() string {
+	s.m.Lock()
+	defer s.m.Unlock()
+	return s.b.String()
+}
+
 func TestStartSender_Loop(t *testing.T) {
-	var logBuf bytes.Buffer
+	var logBuf syncBuffer
 	logger := slog.New(slog.NewTextHandler(&logBuf, nil))
 
 	// Mock Docker Daemon Server
@@ -82,7 +100,7 @@ func TestStartSender_Loop(t *testing.T) {
 	cfg.Cluster.Mode = "worker"
 	cfg.Cluster.HostID = "test-worker-1"
 	cfg.Cluster.LeaderURL = leaderServer.URL
-	cfg.Cluster.SharedSecret = "test-token"
+	cfg.Cluster.AuthToken = "test-token"
 	cfg.Stats.Interval = 10 * time.Millisecond // very short interval for testing
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -107,7 +125,7 @@ func TestStartSender_Loop(t *testing.T) {
 	time.Sleep(20 * time.Millisecond)
 
 	logOutput := logBuf.String()
-	if !bytes.Contains([]byte(logOutput), []byte("Worker Sender stopped")) {
+	if !strings.Contains(logOutput, "Worker Sender stopped") {
 		t.Errorf("expected 'Worker Sender stopped' log, got: %s", logOutput)
 	}
 }
@@ -146,7 +164,8 @@ func TestSendPushPayload_Success(t *testing.T) {
 	defer server.Close()
 
 	payload := models.PushPayload{HostID: "test-host"}
-	sendPushPayload(context.Background(), server.Client(), server.URL, "test-token", payload, logger)
+	// Passing empty secret to stay in cleartext and match application/json requirement for this test
+	sendPushPayload(context.Background(), server.Client(), server.URL, "", "test-token", payload, logger)
 
 	if !serverCalled {
 		t.Error("expected server to be called")
@@ -168,7 +187,7 @@ func TestSendPushPayload_Rejected(t *testing.T) {
 	defer server.Close()
 
 	payload := models.PushPayload{HostID: "test-host"}
-	sendPushPayload(context.Background(), server.Client(), server.URL, "test-token", payload, logger)
+	sendPushPayload(context.Background(), server.Client(), server.URL, "test-secret", "test-token", payload, logger)
 
 	logOutput := logBuf.String()
 	if !bytes.Contains([]byte(logOutput), []byte("Sender: push rejected by leader")) {
@@ -182,7 +201,7 @@ func TestSendPushPayload_CommunicationFailure(t *testing.T) {
 
 	// Invalid URL to force an error (using an invalid IP prevents DNS resolution delays)
 	payload := models.PushPayload{HostID: "test-host"}
-	sendPushPayload(context.Background(), http.DefaultClient, "http://127.0.0.1:0", "token", payload, logger)
+	sendPushPayload(context.Background(), http.DefaultClient, "http://127.0.0.1:0", "test-secret", "test-token", payload, logger)
 
 	logOutput := logBuf.String()
 	if !bytes.Contains([]byte(logOutput), []byte("Sender: communication failure (Leader inactive?)")) {
@@ -210,7 +229,7 @@ func TestSendPushPayload_JSONMarshalError(t *testing.T) {
 		},
 	}
 
-	sendPushPayload(context.Background(), client, server.URL, "token", payload, logger)
+	sendPushPayload(context.Background(), client, server.URL, "test-secret", "test-token", payload, logger)
 
 	logOutput := logBuf.String()
 	if !bytes.Contains([]byte(logOutput), []byte("Sender: error marshaling payload JSON")) {

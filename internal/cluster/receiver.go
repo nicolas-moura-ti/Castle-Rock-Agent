@@ -29,13 +29,13 @@ type Receiver struct {
 }
 
 // NewReceiver creates a new Receiver instance.
-// Resolvido: Unificando o uso do segredo para Token e Encryption.
-func NewReceiver(log *slog.Logger, secret string) *Receiver {
+// Resolvido: Segredo AES e Token Bearer agora são chaves separadas.
+func NewReceiver(log *slog.Logger, secret string, token string) *Receiver {
 	return &Receiver{
 		hosts:        make(map[string]HostData),
 		log:          log,
 		sharedSecret: secret,
-		token:        secret,
+		token:        token,
 	}
 }
 
@@ -64,6 +64,9 @@ func (r *Receiver) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 	}
 
+	// 1.5 Correção de Vulnerabilidade: Prevendo ataques DoS por exaustão de memória
+	// Limita o tamanho do body a 5MB, blindando o Agente contra payloads corrompidos.
+	req.Body = http.MaxBytesReader(w, req.Body, 5*1024*1024)
 	defer req.Body.Close()
 
 	body, err := io.ReadAll(req.Body)

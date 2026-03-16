@@ -53,6 +53,7 @@ type ClusterConfig struct {
 	LeaderURL    string `yaml:"leader_url"`    // HTTP endpoint for metrics submission
 	HostID       string `yaml:"host_id"`       // Unique identifier for this node
 	SharedSecret string `yaml:"shared_secret"` // Secret key for AES payload encryption
+	AuthToken    string `yaml:"auth_token"`    // Bearer token for API authentication
 }
 
 // AlertsConfig configures the alert system.
@@ -89,6 +90,7 @@ func DefaultConfig() Config {
 			LeaderURL:    "http://127.0.0.1:9110/api/v1/push",
 			HostID:       "", 
 			SharedSecret: "", // Resolvido: Alterado de Token para SharedSecret
+			AuthToken:    "", // Resolvido: Token de autenticação separado da chave AES
 		},
 		Alerts: AlertsConfig{
 			Enabled: true,
@@ -209,6 +211,10 @@ func applyClusterEnv(cfg *Config) {
 	// Resolvido: Mapeamento da variável de ambiente para o SharedSecret
 	if v := os.Getenv("CASTLE_ROCK_CLUSTER_SHARED_SECRET"); v != "" {
 		cfg.Cluster.SharedSecret = v
+	}
+	// Resolvido: Variável de ambiente isolada para o AuthToken
+	if v := os.Getenv("CASTLE_ROCK_CLUSTER_AUTH_TOKEN"); v != "" {
+		cfg.Cluster.AuthToken = v
 	}
 }
 

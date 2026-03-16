@@ -61,6 +61,7 @@ stats:
   interval: 10s
 cluster:
   shared_secret: "my-secret-yaml-token"
+  auth_token: "my-auth-yaml-token"
 alerts:
   enabled: false
 `,
@@ -83,6 +84,9 @@ alerts:
 				if cfg.Cluster.SharedSecret != "my-secret-yaml-token" {
 					t.Errorf("Cluster.SharedSecret = %q, want %q", cfg.Cluster.SharedSecret, "my-secret-yaml-token")
 				}
+				if cfg.Cluster.AuthToken != "my-auth-yaml-token" {
+					t.Errorf("Cluster.AuthToken = %q, want %q", cfg.Cluster.AuthToken, "my-auth-yaml-token")
+				}
 			},
 		},
 		{
@@ -91,6 +95,7 @@ alerts:
 				"CASTLE_ROCK_LOG_LEVEL":       "error",
 				"CASTLE_ROCK_PROMETHEUS_PORT":       "3000",
 				"CASTLE_ROCK_CLUSTER_SHARED_SECRET": "env-secret-token",
+				"CASTLE_ROCK_CLUSTER_AUTH_TOKEN":    "env-auth-token",
 			},
 			wantAssert: func(t *testing.T, cfg Config) {
 				if cfg.LogLevel != "error" {
@@ -101,6 +106,9 @@ alerts:
 				}
 				if cfg.Cluster.SharedSecret != "env-secret-token" {
 					t.Errorf("Cluster.SharedSecret = %q, want %q (from env)", cfg.Cluster.SharedSecret, "env-secret-token")
+				}
+				if cfg.Cluster.AuthToken != "env-auth-token" {
+					t.Errorf("Cluster.AuthToken = %q, want %q (from env)", cfg.Cluster.AuthToken, "env-auth-token")
 				}
 			},
 		},
