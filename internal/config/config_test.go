@@ -3,6 +3,7 @@ package config
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 )
@@ -31,21 +32,27 @@ func TestDefaultConfig(t *testing.T) {
 	}
 }
 
-// TestLoadNonExistentFile verifies that a nonexistent file
-// returns the default configuration without error.
-func TestLoadNonExistentFile(t *testing.T) {
-	cfg, err := Load("/tmp/nonexistent-castle-rock-test.yaml")
-	if err != nil {
-		t.Fatalf("Load should not error for nonexistent file: %v", err)
-	}
-	if cfg.LogLevel != "info" {
-		t.Errorf("Expected default log_level, got %q", cfg.LogLevel)
-	}
-}
-
-// TestLoadValidYAML verifies parsing of a valid YAML file.
-func TestLoadValidYAML(t *testing.T) {
-	content := `
+// TestLoad verifies the configuration loader behavior under various conditions.
+func TestLoad(t *testing.T) {
+	tests := []struct {
+		name       string
+		fileBody   string
+		envVars    map[string]string
+		wantErr    bool
+		wantAssert func(*testing.T, Config)
+	}{
+		{
+			name:     "nonexistent file returns default config",
+			fileBody: "", // indicates no file
+			wantAssert: func(t *testing.T, cfg Config) {
+				if cfg.LogLevel != "info" {
+					t.Errorf("Expected default log_level, got %q", cfg.LogLevel)
+				}
+			},
+		},
+		{
+			name: "valid YAML file",
+			fileBody: `
 log_level: "debug"
 prometheus:
   enabled: false
@@ -56,65 +63,70 @@ cluster:
   token: "my-secret-yaml-token"
 alerts:
   enabled: false
-`
-	tmpFile, err := os.CreateTemp("", "castle-rock-test-*.yaml")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.Remove(tmpFile.Name())
-
-	if _, err := tmpFile.WriteString(content); err != nil {
-		t.Fatal(err)
-	}
-	tmpFile.Close()
-
-	cfg, err := Load(tmpFile.Name())
-	if err != nil {
-		t.Fatalf("Load error: %v", err)
-	}
-
-	if cfg.LogLevel != "debug" {
-		t.Errorf("LogLevel = %q, want %q", cfg.LogLevel, "debug")
-	}
-	if cfg.Prometheus.Enabled {
-		t.Error("Prometheus should be disabled")
-	}
-	if cfg.Prometheus.Port != 8080 {
-		t.Errorf("Prometheus.Port = %d, want %d", cfg.Prometheus.Port, 8080)
-	}
-	if cfg.Stats.Interval != 10*time.Second {
-		t.Errorf("Stats.Interval = %v, want %v", cfg.Stats.Interval, 10*time.Second)
-	}
-	if cfg.Alerts.Enabled {
-		t.Error("Alerts should be disabled")
-	}
-	if cfg.Cluster.Token != "my-secret-yaml-token" {
-		t.Errorf("Cluster.Token = %q, want %q", cfg.Cluster.Token, "my-secret-yaml-token")
-	}
-}
-
-// TestEnvOverrides verifies that environment variables take precedence.
-func TestEnvOverrides(t *testing.T) {
-	// Set env vars
-	os.Setenv("CASTLE_ROCK_LOG_LEVEL", "error")
-	os.Setenv("CASTLE_ROCK_PROMETHEUS_PORT", "3000")
-	os.Setenv("CASTLE_ROCK_CLUSTER_TOKEN", "env-secret-token")
-	defer os.Unsetenv("CASTLE_ROCK_LOG_LEVEL")
-	defer os.Unsetenv("CASTLE_ROCK_PROMETHEUS_PORT")
-	defer os.Unsetenv("CASTLE_ROCK_CLUSTER_TOKEN")
-
-	cfg, err := Load("/tmp/nonexistent.yaml")
-	if err != nil {
-		t.Fatal(err)
+`,
+			wantAssert: func(t *testing.T, cfg Config) {
+				if cfg.LogLevel != "debug" {
+					t.Errorf("LogLevel = %q, want %q", cfg.LogLevel, "debug")
+				}
+				if cfg.Prometheus.Enabled {
+					t.Error("Prometheus should be disabled")
+				}
+				if cfg.Prometheus.Port != 8080 {
+					t.Errorf("Prometheus.Port = %d, want %d", cfg.Prometheus.Port, 8080)
+				}
+				if cfg.Stats.Interval != 10*time.Second {
+					t.Errorf("Stats.Interval = %v, want %v", cfg.Stats.Interval, 10*time.Second)
+				}
+				if cfg.Alerts.Enabled {
+					t.Error("Alerts should be disabled")
+				}
+				if cfg.Cluster.Token != "my-secret-yaml-token" {
+					t.Errorf("Cluster.Token = %q, want %q", cfg.Cluster.Token, "my-secret-yaml-token")
+				}
+			},
+		},
+		{
+			name: "environment variables take precedence",
+			envVars: map[string]string{
+				"CASTLE_ROCK_LOG_LEVEL":       "error",
+				"CASTLE_ROCK_PROMETHEUS_PORT": "3000",
+				"CASTLE_ROCK_CLUSTER_TOKEN":   "env-secret-token",
+			},
+			wantAssert: func(t *testing.T, cfg Config) {
+				if cfg.LogLevel != "error" {
+					t.Errorf("LogLevel = %q, want %q (from env)", cfg.LogLevel, "error")
+				}
+				if cfg.Prometheus.Port != 3000 {
+					t.Errorf("Prometheus.Port = %d, want %d (from env)", cfg.Prometheus.Port, 3000)
+				}
+				if cfg.Cluster.Token != "env-secret-token" {
+					t.Errorf("Cluster.Token = %q, want %q (from env)", cfg.Cluster.Token, "env-secret-token")
+				}
+			},
+		},
 	}
 
-	if cfg.LogLevel != "error" {
-		t.Errorf("LogLevel = %q, want %q (from env)", cfg.LogLevel, "error")
-	}
-	if cfg.Prometheus.Port != 3000 {
-		t.Errorf("Prometheus.Port = %d, want %d (from env)", cfg.Prometheus.Port, 3000)
-	}
-	if cfg.Cluster.Token != "env-secret-token" {
-		t.Errorf("Cluster.Token = %q, want %q (from env)", cfg.Cluster.Token, "env-secret-token")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			for k, v := range tt.envVars {
+				t.Setenv(k, v)
+			}
+
+			path := filepath.Join(t.TempDir(), "nonexistent.yaml")
+			if tt.fileBody != "" {
+				path = filepath.Join(t.TempDir(), "config.yaml")
+				if err := os.WriteFile(path, []byte(tt.fileBody), 0644); err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			cfg, err := Load(path)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("Load() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if err == nil && tt.wantAssert != nil {
+				tt.wantAssert(t, cfg)
+			}
+		})
 	}
 }

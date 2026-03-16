@@ -43,7 +43,7 @@ func (a *Auditor) Audit(ctx context.Context, containers []logger.ContainerDispla
 	activeIDs := make(map[string]bool)
 	now := time.Now()
 
-	var toInspect []logger.ContainerDisplay
+	toInspect := make([]logger.ContainerDisplay, 0, len(containers))
 
 	for _, c := range containers {
 		activeIDs[c.ID] = true
@@ -140,24 +140,31 @@ func (a *Auditor) checkRootUser(result []alerts.Alert, c logger.ContainerDisplay
 	return result
 }
 
+func isDBPort(portStr string) bool {
+	return strings.HasPrefix(portStr, "3306/") ||
+		strings.HasPrefix(portStr, "5432/") ||
+		strings.HasPrefix(portStr, "27017/") ||
+		strings.HasPrefix(portStr, "6379/")
+}
+
+func isGloballyExposed(ip string) bool {
+	return ip == "0.0.0.0" || ip == "" || ip == "::"
+}
+
 func (a *Auditor) checkDBPortExposed(result []alerts.Alert, c logger.ContainerDisplay, j types.ContainerJSON, now time.Time) []alerts.Alert {
 	if j.NetworkSettings == nil {
 		return result
 	}
 	for port, bindings := range j.NetworkSettings.Ports {
-		portStr := string(port)
-		isDBPort := strings.HasPrefix(portStr, "3306/") ||
-			strings.HasPrefix(portStr, "5432/") ||
-			strings.HasPrefix(portStr, "27017/") ||
-			strings.HasPrefix(portStr, "6379/")
-		if isDBPort {
-			for _, b := range bindings {
-				if b.HostIP == "0.0.0.0" || b.HostIP == "" || b.HostIP == "::" {
-					return append(result, alerts.Alert{
-						RuleName: "Sec: DB Port Exposed globally", ContainerID: c.ID, ContainerName: c.Name,
-						Metric: "security_db_port", CurrentValue: float64(port.Int()), Severity: "critical", ActiveSince: now, FiredAt: now,
-					})
-				}
+		if !isDBPort(string(port)) {
+			continue
+		}
+		for _, b := range bindings {
+			if isGloballyExposed(b.HostIP) {
+				return append(result, alerts.Alert{
+					RuleName: "Sec: DB Port Exposed globally", ContainerID: c.ID, ContainerName: c.Name,
+					Metric: "security_db_port", CurrentValue: float64(port.Int()), Severity: "critical", ActiveSince: now, FiredAt: now,
+				})
 			}
 		}
 	}

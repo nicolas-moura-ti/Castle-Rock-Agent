@@ -265,19 +265,29 @@ func (m Model) handleContainerListMsg(msg containerListMsg) (tea.Model, tea.Cmd)
 	if m.cursor >= len(m.containers) && len(m.containers) > 0 {
 		m.cursor = len(m.containers) - 1
 	}
-	if m.auditor != nil {
-		oldAlertsCount := len(m.securityAlerts)
-		m.securityAlerts = m.auditor.Audit(m.ctx, m.containers)
-		if len(m.securityAlerts) > oldAlertsCount {
-			m.events = append([]EventLogEntry{{
-				Time:   time.Now(),
-				Icon:   "🛡️ ",
-				Action: "SEC-AUDIT",
-				Name:   fmt.Sprintf("%d issues found", len(m.securityAlerts)),
-			}}, m.events...)
-		}
-	}
+
+	m = m.processSecurityAlerts()
+
 	return m, nil
+}
+
+func (m Model) processSecurityAlerts() Model {
+	if m.auditor == nil {
+		return m
+	}
+
+	oldAlertsCount := len(m.securityAlerts)
+	m.securityAlerts = m.auditor.Audit(m.ctx, m.containers)
+	if len(m.securityAlerts) > oldAlertsCount {
+		m.events = append([]EventLogEntry{{
+			Time:   time.Now(),
+			Icon:   "🛡️ ",
+			Action: "SEC-AUDIT",
+			Name:   fmt.Sprintf("%d issues found", len(m.securityAlerts)),
+		}}, m.events...)
+	}
+
+	return m
 }
 
 func (m Model) handleStatsMsg(msg statsMsg) (tea.Model, tea.Cmd) {
@@ -671,20 +681,7 @@ func (m Model) handleActionKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "x":
 		if !m.showLogs && !m.showDetail && !m.showMap && m.cursor < len(m.containers) {
-			c := m.containers[m.cursor]
-			cmd := exec.Command("docker", "exec", "-it", c.Name, "/bin/sh")
-			return m, tea.ExecProcess(cmd, func(err error) tea.Msg {
-				if err != nil {
-					cmdBash := exec.Command("docker", "exec", "-it", c.Name, "/bin/bash")
-					return tea.ExecProcess(cmdBash, func(err2 error) tea.Msg {
-						if err2 != nil {
-							return dockerErrorMsg{err: fmt.Errorf("shell exec failed (sh/bash): %v", err2)}
-						}
-						return nil
-					})()
-				}
-				return nil
-			})
+			return m, m.executeShell()
 		}
 	case "S":
 		m.showStress = true
@@ -1559,6 +1556,23 @@ func (m Model) executeStress(mode string) tea.Cmd {
 			err:     err,
 		}
 	}
+}
+
+func (m Model) executeShell() tea.Cmd {
+	c := m.containers[m.cursor]
+	cmd := exec.Command("docker", "exec", "-it", c.Name, "/bin/sh")
+	return tea.ExecProcess(cmd, func(err error) tea.Msg {
+		if err != nil {
+			cmdBash := exec.Command("docker", "exec", "-it", c.Name, "/bin/bash")
+			return tea.ExecProcess(cmdBash, func(err2 error) tea.Msg {
+				if err2 != nil {
+					return dockerErrorMsg{err: fmt.Errorf("shell exec failed (sh/bash): %v", err2)}
+				}
+				return nil
+			})()
+		}
+		return nil
+	})
 }
 
 // ─── Formatting ──────────────────────────────────────────────────────────────
