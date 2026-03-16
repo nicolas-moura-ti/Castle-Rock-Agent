@@ -30,11 +30,19 @@ func TestEncryptDecrypt(t *testing.T) {
 
 func TestDecryptInvalidLength(t *testing.T) {
 	secret := "secret"
-	shortPayload := []byte("short")
 
+	// Too short to contain salt
+	shortPayload := []byte("short")
 	_, err := Decrypt(shortPayload, secret)
 	if err == nil {
-		t.Fatalf("expected error for too short ciphertext, got nil")
+		t.Fatalf("expected error for ciphertext too short to contain salt, got nil")
+	}
+
+	// Contains salt but too short to contain nonce
+	saltOnlyPayload := make([]byte, 16)
+	_, err = Decrypt(saltOnlyPayload, secret)
+	if err == nil {
+		t.Fatalf("expected error for ciphertext too short to contain nonce, got nil")
 	}
 }
 
