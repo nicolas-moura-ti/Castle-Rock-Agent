@@ -265,19 +265,29 @@ func (m Model) handleContainerListMsg(msg containerListMsg) (tea.Model, tea.Cmd)
 	if m.cursor >= len(m.containers) && len(m.containers) > 0 {
 		m.cursor = len(m.containers) - 1
 	}
-	if m.auditor != nil {
-		oldAlertsCount := len(m.securityAlerts)
-		m.securityAlerts = m.auditor.Audit(m.ctx, m.containers)
-		if len(m.securityAlerts) > oldAlertsCount {
-			m.events = append([]EventLogEntry{{
-				Time:   time.Now(),
-				Icon:   "🛡️ ",
-				Action: "SEC-AUDIT",
-				Name:   fmt.Sprintf("%d issues found", len(m.securityAlerts)),
-			}}, m.events...)
-		}
-	}
+
+	m = m.processSecurityAlerts()
+
 	return m, nil
+}
+
+func (m Model) processSecurityAlerts() Model {
+	if m.auditor == nil {
+		return m
+	}
+
+	oldAlertsCount := len(m.securityAlerts)
+	m.securityAlerts = m.auditor.Audit(m.ctx, m.containers)
+	if len(m.securityAlerts) > oldAlertsCount {
+		m.events = append([]EventLogEntry{{
+			Time:   time.Now(),
+			Icon:   "🛡️ ",
+			Action: "SEC-AUDIT",
+			Name:   fmt.Sprintf("%d issues found", len(m.securityAlerts)),
+		}}, m.events...)
+	}
+
+	return m
 }
 
 func (m Model) handleStatsMsg(msg statsMsg) (tea.Model, tea.Cmd) {
