@@ -92,7 +92,8 @@ func main() {
 	// ─────────────────────────────────────────────────────────────────────
 	var receiver *cluster.Receiver
 	if cfg.Cluster.Mode == "leader" {
-		receiver = cluster.NewReceiver(log, cfg.Cluster.SharedSecret, cfg.Cluster.AuthToken)
+		store := cluster.NewMemoryStore(log)
+		receiver = cluster.NewReceiver(log, store, cfg.Cluster.SharedSecret, cfg.Cluster.AuthToken)
 		log.Info("Starting in LEADER mode. Will receive metrics on /api/v1/push",
 			slog.Bool("auth_token_enabled", cfg.Cluster.AuthToken != ""),
 			slog.Bool("aes_encryption_enabled", cfg.Cluster.SharedSecret != ""),
