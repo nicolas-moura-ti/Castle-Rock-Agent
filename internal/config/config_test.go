@@ -60,7 +60,7 @@ prometheus:
 stats:
   interval: 10s
 cluster:
-  token: "my-secret-yaml-token"
+  shared_secret: "my-secret-yaml-token"
 alerts:
   enabled: false
 `,
@@ -80,8 +80,8 @@ alerts:
 				if cfg.Alerts.Enabled {
 					t.Error("Alerts should be disabled")
 				}
-				if cfg.Cluster.Token != "my-secret-yaml-token" {
-					t.Errorf("Cluster.Token = %q, want %q", cfg.Cluster.Token, "my-secret-yaml-token")
+				if cfg.Cluster.SharedSecret != "my-secret-yaml-token" {
+					t.Errorf("Cluster.SharedSecret = %q, want %q", cfg.Cluster.SharedSecret, "my-secret-yaml-token")
 				}
 			},
 		},
@@ -89,8 +89,8 @@ alerts:
 			name: "environment variables take precedence",
 			envVars: map[string]string{
 				"CASTLE_ROCK_LOG_LEVEL":       "error",
-				"CASTLE_ROCK_PROMETHEUS_PORT": "3000",
-				"CASTLE_ROCK_CLUSTER_TOKEN":   "env-secret-token",
+				"CASTLE_ROCK_PROMETHEUS_PORT":       "3000",
+				"CASTLE_ROCK_CLUSTER_SHARED_SECRET": "env-secret-token",
 			},
 			wantAssert: func(t *testing.T, cfg Config) {
 				if cfg.LogLevel != "error" {
@@ -99,8 +99,8 @@ alerts:
 				if cfg.Prometheus.Port != 3000 {
 					t.Errorf("Prometheus.Port = %d, want %d (from env)", cfg.Prometheus.Port, 3000)
 				}
-				if cfg.Cluster.Token != "env-secret-token" {
-					t.Errorf("Cluster.Token = %q, want %q (from env)", cfg.Cluster.Token, "env-secret-token")
+				if cfg.Cluster.SharedSecret != "env-secret-token" {
+					t.Errorf("Cluster.SharedSecret = %q, want %q (from env)", cfg.Cluster.SharedSecret, "env-secret-token")
 				}
 			},
 		},

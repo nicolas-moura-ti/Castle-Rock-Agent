@@ -39,6 +39,16 @@ type Messages struct {
 	SecInsecurePort      string
 	SecMissingNoNewPrivs string
 	SecHostNetwork       string
+	// Short Alert Names
+	AlertSecPrivileged   string
+	AlertSecRootUser     string
+	AlertSecDBPort       string
+	AlertSecSensitiveCap string
+	AlertSecNoQuotas     string
+	AlertSecWritableFS   string
+	AlertSecInsecurePort string
+	AlertSecNoNewPrivs   string
+	AlertSecHostNet      string
 }
 
 var En = Messages{
@@ -80,6 +90,15 @@ var En = Messages{
 	SecInsecurePort:      "Insecure management ports (SSH:22 or Telnet:23) exposed",
 	SecMissingNoNewPrivs: "Missing 'no-new-privileges' flag (Allows SUID escalation)",
 	SecHostNetwork:       "Running with --network=host (Bypasses network isolation)",
+	AlertSecPrivileged:   "Privileged Mode",
+	AlertSecRootUser:     "Root User",
+	AlertSecDBPort:       "DB Port Exposed",
+	AlertSecSensitiveCap: "Sensitive CAP_ADD",
+	AlertSecNoQuotas:     "No Resource Quotas",
+	AlertSecWritableFS:   "Writable RootFS",
+	AlertSecInsecurePort: "Insecure Port",
+	AlertSecNoNewPrivs:   "Missing No-New-Privileges",
+	AlertSecHostNet:      "Host Networking",
 }
 
 var Pt = Messages{
@@ -119,8 +138,17 @@ var Pt = Messages{
 	SecNoResourceQuotas:  "Container sem limite de Memória ou CPU configurado (Risco de DoS no Host)",
 	SecWritableRootFS:    "Root Filesystem aberto para escrita (O ideal é rodar containers imutáveis c/ readonly-rootfs)",
 	SecInsecurePort:      "Portas de gerenciamento inseguras (SSH:22 ou Telnet:23) expostas pelo container",
-	SecMissingNoNewPrivs: "Falta a flag 'no-new-privileges' (Permite escalonamento via binários SUID nativos do Linux)",
-	SecHostNetwork:       "Rodando em modo --network=host (Isolamento de rede quebrado com o sistema principal)",
+	SecMissingNoNewPrivs: "Faltando flag 'no-new-privileges' (Permite escalonamento SUID)",
+	SecHostNetwork:       "Rodando com --network=host (Burla o isolamento de rede nativo)",
+	AlertSecPrivileged:   "Modo Privilegiado",
+	AlertSecRootUser:     "Usuário Root",
+	AlertSecDBPort:       "Porta DB Exposta",
+	AlertSecSensitiveCap: "CAP_ADD Sensível",
+	AlertSecNoQuotas:     "Sem Limites de Recurso",
+	AlertSecWritableFS:   "RootFS Gravável",
+	AlertSecInsecurePort: "Porta Insegura",
+	AlertSecNoNewPrivs:   "Sem No-New-Privileges",
+	AlertSecHostNet:      "Rede Host",
 }
 
 // Get returns loaded strings based on env lang (en, pt).

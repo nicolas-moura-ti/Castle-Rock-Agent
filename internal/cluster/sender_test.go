@@ -82,7 +82,7 @@ func TestStartSender_Loop(t *testing.T) {
 	cfg.Cluster.Mode = "worker"
 	cfg.Cluster.HostID = "test-worker-1"
 	cfg.Cluster.LeaderURL = leaderServer.URL
-	cfg.Cluster.Token = "test-token"
+	cfg.Cluster.SharedSecret = "test-token"
 	cfg.Stats.Interval = 10 * time.Millisecond // very short interval for testing
 
 	ctx, cancel := context.WithCancel(context.Background())

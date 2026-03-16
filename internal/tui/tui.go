@@ -1233,19 +1233,50 @@ func (m Model) renderAlerts() string {
 	allAlerts := append([]alerts.Alert{}, m.activeAlerts...)
 	allAlerts = append(allAlerts, m.securityAlerts...)
 
+	if len(allAlerts) == 0 {
+		return ""
+	}
+
+	maxW := min(m.width-4, 80)
+	if maxW < 40 {
+		maxW = 40
+	}
+
 	for _, a := range allAlerts {
 		msg := ""
-		if strings.HasPrefix(a.RuleName, "Sec:") {
-			msg = fmt.Sprintf(" %s: %s [%s] ", a.RuleName, a.ContainerName, a.Severity)
+		ruleName := a.RuleName
+
+		if strings.HasPrefix(ruleName, "Sec:") {
+			switch ruleName {
+			case "Sec: Privileged Mode":
+				ruleName = "Sec: " + m.msg.AlertSecPrivileged
+			case "Sec: Root User":
+				ruleName = "Sec: " + m.msg.AlertSecRootUser
+			case "Sec: DB Port Exposed globally":
+				ruleName = "Sec: " + m.msg.AlertSecDBPort
+			case "Sec: Sensitive CAP_ADD":
+				ruleName = "Sec: " + m.msg.AlertSecSensitiveCap
+			case "Sec: No Resource Quotas":
+				ruleName = "Sec: " + m.msg.AlertSecNoQuotas
+			case "Sec: Writable RootFS":
+				ruleName = "Sec: " + m.msg.AlertSecWritableFS
+			case "Sec: Insecure Port Exposed":
+				ruleName = "Sec: " + m.msg.AlertSecInsecurePort
+			case "Sec: Missing No-New-Privileges":
+				ruleName = "Sec: " + m.msg.AlertSecNoNewPrivs
+			case "Sec: Host Networking Mode":
+				ruleName = "Sec: " + m.msg.AlertSecHostNet
+			}
+			msg = fmt.Sprintf(" %s: %s [%s] ", ruleName, a.ContainerName, a.Severity)
 		} else {
 			msg = fmt.Sprintf(" %s: %s %.1f%% > %.1f%% [%s] ",
-				a.RuleName, a.ContainerName, a.CurrentValue, a.Threshold, a.Severity)
+				ruleName, a.ContainerName, a.CurrentValue, a.Threshold, a.Severity)
 		}
 
 		if a.Severity == "critical" {
-			b.WriteString("  " + alertCritStyle.Render("🚨"+msg) + "\n")
+			b.WriteString("  " + alertCritStyle.Width(maxW).Render(" 🚨"+msg) + "\n")
 		} else {
-			b.WriteString("  " + alertWarnStyle.Render("⚠️"+msg) + "\n")
+			b.WriteString("  " + alertWarnStyle.Width(maxW).Render(" ⚠️"+msg) + "\n")
 		}
 	}
 	return b.String()
