@@ -123,10 +123,13 @@ make run
 Spins up the **Headless Agent** + **Prometheus** + **Grafana** in isolated containers. Best for 24/7 background monitoring.
 
 ```bash
+# Copy example env file and set your password
+cp .env.example .env
+
 docker compose up -d
 
 # Access:
-# - Grafana:    http://localhost:3000  (admin / castlerock)
+# - Grafana:    http://localhost:3000
 # - Prometheus: http://localhost:9090
 # - Metrics:    http://localhost:9110/metrics
 ```
