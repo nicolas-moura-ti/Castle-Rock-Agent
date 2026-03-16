@@ -90,7 +90,21 @@ func (e *Engine) Evaluate(stats map[string]models.ContainerMetrics) []Alert {
 	var newAlerts []Alert
 	now := time.Now()
 
-	// Clear alerts for containers that no longer exist
+	e.clearInactiveAlerts(stats)
+
+	for _, s := range stats {
+		for _, rule := range e.rules {
+			if alert := e.evaluateRule(s, rule, now); alert != nil {
+				newAlerts = append(newAlerts, *alert)
+			}
+		}
+	}
+
+	return newAlerts
+}
+
+// clearInactiveAlerts removes alerts for containers that no longer exist.
+func (e *Engine) clearInactiveAlerts(stats map[string]models.ContainerMetrics) {
 	for key := range e.activeAlerts {
 		found := false
 		for _, s := range stats {
@@ -104,61 +118,60 @@ func (e *Engine) Evaluate(stats map[string]models.ContainerMetrics) []Alert {
 			delete(e.conditionStart, key)
 		}
 	}
+}
 
-	for _, s := range stats {
-		for _, rule := range e.rules {
-			key := e.alertKey(s.ContainerID, rule.Name)
+// evaluateRule evaluates a single rule against a single container's metrics.
+func (e *Engine) evaluateRule(s models.ContainerMetrics, rule config.AlertRule, now time.Time) *Alert {
+	key := e.alertKey(s.ContainerID, rule.Name)
+	value := e.getMetricValue(s, rule.Metric)
+	conditionMet := e.evaluateCondition(value, rule.Operator, rule.Threshold)
 
-			// Extract the metric value
-			value := e.getMetricValue(s, rule.Metric)
-
-			// Evaluate the condition
-			conditionMet := e.evaluateCondition(value, rule.Operator, rule.Threshold)
-
-			if conditionMet {
-				// Condition active — check if already being tracked
-				startTime, exists := e.conditionStart[key]
-				if !exists {
-					// New — record start
-					e.conditionStart[key] = now
-					continue
-				}
-
-				// Check if enough time has passed (duration)
-				if now.Sub(startTime) >= rule.Duration {
-					// Check if already fired (don't repeat)
-					if _, alreadyFired := e.activeAlerts[key]; !alreadyFired {
-						alert := Alert{
-							RuleName:      rule.Name,
-							ContainerID:   s.ContainerID,
-							ContainerName: s.ContainerName,
-							Metric:        rule.Metric,
-							CurrentValue:  value,
-							Threshold:     rule.Threshold,
-							Severity:      rule.Severity,
-							FiredAt:       now,
-							ActiveSince:   startTime,
-						}
-
-						e.activeAlerts[key] = alert
-						newAlerts = append(newAlerts, alert)
-
-						// Add to history
-						e.firedAlerts = append([]Alert{alert}, e.firedAlerts...)
-						if len(e.firedAlerts) > 50 {
-							e.firedAlerts = e.firedAlerts[:50]
-						}
-					}
-				}
-			} else {
-				// Condition not active — clear state
-				delete(e.conditionStart, key)
-				delete(e.activeAlerts, key)
-			}
-		}
+	if !conditionMet {
+		// Condition not active — clear state
+		delete(e.conditionStart, key)
+		delete(e.activeAlerts, key)
+		return nil
 	}
 
-	return newAlerts
+	// Condition active — check if already being tracked
+	startTime, exists := e.conditionStart[key]
+	if !exists {
+		// New — record start
+		e.conditionStart[key] = now
+		return nil
+	}
+
+	// Check if enough time has passed (duration)
+	if now.Sub(startTime) < rule.Duration {
+		return nil
+	}
+
+	// Check if already fired (don't repeat)
+	if _, alreadyFired := e.activeAlerts[key]; alreadyFired {
+		return nil
+	}
+
+	alert := Alert{
+		RuleName:      rule.Name,
+		ContainerID:   s.ContainerID,
+		ContainerName: s.ContainerName,
+		Metric:        rule.Metric,
+		CurrentValue:  value,
+		Threshold:     rule.Threshold,
+		Severity:      rule.Severity,
+		FiredAt:       now,
+		ActiveSince:   startTime,
+	}
+
+	e.activeAlerts[key] = alert
+
+	// Add to history
+	e.firedAlerts = append([]Alert{alert}, e.firedAlerts...)
+	if len(e.firedAlerts) > 50 {
+		e.firedAlerts = e.firedAlerts[:50]
+	}
+
+	return &alert
 }
 
 // GetActiveAlerts returns all currently active alerts,
