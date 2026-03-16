@@ -50,6 +50,8 @@ This means you don't even need a `config.yaml` if you inject everything through 
 | `CASTLE_ROCK_CLUSTER_MODE` | Role: `standalone`, `leader`, `worker` | `standalone` |
 | `CASTLE_ROCK_CLUSTER_HOST_ID` | Identifier shown in TUI/Grafana | Host OS hostname |
 | `CASTLE_ROCK_CLUSTER_LEADER_URL` | Target URL to push stats to (worker mode) | `http://127.0.0.1:9110` |
+| `CASTLE_ROCK_CLUSTER_AUTH_TOKEN` | Bearer Token for API Authentication | `""` |
+| `CASTLE_ROCK_CLUSTER_SHARED_SECRET` | Secret Key for AES-GCM (Argon2id) encryption | `""` |
 
 ---
 

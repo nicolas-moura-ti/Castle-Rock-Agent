@@ -132,12 +132,18 @@ You spin up **one Leader** and multiple **Workers** (remote agents that push dat
 
 ```bash
 # Main Server (Leader)
-CASTLE_ROCK_CLUSTER_MODE=leader CASTLE_ROCK_CLUSTER_HOST_ID=hq make run
+CASTLE_ROCK_CLUSTER_MODE=leader \
+CASTLE_ROCK_CLUSTER_HOST_ID=hq \
+CASTLE_ROCK_CLUSTER_AUTH_TOKEN="my-secret-token" \
+CASTLE_ROCK_CLUSTER_SHARED_SECRET="my-aes-key" \
+make run
 
 # On another server (Worker) - No TUI, running in the background
 CASTLE_ROCK_CLUSTER_MODE=worker \
 CASTLE_ROCK_CLUSTER_HOST_ID=branch-nyc \
 CASTLE_ROCK_CLUSTER_LEADER_URL=http://<LEADER_IP>:9110 \
+CASTLE_ROCK_CLUSTER_AUTH_TOKEN="my-secret-token" \
+CASTLE_ROCK_CLUSTER_SHARED_SECRET="my-aes-key" \
 make run
 ```
 

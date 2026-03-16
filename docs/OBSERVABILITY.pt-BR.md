@@ -108,12 +108,18 @@ Ao invés disso, o Agente funciona organicamente em sistemas amplos como uma hie
 
 ```bash
 # Máquina Sede Master PromQL Integrada
-CASTLE_ROCK_CLUSTER_MODE=leader CASTLE_ROCK_CLUSTER_HOST_ID=brasilia make run
+CASTLE_ROCK_CLUSTER_MODE=leader \
+CASTLE_ROCK_CLUSTER_HOST_ID=brasilia \
+CASTLE_ROCK_CLUSTER_AUTH_TOKEN="my-secret-token" \
+CASTLE_ROCK_CLUSTER_SHARED_SECRET="my-aes-key" \
+make run
 
 # Em um Data Center remoto (Roda escondido apenas passando dados)
 CASTLE_ROCK_CLUSTER_MODE=worker \
 CASTLE_ROCK_CLUSTER_HOST_ID=saopaulo-b \
 CASTLE_ROCK_CLUSTER_LEADER_URL=http://<IP_DE_BRASILIA>:9110 \
+CASTLE_ROCK_CLUSTER_AUTH_TOKEN="my-secret-token" \
+CASTLE_ROCK_CLUSTER_SHARED_SECRET="my-aes-key" \
 make run
 ```
 
