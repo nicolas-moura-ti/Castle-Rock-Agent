@@ -255,27 +255,32 @@ func (c *Client) StreamContainerLogs(ctx context.Context, containerID string) (<
 					return
 				}
 				if n > 0 {
-					// Remove 8-byte header from Docker multiplexed stream
-					content := string(buf[:n])
-					// Split by lines and send each one
-					lines := strings.Split(content, "\n")
-					for _, line := range lines {
-						// Clean Docker header control characters
-						cleaned := cleanLogLine(line)
-						if cleaned != "" {
-							select {
-							case logCh <- cleaned:
-							default:
-								// Buffer full, discard old line
-							}
-						}
-					}
+					processLogChunk(n, buf, logCh)
 				}
 			}
 		}
 	}()
 
 	return logCh, nil
+}
+
+// processLogChunk splits a multiplexed log chunk into lines and sends them to the channel.
+func processLogChunk(n int, buf []byte, logCh chan<- string) {
+	// Remove 8-byte header from Docker multiplexed stream
+	content := string(buf[:n])
+	// Split by lines and send each one
+	lines := strings.Split(content, "\n")
+	for _, line := range lines {
+		// Clean Docker header control characters
+		cleaned := cleanLogLine(line)
+		if cleaned != "" {
+			select {
+			case logCh <- cleaned:
+			default:
+				// Buffer full, discard old line
+			}
+		}
+	}
 }
 
 // cleanLogLine removes the 8-byte header from Docker multiplexed stream.
