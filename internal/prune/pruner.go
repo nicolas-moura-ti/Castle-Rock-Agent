@@ -23,6 +23,9 @@ type AutoPruner struct {
 
 	// Prevents rapid consecutive executions
 	lastPrune time.Time
+
+	// dependency injection for testing
+	diskCheckFunc func(ctx context.Context, path string) (*disk.UsageStat, error)
 }
 
 // NewAutoPruner creates a configured pruner instance to watch a path and threshold.
@@ -30,12 +33,13 @@ func NewAutoPruner(client *docker.Client, store *storage.SQLiteStore, triggerPct
 	// In most systems (even containerized via docker-socket),
 	// checking the root FS ("/") is sufficient, or the host-mapped volume.
 	return &AutoPruner{
-		dockerClient: client,
-		store:        store,
-		log:          slog.Default(),
-		thresholdPct: triggerPct,
-		checkPeriod:  time.Minute * 5, // Check disk every 5m
-		pathToCheck:  "/",
+		dockerClient:  client,
+		store:         store,
+		log:           slog.Default(),
+		thresholdPct:  triggerPct,
+		checkPeriod:   time.Minute * 5, // Check disk every 5m
+		pathToCheck:   "/",
+		diskCheckFunc: disk.UsageWithContext,
 	}
 }
 
@@ -61,7 +65,7 @@ func (p *AutoPruner) checkAndPrune(ctx context.Context) {
 		return
 	}
 
-	usage, err := disk.UsageWithContext(ctx, p.pathToCheck)
+	usage, err := p.diskCheckFunc(ctx, p.pathToCheck)
 	if err != nil {
 		p.log.Debug("pruner: failed to check disk usage", slog.String("error", err.Error()))
 		return
