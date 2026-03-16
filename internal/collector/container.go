@@ -14,6 +14,7 @@ package collector
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/nicolas-moura-ti/castle-rock-agent/internal/config"
@@ -29,11 +30,6 @@ import (
 //   - Go convention: "Accept interfaces, return structs"
 //   - Don't create interfaces prematurely — extract them when there's
 //     a real need for polymorphism
-//
-// Why define this interface now?
-//   - Establishes the contract that future implementations must follow
-//   - Allows using mocks in unit tests
-//   - Documents the architectural intent of the system
 type Collector interface {
 	// Collect executes metric collection for all containers.
 	//
@@ -71,9 +67,15 @@ func NewContainerCollector(dockerClient *docker.Client, cfg config.Config, inter
 // The Docker Stats API provides real-time CPU, memory,
 // network I/O and disk metrics for each container.
 func (c *ContainerCollector) Collect(ctx context.Context) ([]models.ContainerMetrics, error) {
+	// Verificação de segurança vinda da branch feat
+	if c.dockerClient == nil {
+		return nil, fmt.Errorf("collector: docker client is not initialized")
+	}
+
 	statsMap, err := c.dockerClient.GetAllContainerStats(ctx, false)
 	if err != nil {
-		return nil, err
+		// Uso do %w para permitir o unwrap do erro original posteriormente, se necessário
+		return nil, fmt.Errorf("collector: failed to get container stats: %w", err)
 	}
 
 	metrics := make([]models.ContainerMetrics, 0, len(statsMap))
