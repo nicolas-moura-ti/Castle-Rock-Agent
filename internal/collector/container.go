@@ -15,7 +15,9 @@ package collector
 import (
 	"context"
 	"fmt"
+	"time"
 
+	"github.com/nicolas-moura-ti/castle-rock-agent/internal/config"
 	"github.com/nicolas-moura-ti/castle-rock-agent/internal/docker"
 	"github.com/nicolas-moura-ti/castle-rock-agent/pkg/models"
 )
@@ -28,11 +30,6 @@ import (
 //   - Go convention: "Accept interfaces, return structs"
 //   - Don't create interfaces prematurely — extract them when there's
 //     a real need for polymorphism
-//
-// Why define this interface now?
-//   - Establishes the contract that future implementations must follow
-//   - Allows using mocks in unit tests
-//   - Documents the architectural intent of the system
 type Collector interface {
 	// Collect executes metric collection for all containers.
 	//
@@ -50,25 +47,34 @@ type Collector interface {
 // (Docker client, configuration, etc.).
 type ContainerCollector struct {
 	dockerClient *docker.Client
+	cfg          config.Config
+	interval     time.Duration
 }
 
 // NewContainerCollector creates a new ContainerCollector instance.
 //
 // Follows the Go constructor pattern New<Type>.
-func NewContainerCollector(client *docker.Client) *ContainerCollector {
+func NewContainerCollector(dockerClient *docker.Client, cfg config.Config, interval time.Duration) *ContainerCollector {
 	return &ContainerCollector{
-		dockerClient: client,
+		dockerClient: dockerClient,
+		cfg:          cfg,
+		interval:     interval,
 	}
 }
 
 // Collect implements the Collector interface.
+//
+// The Docker Stats API provides real-time CPU, memory,
+// network I/O and disk metrics for each container.
 func (c *ContainerCollector) Collect(ctx context.Context) ([]models.ContainerMetrics, error) {
+	// Verificação de segurança vinda da branch feat
 	if c.dockerClient == nil {
 		return nil, fmt.Errorf("collector: docker client is not initialized")
 	}
 
 	statsMap, err := c.dockerClient.GetAllContainerStats(ctx, false)
 	if err != nil {
+		// Uso do %w para permitir o unwrap do erro original posteriormente, se necessário
 		return nil, fmt.Errorf("collector: failed to get container stats: %w", err)
 	}
 
