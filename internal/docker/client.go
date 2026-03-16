@@ -967,24 +967,22 @@ func formatPorts(ports []types.Port) string {
 //	AutoRemove:true ensures the container is removed after execution,
 //	avoiding accumulation of stopped containers.
 func (c *Client) RunStressTest(ctx context.Context, mode string, durationSec int) error {
-	stressImage := "alpine:latest"
+	stressImage := "ghcr.io/alexei-led/stress-ng:latest"
 	containerName := "castle-rock-stress"
 
 	// Build stress-ng arguments
-	var stressArgs string
+	var cmd []string
 	switch mode {
 	case "cpu":
-		stressArgs = fmt.Sprintf("--cpu 2 --timeout %ds", durationSec)
+		cmd = []string{"--cpu", "2", "--timeout", fmt.Sprintf("%ds", durationSec)}
 	case "memory":
 		// --vm-hang 0 = sleep after allocation to keep memory held without burning CPU
-		stressArgs = fmt.Sprintf("--vm 1 --vm-bytes 256M --vm-hang 0 --timeout %ds", durationSec)
+		cmd = []string{"--vm", "1", "--vm-bytes", "256M", "--vm-hang", "0", "--timeout", fmt.Sprintf("%ds", durationSec)}
 	case "both":
-		stressArgs = fmt.Sprintf("--cpu 2 --vm 1 --vm-bytes 256M --vm-hang 0 --timeout %ds", durationSec)
+		cmd = []string{"--cpu", "2", "--vm", "1", "--vm-bytes", "256M", "--vm-hang", "0", "--timeout", fmt.Sprintf("%ds", durationSec)}
 	default:
 		return fmt.Errorf("docker.RunStressTest: invalid mode: %s", mode)
 	}
-
-	cmd := []string{"sh", "-c", fmt.Sprintf("apk add --no-cache stress-ng && stress-ng %s", stressArgs)}
 
 	// Try to remove previous container with the same name (if it exists)
 	_ = c.cli.ContainerRemove(ctx, containerName, container.RemoveOptions{Force: true})
@@ -992,7 +990,7 @@ func (c *Client) RunStressTest(ctx context.Context, mode string, durationSec int
 	// Pull image if not available locally
 	_, _, err := c.cli.ImageInspectWithRaw(ctx, stressImage)
 	if err != nil {
-		reader, pullErr := c.cli.ImagePull(ctx, "docker.io/library/"+stressImage, image.PullOptions{})
+		reader, pullErr := c.cli.ImagePull(ctx, stressImage, image.PullOptions{})
 		if pullErr != nil {
 			return fmt.Errorf("docker.RunStressTest: failed to pull image %s: %w", stressImage, pullErr)
 		}
