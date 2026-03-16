@@ -66,7 +66,7 @@ func NewSQLiteStore(dbPath string) (*SQLiteStore, error) {
 func (s *SQLiteStore) SaveEvent(ctx context.Context, action, container, message string) {
 	go func() {
 		query := `INSERT INTO events (timestamp, type, action, container, message) VALUES (?, ?, ?, ?, ?)`
-		s.db.ExecContext(context.Background(), query, time.Now().UTC(), "event", action, container, message)
+		s.db.ExecContext(context.WithoutCancel(ctx), query, time.Now().UTC(), "event", action, container, message)
 	}()
 }
 
