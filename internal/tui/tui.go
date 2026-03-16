@@ -128,6 +128,7 @@ type Model struct {
 	alertEngine    *alerts.Engine
 	activeAlerts   []alerts.Alert
 	securityAlerts []alerts.Alert
+	alertMarks     map[string]string // ContainerID -> Alert mark string
 	auditor        *security.Auditor
 
 	// Logs
@@ -194,6 +195,7 @@ func NewModel(dockerClient *docker.Client, receiver metrics.ClusterProvider, ctx
 		alertEngine:    engine,
 		activeAlerts:   []alerts.Alert{},
 		securityAlerts: []alerts.Alert{},
+		alertMarks:     make(map[string]string),
 		auditor:        security.NewAuditor(dockerClient),
 		mapper:         topology.NewMapper(dockerClient),
 		logLines:       []LogEntry{},
@@ -271,6 +273,29 @@ func (m Model) handleContainerListMsg(msg containerListMsg) (tea.Model, tea.Cmd)
 	return m, nil
 }
 
+func (m Model) updateAlertMarks() Model {
+	marks := make(map[string]string)
+
+	for _, sa := range m.securityAlerts {
+		if sa.Severity == "critical" {
+			marks[sa.ContainerID] = " 🛡️ 🚨"
+		} else if marks[sa.ContainerID] != " 🛡️ 🚨" {
+			marks[sa.ContainerID] = " 🛡️ ⚠️"
+		}
+	}
+
+	for _, a := range m.activeAlerts {
+		if a.Severity == "critical" {
+			marks[a.ContainerID] = " 🚨"
+		} else if marks[a.ContainerID] != " 🚨" && marks[a.ContainerID] != " 🛡️ 🚨" {
+			marks[a.ContainerID] = " ⚠️"
+		}
+	}
+
+	m.alertMarks = marks
+	return m
+}
+
 func (m Model) processSecurityAlerts() Model {
 	if m.auditor == nil {
 		return m
@@ -287,7 +312,7 @@ func (m Model) processSecurityAlerts() Model {
 		}}, m.events...)
 	}
 
-	return m
+	return m.updateAlertMarks()
 }
 
 func (m Model) handleStatsMsg(msg statsMsg) (tea.Model, tea.Cmd) {
@@ -308,7 +333,7 @@ func (m Model) handleStatsMsg(msg statsMsg) (tea.Model, tea.Cmd) {
 			}}, m.events...)
 		}
 	}
-	return m, nil
+	return m.updateAlertMarks(), nil
 }
 
 func (m Model) handleDockerEventMsg(msg dockerEventMsg) (tea.Model, tea.Cmd) {
@@ -921,29 +946,7 @@ func (m *Model) formatContainerRow(index int, c logger.ContainerDisplay) string 
 }
 
 func (m *Model) getContainerAlertMark(id string) string {
-	alertMark := ""
-	for _, a := range m.activeAlerts {
-		if a.ContainerID == id {
-			if a.Severity == "critical" {
-				return " 🚨"
-			}
-			alertMark = " ⚠️"
-		}
-	}
-
-	if alertMark != " 🚨" {
-		for _, sa := range m.securityAlerts {
-			if sa.ContainerID == id {
-				if sa.Severity == "critical" {
-					return " 🛡️ 🚨"
-				}
-				if alertMark == "" {
-					alertMark = " 🛡️ ⚠️"
-				}
-			}
-		}
-	}
-	return alertMark
+	return m.alertMarks[id]
 }
 
 func (m *Model) getContainerHealthMark(healthStatus string) string {
