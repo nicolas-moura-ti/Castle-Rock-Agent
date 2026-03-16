@@ -113,7 +113,20 @@ func (a *Auditor) evaluateSecurityRules(c logger.ContainerDisplay, inspectJSON t
 	secAlerts = a.checkInsecurePorts(secAlerts, c, inspectJSON, now)
 	secAlerts = a.checkNoNewPrivileges(secAlerts, c, inspectJSON, now)
 	secAlerts = a.checkHostNetworking(secAlerts, c, inspectJSON, now)
+	secAlerts = a.checkSensitiveMounts(secAlerts, c, inspectJSON, now)
 	return secAlerts
+}
+
+func (a *Auditor) checkSensitiveMounts(result []alerts.Alert, c logger.ContainerDisplay, j types.ContainerJSON, now time.Time) []alerts.Alert {
+	for _, m := range j.Mounts {
+		if strings.Contains(m.Source, "docker.sock") {
+			return append(result, alerts.Alert{
+				RuleName: "Sec: Docker Socket Mounted", ContainerID: c.ID, ContainerName: c.Name,
+				Metric: "security_docker_sock", CurrentValue: 1, Severity: "critical", ActiveSince: now, FiredAt: now,
+			})
+		}
+	}
+	return result
 }
 
 func (a *Auditor) checkPrivilegedMode(result []alerts.Alert, c logger.ContainerDisplay, j types.ContainerJSON, now time.Time) []alerts.Alert {
@@ -178,7 +191,8 @@ func (a *Auditor) checkSensitiveCaps(result []alerts.Alert, c logger.ContainerDi
 	for _, cap := range j.HostConfig.CapAdd {
 		if cap == "SYS_ADMIN" || cap == "NET_ADMIN" ||
 			cap == "SYS_PTRACE" || cap == "DAC_OVERRIDE" ||
-			cap == "SYS_RAWIO" || cap == "SYS_MODULE" {
+			cap == "SYS_RAWIO" || cap == "SYS_MODULE" ||
+			cap == "NET_RAW" {
 			return append(result, alerts.Alert{
 				RuleName: "Sec: Sensitive CAP_ADD", ContainerID: c.ID, ContainerName: c.Name,
 				Metric: "security_sensitive_cap", CurrentValue: 1, Severity: "warning", ActiveSince: now, FiredAt: now,

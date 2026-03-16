@@ -759,38 +759,65 @@ func (c *Client) enrichConfigDetails(inspect *types.ContainerJSON, cd *logger.Co
 	if inspect.Config == nil {
 		return
 	}
+
+	// Redact sensitive environment variables
 	var redactedEnv []string
 	for _, env := range inspect.Config.Env {
-		// Split by first "="
-		parts := strings.SplitN(env, "=", 2)
-		if len(parts) == 2 {
-			k := strings.ToUpper(parts[0])
-			if strings.Contains(k, "PASS") || strings.Contains(k, "KEY") ||
-				strings.Contains(k, "SECRET") || strings.Contains(k, "TOKEN") ||
-				strings.Contains(k, "AUTH") {
-				redactedEnv = append(redactedEnv, parts[0]+"=[REDACTED]")
-			} else {
-				redactedEnv = append(redactedEnv, env)
-			}
-		} else {
-			redactedEnv = append(redactedEnv, env)
-		}
+		redactedEnv = append(redactedEnv, redactSensitiveString(env))
 	}
 	cd.Env = redactedEnv
 
+	// Build and redact Entrypoint + Cmd
+	fullCommand := ""
 	if len(inspect.Config.Entrypoint) > 0 {
-		cd.Entrypoint = strings.Join(inspect.Config.Entrypoint, " ")
+		fullCommand = strings.Join(inspect.Config.Entrypoint, " ")
 	}
 	if len(inspect.Config.Cmd) > 0 {
-		if cd.Entrypoint != "" {
-			cd.Entrypoint += " " + strings.Join(inspect.Config.Cmd, " ")
+		cmdStr := strings.Join(inspect.Config.Cmd, " ")
+		if fullCommand != "" {
+			fullCommand += " " + cmdStr
 		} else {
-			cd.Entrypoint = strings.Join(inspect.Config.Cmd, " ")
+			fullCommand = cmdStr
 		}
 	}
+
+	// Apply redaction to the full command line
+	cd.Entrypoint = redactSensitiveString(fullCommand)
+
 	if len(cd.Entrypoint) > 80 {
 		cd.Entrypoint = cd.Entrypoint[:77] + "..."
 	}
+}
+
+// redactSensitiveString replaces sensitive values (PASS, KEY, SECRET, TOKEN, AUTH, URL, URI, PRIVATE)
+// with [REDACTED] if they look like assignments (KEY=VALUE) or contain suspicious flags.
+func redactSensitiveString(s string) string {
+	upperS := strings.ToUpper(s)
+	sensitiveKeys := []string{"PASS", "KEY", "SECRET", "TOKEN", "AUTH", "URL", "URI", "PRIVATE"}
+
+	// 1. Handle assignment style (KEY=VALUE)
+	if strings.Contains(s, "=") {
+		parts := strings.SplitN(s, "=", 2)
+		key := strings.ToUpper(parts[0])
+		for _, sk := range sensitiveKeys {
+			if strings.Contains(key, sk) {
+				return parts[0] + "=[REDACTED]"
+			}
+		}
+	}
+
+	// 2. Handle CLI flag style (--password secret)
+	for _, sk := range sensitiveKeys {
+		if strings.Contains(upperS, sk) {
+			// Basic heuristic: if it contains a space or colon, it likely has a value.
+			// Don't redact simple words like "KEY" if they are alone, but redact if they have context.
+			if strings.Contains(s, " ") || strings.Contains(s, ":") {
+				return "[REDACTED]"
+			}
+		}
+	}
+
+	return s
 }
 
 func (c *Client) enrichHealthDetails(inspect *types.ContainerJSON, cd *logger.ContainerDisplay) {
