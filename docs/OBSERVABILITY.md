@@ -45,7 +45,7 @@ sum(castle_rock_container_network_rx_bytes) by (container_name)
 
 Docker Compose automatically provisions **5 dashboards** in Grafana. They all update in real-time.
 
-**Access:** http://localhost:3000 → Login: `admin` / `castlerock`
+**Access:** http://localhost:3000 → Login with the credentials defined in your `.env` file (default: `admin` / `castlerock`).
 
 1. **Dashboard 1: Overview:** A broad overview of all containers (Average CPU/Mem, Top traffic, Speedometers, Bar Gauges).
 2. **Dashboard 2: Container Detail:** A deep dive into a specific container selected via a dropdown. Shows history over time.

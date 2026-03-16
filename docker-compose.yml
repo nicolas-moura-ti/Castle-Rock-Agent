@@ -10,7 +10,7 @@
 #
 # COMO USAR:
 #   docker compose up -d
-#   Abra http://localhost:3000 (Grafana: admin/castlerock)
+#   Abra http://localhost:3000 (Grafana UI)
 #   Abra http://localhost:9090 (Prometheus UI)
 #
 # PARAR:
@@ -136,8 +136,8 @@ services:
       - ./deploy/grafana/provisioning:/etc/grafana/provisioning:ro
       - grafana_data:/var/lib/grafana
     environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=castlerock
+      - GF_SECURITY_ADMIN_USER=${GF_SECURITY_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GF_SECURITY_ADMIN_PASSWORD}
       - GF_USERS_ALLOW_SIGN_UP=false
     ports:
       - "3000:3000" # Grafana UI

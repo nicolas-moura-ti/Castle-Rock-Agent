@@ -123,10 +123,13 @@ make run
 Eleva de forma isolada do HD três pilares atrelados para atuar 24/7 horas sobre a sua Nuvem sem fechar, usando apenas portas expostas (**O Castle entra no modo sombra (Headless) recolhendo silenciosamente dados ao Prome**).
 
 ```bash
+# Copie o arquivo de exemplo e defina sua senha
+cp .env.example .env
+
 docker compose up -d
 
 # Visualização no Navegador:
-# - A sua Central Grafana em Geral: http://127.0.0.1:3000  (admin / castlerock)
+# - A sua Central Grafana em Geral: http://127.0.0.1:3000
 # - O Banco Analítico Primitivo Prom:  http://127.0.0.1:9090
 # - Ver Endpoint de saída Castle Crua  http://127.0.0.1:9110/metrics
 ```
