@@ -178,7 +178,7 @@ func TestSendPushPayload_Success(t *testing.T) {
 }
 
 func TestSendPushPayload_Rejected(t *testing.T) {
-	var logBuf bytes.Buffer
+	var logBuf syncBuffer
 	logger := slog.New(slog.NewTextHandler(&logBuf, nil))
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -186,26 +186,33 @@ func TestSendPushPayload_Rejected(t *testing.T) {
 	}))
 	defer server.Close()
 
+	// Use a very short timeout context to trigger at least one retry attempt quickly
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+	defer cancel()
+
 	payload := models.PushPayload{HostID: "test-host"}
-	sendPushPayload(context.Background(), server.Client(), server.URL, "test-secret", "test-token", payload, logger)
+	sendPushPayload(ctx, server.Client(), server.URL, "test-secret", "test-token", payload, logger)
 
 	logOutput := logBuf.String()
-	if !bytes.Contains([]byte(logOutput), []byte("Sender: push rejected by leader")) {
-		t.Errorf("expected log about rejected push, got: %s", logOutput)
+	if !strings.Contains(logOutput, "Sender: push failed, retrying...") {
+		t.Errorf("expected log about push retry, got: %s", logOutput)
 	}
 }
 
 func TestSendPushPayload_CommunicationFailure(t *testing.T) {
-	var logBuf bytes.Buffer
+	var logBuf syncBuffer
 	logger := slog.New(slog.NewTextHandler(&logBuf, nil))
 
-	// Invalid URL to force an error (using an invalid IP prevents DNS resolution delays)
+	// Use a short timeout context
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+	defer cancel()
+
 	payload := models.PushPayload{HostID: "test-host"}
-	sendPushPayload(context.Background(), http.DefaultClient, "http://127.0.0.1:0", "test-secret", "test-token", payload, logger)
+	sendPushPayload(ctx, http.DefaultClient, "http://127.0.0.1:0", "test-secret", "test-token", payload, logger)
 
 	logOutput := logBuf.String()
-	if !bytes.Contains([]byte(logOutput), []byte("Sender: communication failure (Leader inactive?)")) {
-		t.Errorf("expected log about communication failure, got: %s", logOutput)
+	if !strings.Contains(logOutput, "Sender: push failed, retrying...") {
+		t.Errorf("expected log about push retry, got: %s", logOutput)
 	}
 }
 

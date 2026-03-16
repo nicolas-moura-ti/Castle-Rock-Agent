@@ -1681,6 +1681,13 @@ func min(a, b int) int {
 func Run(dockerClient *docker.Client, receiver *cluster.Receiver, ctx context.Context, sysInfo map[string]string, version string, cfg config.Config, store *storage.SQLiteStore) error {
 	model := NewModel(dockerClient, receiver, ctx, sysInfo, version, cfg, store)
 	p := tea.NewProgram(model, tea.WithAltScreen(), tea.WithMouseCellMotion())
+
+	// Handle graceful shutdown via context
+	go func() {
+		<-ctx.Done()
+		p.Quit()
+	}()
+
 	_, err := p.Run()
 	return err
 }

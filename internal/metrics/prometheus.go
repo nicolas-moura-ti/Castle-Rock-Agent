@@ -30,26 +30,29 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-	"github.com/nicolas-moura-ti/castle-rock-agent/internal/cluster"
-	"github.com/nicolas-moura-ti/castle-rock-agent/internal/docker"
 	"github.com/nicolas-moura-ti/castle-rock-agent/pkg/models"
 )
 
+// MetricsProvider defines what a data source must provide for Prometheus.
+type MetricsProvider interface {
+	GetAllContainerStats(ctx context.Context, all bool) (map[string]models.ContainerMetrics, error)
+}
+
+// ClusterProvider defines what a cluster source must provide for Prometheus.
+type ClusterProvider interface {
+	GetAllMetrics() []models.ContainerMetrics
+	ServeHTTP(w http.ResponseWriter, r *http.Request)
+}
+
 // Exporter manages Prometheus metrics and the HTTP server.
-//
-// DESIGN:
-//
-//	The Exporter runs in background (its own goroutine), collecting
-//	metrics periodically and updating Prometheus gauges.
-//	The HTTP server exposes /metrics for Prometheus scraping.
 type Exporter struct {
-	dockerClient *docker.Client
+	dockerClient MetricsProvider
 	interval     time.Duration
 	port         int
 	log          *slog.Logger
 
 	// receiver (optional) brings data from other cluster nodes in Leader mode
-	receiver *cluster.Receiver
+	receiver ClusterProvider
 
 	// hostID is this machine's own name
 	hostID string
@@ -89,7 +92,7 @@ var containerLabels = []string{"host_id", "container_id", "container_name", "ima
 //   - Suffix: unit (_bytes, _percent, _total)
 //   - Snake_case always
 //   - Reference: https://prometheus.io/docs/practices/naming/
-func NewExporter(dockerClient *docker.Client, receiver *cluster.Receiver, hostID string, interval time.Duration, port int, log *slog.Logger) *Exporter {
+func NewExporter(dockerClient MetricsProvider, receiver ClusterProvider, hostID string, interval time.Duration, port int, log *slog.Logger) *Exporter {
 	e := &Exporter{
 		dockerClient: dockerClient,
 		interval:     interval,
@@ -163,9 +166,9 @@ func NewExporter(dockerClient *docker.Client, receiver *cluster.Receiver, hostID
 		}, containerLabels),
 	}
 
-	// Register all metrics in the default Prometheus registry.
-	// The registry is the central repository for all metrics.
-	prometheus.MustRegister(
+	// Register all metrics. We use Register instead of MustRegister
+	// to avoid panics during tests if the metrics are already registered.
+	metricsList := []prometheus.Collector{
 		e.cpuPercent,
 		e.memoryUsage,
 		e.memoryLimit,
@@ -175,7 +178,15 @@ func NewExporter(dockerClient *docker.Client, receiver *cluster.Receiver, hostID
 		e.blockRead,
 		e.blockWrite,
 		e.containerInfo,
-	)
+	}
+
+	for _, m := range metricsList {
+		if err := prometheus.Register(m); err != nil {
+			if _, ok := err.(prometheus.AlreadyRegisteredError); !ok {
+				log.Warn("failed to register metric", slog.String("error", err.Error()))
+			}
+		}
+	}
 
 	return e
 }

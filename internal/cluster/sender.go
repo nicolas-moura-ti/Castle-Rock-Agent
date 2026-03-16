@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"log/slog"
@@ -10,7 +11,9 @@ import (
 
 	"github.com/nicolas-moura-ti/castle-rock-agent/internal/config"
 	"github.com/nicolas-moura-ti/castle-rock-agent/internal/docker"
+	"github.com/nicolas-moura-ti/castle-rock-agent/internal/metrics"
 	"github.com/nicolas-moura-ti/castle-rock-agent/pkg/models"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // StartSender starts the routine that collects local Docker data
@@ -80,6 +83,10 @@ func StartSender(ctx context.Context, dockerClient *docker.Client, cfg config.Co
 }
 
 func sendPushPayload(ctx context.Context, client *http.Client, url string, secret string, authToken string, payload models.PushPayload, log *slog.Logger) {
+	// Measure the total duration of the push attempt (including retries)
+	timer := prometheus.NewTimer(metrics.ClusterPushDuration)
+	defer timer.ObserveDuration()
+
 	data, err := json.Marshal(payload)
 	if err != nil {
 		log.Error("Sender: error marshaling payload JSON", slog.String("error", err.Error()))
@@ -88,51 +95,76 @@ func sendPushPayload(ctx context.Context, client *http.Client, url string, secre
 
 	encrypted := false
 	if secret != "" {
-		// A função Encrypt deve estar definida no pacote cluster (crypto.go provavelmente)
 		data, err = Encrypt(data, secret)
 		if err != nil {
 			log.Error("Sender: error encrypting payload", slog.String("error", err.Error()))
 			return
 		}
 		encrypted = true
-	} else {
-		log.Warn("Sender: pushing metrics in cleartext (SharedSecret is not set)")
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(data))
-	if err != nil {
-		log.Error("Sender: error creating request", slog.String("error", err.Error()))
+	// Prepare the compressed body once
+	var buf bytes.Buffer
+	gw := gzip.NewWriter(&buf)
+	if _, err := gw.Write(data); err != nil {
+		log.Error("Sender: error compressing payload", slog.String("error", err.Error()))
 		return
 	}
+	gw.Close()
+	compressedData := buf.Bytes()
 
-	// Lógica de Headers Resolvida:
-	// Se estiver criptografado, enviamos como stream binário.
-	// Caso contrário, enviamos como JSON padrão.
-	if encrypted {
-		req.Header.Set("Content-Type", "application/octet-stream")
-		req.Header.Set("X-CastleRock-Encrypted", "true")
-	} else {
-		req.Header.Set("Content-Type", "application/json")
+	// ─────────────────────────────────────────────────────────────────────
+	// RETRY LOGIC (Exponential Backoff)
+	// ─────────────────────────────────────────────────────────────────────
+	maxRetries := 3
+	backoff := 1 * time.Second
+
+	for i := 0; i <= maxRetries; i++ {
+		success := func() bool {
+			req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(compressedData))
+			if err != nil {
+				return false
+			}
+
+			if encrypted {
+				req.Header.Set("Content-Type", "application/octet-stream")
+				req.Header.Set("X-CastleRock-Encrypted", "true")
+			} else {
+				req.Header.Set("Content-Type", "application/json")
+			}
+			req.Header.Set("Content-Encoding", "gzip")
+			if authToken != "" {
+				req.Header.Set("Authorization", "Bearer "+authToken)
+			}
+
+			resp, err := client.Do(req)
+			if err != nil {
+				return false
+			}
+			defer resp.Body.Close()
+
+			return resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusAccepted
+		}()
+
+		if success {
+			return
+		}
+
+		if i < maxRetries {
+			log.Warn("Sender: push failed, retrying...", 
+				slog.Int("attempt", i+1), 
+				slog.Duration("next_retry_in", backoff))
+			
+			select {
+			case <-time.After(backoff):
+				backoff *= 2 // Exponential backoff
+			case <-ctx.Done():
+				return
+			}
+		}
 	}
 
-	// 1. Correção de Vulnerabilidade: Autenticação separada de criptografia
-	if authToken != "" {
-		req.Header.Set("Authorization", "Bearer "+authToken)
-	}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		log.Warn("Sender: communication failure (Leader inactive?)",
-			slog.String("url", url),
-			slog.String("error", err.Error()),
-		)
-		return
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted {
-		log.Warn("Sender: push rejected by leader",
-			slog.Int("status_code", resp.StatusCode),
-		)
-	}
+	// If we reach here, all retries failed
+	metrics.ClusterPushFailures.Inc()
+	log.Error("Sender: push failed after all retries", slog.String("url", url))
 }

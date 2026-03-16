@@ -28,55 +28,46 @@ import (
 	"github.com/docker/docker/client"
 
 	"github.com/nicolas-moura-ti/castle-rock-agent/internal/logger"
+	"github.com/nicolas-moura-ti/castle-rock-agent/internal/metrics"
 	"github.com/nicolas-moura-ti/castle-rock-agent/pkg/models"
 )
 
+// staticContainerData holds container information that does not change
+// during the container's lifecycle, avoiding heavy Inspect calls.
+type staticContainerData struct {
+	Env           []string
+	Entrypoint    string
+	Command       string
+	Mounts        []string
+	RestartPolicy string
+	CPULimit      float64
+	MemoryLimit   int64
+}
+
 // Client wraps the official Docker client, adding high-level methods
 // specific to the Castle Rock Agent.
-//
-// Why not use client.Client directly?
-//   - client.Client has dozens of methods we don't need
-//   - Our Client exposes only the minimal required interface
-//   - Follows the Interface Segregation Principle (SOLID)
 type Client struct {
-	// cli is the real Docker SDK client.
-	// Kept as an unexported field for encapsulation.
 	cli *client.Client
-
-	// includeContainers is a list of container names/substrings to monitor.
 	includeContainers []string
+
+	metadataCache   map[string]staticContainerData
+	metadataCacheMu sync.RWMutex
 }
 
 // NewClient creates a new Client instance connected to the local Docker daemon.
-//
-// Uses client.NewClientWithOpts with the following options:
-//   - FromEnv(): reads configuration from env variables (DOCKER_HOST, etc.)
-//   - WithAPIVersionNegotiation(): automatically negotiates the API version
-//     with the daemon, avoiding version incompatibility errors.
-//
-// GO PATTERN: Constructor functions are named New<Type> by convention.
-// They return (*Type, error) — always check the error at the call site.
 func NewClient() (*Client, error) {
-	// client.NewClientWithOpts accepts a variable number of options
-	// (variadic function), allowing flexible configuration.
-	//
-	// WithAPIVersionNegotiation is ESSENTIAL in production:
-	//   - Without it, the client uses a fixed API version
-	//   - If the daemon has a different version, all calls fail
-	//   - With negotiation, the client discovers the daemon version and adapts
 	cli, err := client.NewClientWithOpts(
 		client.FromEnv,
 		client.WithAPIVersionNegotiation(),
 	)
 	if err != nil {
-		// Use fmt.Errorf with the %w verb for error wrapping.
-		// %w preserves the original error, allowing the caller to use
-		// errors.Is() and errors.As() to inspect the root cause.
-		// This is fundamental for production debugging.
 		return nil, fmt.Errorf("docker.NewClient: failed to create client: %w", err)
 	}
 
-	return &Client{cli: cli}, nil
+	return &Client{
+		cli:           cli,
+		metadataCache: make(map[string]staticContainerData),
+	}, nil
 }
 
 // SetIncludeContainers configuration on the client.
@@ -723,8 +714,11 @@ func (c *Client) ListRunningContainersDetailed(ctx context.Context, all bool) ([
 	}
 
 	if len(monitored) == 0 {
+		metrics.MonitoredContainers.Set(0)
 		return monitored, nil
 	}
+
+	metrics.MonitoredContainers.Set(float64(len(monitored)))
 
 	// Second pass: fetch details concurrently
 	var wg sync.WaitGroup
@@ -744,6 +738,28 @@ func (c *Client) ListRunningContainersDetailed(ctx context.Context, all bool) ([
 
 // enrichContainerDetails acquires metadata from ContainerInspect and fills the display struct.
 func (c *Client) enrichContainerDetails(ctx context.Context, id string, cd *logger.ContainerDisplay) {
+	c.metadataCacheMu.RLock()
+	cached, exists := c.metadataCache[id]
+	c.metadataCacheMu.RUnlock()
+
+	if exists {
+		metrics.MetadataCacheHits.Inc()
+		cd.Env = cached.Env
+		cd.Entrypoint = cached.Entrypoint
+		// Command is already partially populated from ContainerList, but we use the cached exact one
+		if cached.Command != "" {
+			cd.Command = cached.Command
+		}
+		cd.Mounts = cached.Mounts
+		cd.RestartPolicy = cached.RestartPolicy
+		cd.CPULimit = cached.CPULimit
+		cd.MemoryLimit = cached.MemoryLimit
+		// HealthStatus and RestartCount are dynamic, but avoiding the heavy inspect on every tick
+		// is worth the trade-off. Their basic states are often inferred via the Status field from ContainerList.
+		return
+	}
+
+	metrics.MetadataCacheMisses.Inc()
 	inspect, err := c.cli.ContainerInspect(ctx, id)
 	if err != nil {
 		return
@@ -753,6 +769,18 @@ func (c *Client) enrichContainerDetails(ctx context.Context, id string, cd *logg
 	c.enrichHealthDetails(&inspect, cd)
 	c.enrichHostConfigDetails(&inspect, cd)
 	c.enrichMountDetails(&inspect, cd)
+
+	c.metadataCacheMu.Lock()
+	c.metadataCache[id] = staticContainerData{
+		Env:           cd.Env,
+		Entrypoint:    cd.Entrypoint,
+		Command:       cd.Command,
+		Mounts:        cd.Mounts,
+		RestartPolicy: cd.RestartPolicy,
+		CPULimit:      cd.CPULimit,
+		MemoryLimit:   cd.MemoryLimit,
+	}
+	c.metadataCacheMu.Unlock()
 }
 
 func (c *Client) enrichConfigDetails(inspect *types.ContainerJSON, cd *logger.ContainerDisplay) {

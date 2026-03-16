@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"compress/gzip"
 	"crypto/subtle"
 	"encoding/json"
 	"io"
@@ -138,7 +139,19 @@ func (r *Receiver) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	req.Body = http.MaxBytesReader(w, req.Body, 5*1024*1024)
 	defer req.Body.Close()
 
-	body, err := io.ReadAll(req.Body)
+	var reader io.ReadCloser = req.Body
+	if req.Header.Get("Content-Encoding") == "gzip" {
+		var err error
+		reader, err = gzip.NewReader(req.Body)
+		if err != nil {
+			r.log.Warn("receiver: gzip decompress error", slog.String("error", err.Error()))
+			http.Error(w, "Bad Request", http.StatusBadRequest)
+			return
+		}
+		defer reader.Close()
+	}
+
+	body, err := io.ReadAll(reader)
 	if err != nil {
 		r.log.Warn("receiver: read failure", slog.String("error", err.Error()))
 		http.Error(w, "Bad Request", http.StatusBadRequest)
