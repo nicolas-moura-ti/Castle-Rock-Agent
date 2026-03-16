@@ -165,13 +165,11 @@ func (r *DBPortExposedRule) Evaluate(c logger.ContainerDisplay, j types.Containe
 	var alertsList []alerts.Alert
 	for port, bindings := range j.NetworkSettings.Ports {
 		portStr := string(port)
-		isDB := strings.HasPrefix(portStr, "3306/") || strings.HasPrefix(portStr, "5432/") ||
-			strings.HasPrefix(portStr, "27017/") || strings.HasPrefix(portStr, "6379/")
-		if !isDB {
+		if !isDBPort(portStr) {
 			continue
 		}
 		for _, b := range bindings {
-			if b.HostIP == "0.0.0.0" || b.HostIP == "" || b.HostIP == "::" {
+			if isGloballyExposed(b.HostIP) {
 				alertsList = append(alertsList, alerts.Alert{
 					RuleName: "Sec: DB Port Exposed globally", ContainerID: c.ID, ContainerName: c.Name,
 					Metric: "security_db_port", CurrentValue: float64(port.Int()), Severity: "critical", ActiveSince: now, FiredAt: now,
@@ -180,6 +178,17 @@ func (r *DBPortExposedRule) Evaluate(c logger.ContainerDisplay, j types.Containe
 		}
 	}
 	return alertsList
+}
+
+func isDBPort(portStr string) bool {
+	return strings.HasPrefix(portStr, "3306/") ||
+		strings.HasPrefix(portStr, "5432/") ||
+		strings.HasPrefix(portStr, "27017/") ||
+		strings.HasPrefix(portStr, "6379/")
+}
+
+func isGloballyExposed(ip string) bool {
+	return ip == "0.0.0.0" || ip == "" || ip == "::"
 }
 
 type SensitiveCapsRule struct{}
