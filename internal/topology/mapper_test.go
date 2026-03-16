@@ -7,11 +7,13 @@ import (
 	"testing"
 
 	"github.com/nicolas-moura-ti/castle-rock-agent/internal/docker"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func TestMapper_BuildMap(t *testing.T) {
-	// Setup a mock HTTP server for the Docker daemon API
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func setupMockServer(t *testing.T, listNetworksHandler http.HandlerFunc) *httptest.Server {
+	t.Helper()
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Mock Docker API negotiation and health check
 		if r.URL.Path == "/_ping" || r.URL.Path == "/v1.43/version" {
 			w.Header().Set("Api-Version", "1.43")
@@ -20,21 +22,8 @@ func TestMapper_BuildMap(t *testing.T) {
 			return
 		}
 
-		// Handle /v1.43/networks list request
 		if r.URL.Path == "/v1.43/networks" {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			// Return a list of 4 networks:
-			// 1. my_network (valid, with containers)
-			// 2. host (built-in, should be skipped)
-			// 3. none (built-in, should be skipped)
-			// 4. empty_network (no containers, should be skipped)
-			w.Write([]byte(`[
-				{"Id": "net1_id1234567890", "Name": "my_network"},
-				{"Id": "net2_id1234567890", "Name": "host"},
-				{"Id": "net3_id1234567890", "Name": "none"},
-				{"Id": "net4_id1234567890", "Name": "empty_network"}
-			]`))
+			listNetworksHandler(w, r)
 			return
 		}
 
@@ -42,7 +31,6 @@ func TestMapper_BuildMap(t *testing.T) {
 		if r.URL.Path == "/v1.43/networks/net1_id1234567890" {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			// Network with one container connected
 			w.Write([]byte(`{
 				"Id": "net1_id1234567890",
 				"Name": "my_network",
@@ -84,97 +72,61 @@ func TestMapper_BuildMap(t *testing.T) {
 		// Default fallback
 		w.WriteHeader(http.StatusNotFound)
 	}))
+}
+
+func TestMapper_BuildMap(t *testing.T) {
+	server := setupMockServer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`[
+			{"Id": "net1_id1234567890", "Name": "my_network"},
+			{"Id": "net2_id1234567890", "Name": "host"},
+			{"Id": "net3_id1234567890", "Name": "none"},
+			{"Id": "net4_id1234567890", "Name": "empty_network"}
+		]`))
+	})
 	defer server.Close()
 
-	// Redirect Docker client to the mock server
 	t.Setenv("DOCKER_HOST", server.URL)
 	t.Setenv("DOCKER_API_VERSION", "1.43")
 
-	// Create a new Docker client wrapper
 	client, err := docker.NewClient()
-	if err != nil {
-		t.Fatalf("Failed to create docker client: %v", err)
-	}
+	require.NoError(t, err)
 	defer client.Close()
 
-	// Initialize Mapper
 	mapper := NewMapper(client)
-
-	// Call BuildMap
 	edges, err := mapper.BuildMap(context.Background())
-	if err != nil {
-		t.Fatalf("BuildMap returned error: %v", err)
-	}
+	require.NoError(t, err)
 
-	// Validate the result
-	// Expected: only 1 network should be returned ("my_network")
-	// "host" and "none" skipped by explicit rules
-	// "empty_network" skipped because len(nodes) == 0
-	if len(edges) != 1 {
-		t.Fatalf("Expected 1 network edge, got %d", len(edges))
-	}
-
+	require.Len(t, edges, 1, "Expected 1 network edge")
 	edge := edges[0]
-	if edge.NetworkName != "my_network" {
-		t.Errorf("Expected NetworkName 'my_network', got '%s'", edge.NetworkName)
-	}
-	if edge.NetworkID != "net1_id12345" { // truncated to 12 chars: net1_id12345
-		t.Errorf("Expected NetworkID 'net1_id12345', got '%s'", edge.NetworkID)
-	}
-	if edge.Driver != "bridge" {
-		t.Errorf("Expected Driver 'bridge', got '%s'", edge.Driver)
-	}
+	assert.Equal(t, "my_network", edge.NetworkName)
+	assert.Equal(t, "net1_id12345", edge.NetworkID)
+	assert.Equal(t, "bridge", edge.Driver)
 
-	if len(edge.Nodes) != 1 {
-		t.Fatalf("Expected 1 node in the network, got %d", len(edge.Nodes))
-	}
-
+	require.Len(t, edge.Nodes, 1, "Expected 1 node in the network")
 	node := edge.Nodes[0]
-	if node.ContainerName != "my_container" {
-		t.Errorf("Expected ContainerName 'my_container', got '%s'", node.ContainerName)
-	}
-	if node.ContainerID != "container1_i" { // truncated to 12 chars
-		t.Errorf("Expected ContainerID 'container1_i', got '%s'", node.ContainerID)
-	}
-	if node.IPv4Address != "172.17.0.2" { // stripped of /16
-		t.Errorf("Expected IPv4Address '172.17.0.2', got '%s'", node.IPv4Address)
-	}
+	assert.Equal(t, "my_container", node.ContainerName)
+	assert.Equal(t, "container1_i", node.ContainerID)
+	assert.Equal(t, "172.17.0.2", node.IPv4Address)
 }
 
 func TestMapper_BuildMap_Error(t *testing.T) {
-	// Setup a mock HTTP server that returns an error for ListNetworks
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/_ping" || r.URL.Path == "/v1.43/version" {
-			w.Header().Set("Api-Version", "1.43")
-			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"ApiVersion":"1.43"}`))
-			return
-		}
-
-		if r.URL.Path == "/v1.43/networks" {
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(`{"message": "internal server error"}`))
-			return
-		}
-	}))
+	server := setupMockServer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(`{"message": "internal server error"}`))
+	})
 	defer server.Close()
 
 	t.Setenv("DOCKER_HOST", server.URL)
 	t.Setenv("DOCKER_API_VERSION", "1.43")
 
 	client, err := docker.NewClient()
-	if err != nil {
-		t.Fatalf("Failed to create docker client: %v", err)
-	}
+	require.NoError(t, err)
 	defer client.Close()
 
 	mapper := NewMapper(client)
-
 	edges, err := mapper.BuildMap(context.Background())
-	if err == nil {
-		t.Fatal("Expected error from BuildMap, but got nil")
-	}
-	if edges != nil {
-		t.Fatalf("Expected nil edges on error, got %v", edges)
-	}
+	assert.Error(t, err)
+	assert.Nil(t, edges)
 }

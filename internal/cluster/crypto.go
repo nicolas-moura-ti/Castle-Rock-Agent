@@ -7,20 +7,31 @@ import (
 	"crypto/sha256"
 	"errors"
 	"io"
+
+	"golang.org/x/crypto/pbkdf2"
 )
 
-// deriveKey takes a shared secret and returns a 32-byte key
-// for use with AES-256. Using SHA256 is fast and prevents DoS
-// attacks that would occur with Argon2id on every packet.
-func deriveKey(secret string) []byte {
-	hash := sha256.Sum256([]byte(secret))
-	return hash[:]
+const (
+	saltSize   = 16
+	iterations = 100000
+	keySize    = 32
+)
+
+// deriveKey takes a shared secret and a salt, returning a 32-byte key
+// for use with AES-256.
+func deriveKey(secret string, salt []byte) []byte {
+	return pbkdf2.Key([]byte(secret), salt, iterations, keySize, sha256.New)
 }
 
 // Encrypt payload using AES-GCM
-// Payload structure: [nonce (12 bytes)][ciphertext]
+// Payload structure: [salt (16 bytes)][nonce (12 bytes)][ciphertext]
 func Encrypt(payload []byte, secret string) ([]byte, error) {
-	key := deriveKey(secret)
+	salt := make([]byte, saltSize)
+	if _, err := io.ReadFull(rand.Reader, salt); err != nil {
+		return nil, err
+	}
+
+	key := deriveKey(secret, salt)
 
 	block, err := aes.NewCipher(key)
 	if err != nil {
@@ -39,13 +50,24 @@ func Encrypt(payload []byte, secret string) ([]byte, error) {
 
 	ciphertext := aesgcm.Seal(nil, nonce, payload, nil)
 
-	// Append nonce to the beginning of the ciphertext
-	return append(nonce, ciphertext...), nil
+	// Prepend salt and nonce to the ciphertext
+	result := make([]byte, 0, saltSize+len(nonce)+len(ciphertext))
+	result = append(result, salt...)
+	result = append(result, nonce...)
+	result = append(result, ciphertext...)
+
+	return result, nil
 }
 
 // Decrypt payload using AES-GCM
+// Expects payload structure: [salt (16 bytes)][nonce (12 bytes)][ciphertext]
 func Decrypt(ciphertext []byte, secret string) ([]byte, error) {
-	key := deriveKey(secret)
+	if len(ciphertext) < saltSize {
+		return nil, errors.New("ciphertext too short to contain salt")
+	}
+
+	salt, ciphertext := ciphertext[:saltSize], ciphertext[saltSize:]
+	key := deriveKey(secret, salt)
 
 	block, err := aes.NewCipher(key)
 	if err != nil {
@@ -59,7 +81,7 @@ func Decrypt(ciphertext []byte, secret string) ([]byte, error) {
 
 	nonceSize := aesgcm.NonceSize()
 	if len(ciphertext) < nonceSize {
-		return nil, errors.New("ciphertext too short")
+		return nil, errors.New("ciphertext too short to contain nonce")
 	}
 
 	nonce, ciphertext := ciphertext[:nonceSize], ciphertext[nonceSize:]
