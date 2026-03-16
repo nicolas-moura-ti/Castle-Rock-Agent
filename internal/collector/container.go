@@ -68,7 +68,6 @@ func NewContainerCollector(dockerClient *docker.Client, cfg config.Config, inter
 
 // Collect implements the Collector interface.
 //
-// TODO: Implement real metric collection via Docker Stats API.
 // The Docker Stats API provides real-time CPU, memory,
 // network I/O and disk metrics for each container.
 func (c *ContainerCollector) Collect(ctx context.Context) ([]models.ContainerMetrics, error) {
