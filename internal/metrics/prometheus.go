@@ -41,6 +41,7 @@ type MetricsProvider interface {
 // ClusterProvider defines what a cluster source must provide for Prometheus.
 type ClusterProvider interface {
 	GetAllMetrics() []models.ContainerMetrics
+	GetAllContainers() []models.ContainerInfo
 	ServeHTTP(w http.ResponseWriter, r *http.Request)
 }
 

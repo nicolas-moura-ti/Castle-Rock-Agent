@@ -90,10 +90,10 @@ func main() {
 	// ─────────────────────────────────────────────────────────────────────
 	// CLUSTER RECEIVER (LEADER MODE)
 	// ─────────────────────────────────────────────────────────────────────
-	var receiver *cluster.Receiver
+	var clusterProvider metrics.ClusterProvider
 	if cfg.Cluster.Mode == "leader" {
 		store := cluster.NewMemoryStore(log)
-		receiver = cluster.NewReceiver(log, store, cfg.Cluster.SharedSecret, cfg.Cluster.AuthToken)
+		clusterProvider = cluster.NewReceiver(log, store, cfg.Cluster.SharedSecret, cfg.Cluster.AuthToken)
 		log.Info("Starting in LEADER mode. Will receive metrics on /api/v1/push",
 			slog.Bool("auth_token_enabled", cfg.Cluster.AuthToken != ""),
 			slog.Bool("aes_encryption_enabled", cfg.Cluster.SharedSecret != ""),
@@ -104,7 +104,7 @@ func main() {
 	// PROMETHEUS EXPORTER
 	// ─────────────────────────────────────────────────────────────────────
 	if cfg.Prometheus.Enabled {
-		exporter := metrics.NewExporter(dockerClient, receiver, cfg.Cluster.HostID, cfg.Stats.Interval, cfg.Prometheus.Port, log)
+		exporter := metrics.NewExporter(dockerClient, clusterProvider, cfg.Cluster.HostID, cfg.Stats.Interval, cfg.Prometheus.Port, log)
 		exporter.Start(ctx)
 		log.Info("prometheus exporter active",
 			slog.Int("port", cfg.Prometheus.Port),
@@ -154,7 +154,7 @@ func main() {
 
 	// TUI Mode
 	log.Info("starting interactive dashboard...")
-	if err := tui.Run(dockerClient, receiver, ctx, sysInfo, Version, cfg, store); err != nil {
+	if err := tui.Run(dockerClient, clusterProvider, ctx, sysInfo, Version, cfg, store); err != nil {
 		log.Error("TUI error", slog.String("error", err.Error()))
 		return
 	}

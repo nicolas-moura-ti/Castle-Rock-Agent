@@ -49,9 +49,19 @@ O ambiente, dessa forma, pode governar inteiramente como o script subirá dispen
 | `CASTLE_ROCK_MODE` | Excluir tela e interface (Modo Fantasma/Docker) | `""` (TUI Ligado) |
 | `CASTLE_ROCK_CLUSTER_MODE` | Papel Master/Worker: `standalone`, `leader`, `worker` | `standalone` |
 | `CASTLE_ROCK_CLUSTER_HOST_ID` | Identificador a aparecer nas abas locais ou Mestra | Host OS Name |
-| `CASTLE_ROCK_CLUSTER_LEADER_URL` | Se worker, IP ou Web hook a entregar dados HTTP | `http://127.0.0.1:9110` |
+| `CASTLE_ROCK_CLUSTER_LEADER_URL` | Se worker, IP ou endpoint a entregar dados HTTP | `http://127.0.0.1:9110` |
+| `CASTLE_ROCK_CLUSTER_SHARED_SECRET` | Chave p/ Criptografia de Payload (**AES-256-GCM**) | `""` |
 | `CASTLE_ROCK_CLUSTER_AUTH_TOKEN` | Token na Autenticação tipo Bearer (API) | `""` |
-| `CASTLE_ROCK_CLUSTER_SHARED_SECRET` | Chave p/ Criptografia de Payload (AES/Argon2id) | `""` |
+
+---
+
+## ⚡ Otimização de Performance: Cache de Metadados
+
+Para minimizar o uso de CPU e a sobrecarga na API do Docker, o agente implementa um **Cache de Metadados Estáticos**.
+
+- **Como funciona:** Dados pesados e que raramente mudam, como `Entrypoint`, `Env`, `Mounts` e `Image`, são buscados apenas uma vez quando o container é detectado pela primeira vez.
+- **Benefícios:** Reduz drasticamente as operações de Unmarshal de JSON e a E/S com o daemon do Docker em ambientes com centenas de containers.
+- **Nota:** Se você alterar as variáveis de ambiente de um container manualmente via Docker, será necessário reiniciar o container para que o agente detecte os novos metadados.
 
 ---
 
