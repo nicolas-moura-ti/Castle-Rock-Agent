@@ -52,7 +52,7 @@ func StartSender(ctx context.Context, dockerClient *docker.Client, cfg config.Co
 			}
 
 			// Collect full metrics in parallel
-			metricsMap, err := dockerClient.GetAllContainerStats(ctx, true)
+			metricsMap, err := dockerClient.GetAllContainerStats(ctx, containers)
 			if err != nil {
 				log.Error("Sender: error fetching stats", slog.String("error", err.Error()))
 				continue

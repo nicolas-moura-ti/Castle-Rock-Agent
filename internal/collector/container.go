@@ -72,7 +72,12 @@ func (c *ContainerCollector) Collect(ctx context.Context) ([]models.ContainerMet
 		return nil, fmt.Errorf("collector: docker client is not initialized")
 	}
 
-	statsMap, err := c.dockerClient.GetAllContainerStats(ctx, false)
+	containers, err := c.dockerClient.ListRunningContainers(ctx, false)
+	if err != nil {
+		return nil, fmt.Errorf("collector: failed to list running containers: %w", err)
+	}
+
+	statsMap, err := c.dockerClient.GetAllContainerStats(ctx, containers)
 	if err != nil {
 		// Uso do %w para permitir o unwrap do erro original posteriormente, se necessário
 		return nil, fmt.Errorf("collector: failed to get container stats: %w", err)

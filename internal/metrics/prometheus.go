@@ -35,7 +35,8 @@ import (
 
 // MetricsProvider defines what a data source must provide for Prometheus.
 type MetricsProvider interface {
-	GetAllContainerStats(ctx context.Context, all bool) (map[string]models.ContainerMetrics, error)
+	ListRunningContainers(ctx context.Context, all bool) ([]models.ContainerInfo, error)
+	GetAllContainerStats(ctx context.Context, containers []models.ContainerInfo) (map[string]models.ContainerMetrics, error)
 }
 
 // ClusterProvider defines what a cluster source must provide for Prometheus.
@@ -268,7 +269,15 @@ func (e *Exporter) Start(ctx context.Context) {
 
 // collect executes a metrics collection and updates Prometheus gauges.
 func (e *Exporter) collect(ctx context.Context) {
-	stats, err := e.dockerClient.GetAllContainerStats(ctx, true)
+	containers, err := e.dockerClient.ListRunningContainers(ctx, true)
+	if err != nil {
+		e.log.Debug("failed to list containers for prometheus",
+			slog.String("error", err.Error()),
+		)
+		return
+	}
+
+	stats, err := e.dockerClient.GetAllContainerStats(ctx, containers)
 	if err != nil {
 		e.log.Debug("failed to collect stats for prometheus",
 			slog.String("error", err.Error()),
