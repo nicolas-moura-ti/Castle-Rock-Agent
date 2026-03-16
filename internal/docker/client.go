@@ -463,35 +463,23 @@ func (c *Client) WatchEvents(ctx context.Context) (<-chan DockerEvent, <-chan er
 //	We collect stats from all containers in parallel using goroutines
 //	+ sync.WaitGroup. This reduces total latency from N*RTT to ~1*RTT
 //	(where RTT is the round-trip time of one API call).
-func (c *Client) GetAllContainerStats(ctx context.Context, all bool) (map[string]models.ContainerMetrics, error) {
-	// First, list running containers
-	containerList, err := c.cli.ContainerList(ctx, container.ListOptions{All: all})
-	if err != nil {
-		return nil, fmt.Errorf("docker.GetAllContainerStats: failed to list: %w", err)
-	}
-
+func (c *Client) GetAllContainerStats(ctx context.Context, containers []models.ContainerInfo) (map[string]models.ContainerMetrics, error) {
 	// Thread-safe map for results
 	results := make(map[string]models.ContainerMetrics)
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 
-	for _, cont := range containerList {
-		// Container name (without "/" prefix)
-		name := ""
-		if len(cont.Names) > 0 {
-			name = strings.TrimPrefix(cont.Names[0], "/")
-		}
-
-		if !c.isMonitored(name) {
+	for _, cont := range containers {
+		if !c.isMonitored(cont.Name) {
 			continue
 		}
 
 		wg.Add(1)
 
 		// Launch a goroutine for each container.
-		// We capture 'cont' and 'name' as parameters to avoid race condition
+		// We capture 'cont' as parameter to avoid race condition
 		// (shared loop variable).
-		go func(ctr types.Container, cName string) {
+		go func(ctr models.ContainerInfo) {
 			defer wg.Done()
 
 			stats, err := c.getContainerStats(ctx, ctr.ID)
@@ -499,14 +487,17 @@ func (c *Client) GetAllContainerStats(ctx context.Context, all bool) (map[string
 				return // Ignore containers that failed (may have stopped)
 			}
 
-			stats.ContainerID = ctr.ID[:12]
-			stats.ContainerName = cName
+			stats.ContainerID = ctr.ID
+			if len(stats.ContainerID) > 12 {
+				stats.ContainerID = stats.ContainerID[:12]
+			}
+			stats.ContainerName = ctr.Name
 			stats.Image = ctr.Image
 
 			mu.Lock()
-			results[ctr.ID[:12]] = stats
+			results[stats.ContainerID] = stats
 			mu.Unlock()
-		}(cont, name)
+		}(cont)
 	}
 
 	wg.Wait()

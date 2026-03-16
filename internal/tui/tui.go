@@ -1444,7 +1444,12 @@ func (m Model) fetchContainers() tea.Cmd {
 
 func (m Model) fetchStats() tea.Cmd {
 	return func() tea.Msg {
-		stats, err := m.dockerClient.GetAllContainerStats(m.ctx, m.showAll)
+		containers, err := m.dockerClient.ListRunningContainers(m.ctx, m.showAll)
+		if err != nil {
+			return dockerErrorMsg{err: err}
+		}
+
+		stats, err := m.dockerClient.GetAllContainerStats(m.ctx, containers)
 		if err != nil {
 			return dockerErrorMsg{err: err}
 		}

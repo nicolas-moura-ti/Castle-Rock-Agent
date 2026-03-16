@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/nicolas-moura-ti/castle-rock-agent/internal/docker"
+	"github.com/nicolas-moura-ti/castle-rock-agent/pkg/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -109,7 +110,7 @@ func TestGetAllContainerStats(t *testing.T) {
 	defer cli.Close()
 
 	// Run GetAllContainerStats
-	stats, err := cli.GetAllContainerStats(context.Background(), false)
+	stats, err := cli.GetAllContainerStats(context.Background(), []models.ContainerInfo{{ID: "test-container-id", Name: "test-container", Image: "test-image"}})
 	require.NoError(t, err)
 	require.NotNil(t, stats)
 
@@ -160,8 +161,7 @@ func TestGetAllContainerStats_Error(t *testing.T) {
 	defer cli.Close()
 
 	// Run GetAllContainerStats, expect an error
-	stats, err := cli.GetAllContainerStats(context.Background(), false)
-	require.Error(t, err)
-	assert.Nil(t, stats)
-	assert.Contains(t, err.Error(), "docker.GetAllContainerStats: failed to list:")
+	stats, err := cli.GetAllContainerStats(context.Background(), []models.ContainerInfo{{ID: "test-container-id"}})
+	require.NoError(t, err) // stats are ignored inside goroutines if they error out, so no error is returned
+	assert.Empty(t, stats)
 }
