@@ -92,6 +92,7 @@ func main() {
 	// ─────────────────────────────────────────────────────────────────────
 	var receiver *cluster.Receiver
 	if cfg.Cluster.Mode == "leader" {
+		// Resolvido: Utilizando SharedSecret da branch de fix para suportar criptografia
 		receiver = cluster.NewReceiver(log, cfg.Cluster.SharedSecret)
 		log.Info("cluster receiver active", slog.String("host_id", cfg.Cluster.HostID))
 	}
@@ -111,23 +112,14 @@ func main() {
 	// ─────────────────────────────────────────────────────────────────────
 	// EXECUTION MODE
 	// ─────────────────────────────────────────────────────────────────────
-	//
-	// CASTLE_ROCK_MODE=headless:
-	//   Runs without TUI, ideal for Docker Compose / Kubernetes.
-	//   The agent stays active only as a Prometheus metrics server.
-	//
-	// Default mode:
-	//   Interactive TUI with full dashboard.
 	mode := os.Getenv("CASTLE_ROCK_MODE")
 
-	// Override by new cluster config if enabled
 	if cfg.Cluster.Mode == "worker" {
 		log.Info("starting in worker mode",
 			slog.String("leader_url", cfg.Cluster.LeaderURL),
 		)
 		go cluster.StartSender(ctx, dockerClient, cfg, log)
 
-		// Block until shutdown signal
 		<-ctx.Done()
 		log.Info("Castle Rock Agent stopped (worker)")
 		return
@@ -137,7 +129,6 @@ func main() {
 		log.Info("headless/leader mode — waiting for connections and scraping",
 			slog.Int("port", cfg.Prometheus.Port),
 		)
-		// Block until shutdown signal
 		<-ctx.Done()
 		log.Info("Castle Rock Agent stopped (headless/leader)")
 		return

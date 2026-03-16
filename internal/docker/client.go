@@ -180,15 +180,35 @@ func (c *Client) ListNetworks(ctx context.Context) ([]network.Inspect, error) {
 		return nil, fmt.Errorf("docker.ListNetworks: %w", err)
 	}
 
-	var results []network.Inspect
-	for _, n := range nets {
-		// Inspect each one to get dynamically connected containers
-		insp, err := c.cli.NetworkInspect(ctx, n.ID, network.InspectOptions{})
-		if err == nil {
-			results = append(results, insp)
+	results := make([]network.Inspect, len(nets))
+	var wg sync.WaitGroup
+
+	for i, n := range nets {
+		wg.Add(1)
+		// Launch a goroutine for each network inspect
+		// We capture 'n' as a parameter to avoid race condition
+		go func(i int, netID string) {
+			defer wg.Done()
+
+			// Inspect each one to get dynamically connected containers
+			insp, err := c.cli.NetworkInspect(ctx, netID, network.InspectOptions{})
+			if err == nil {
+				results[i] = insp
+			}
+		}(i, n.ID)
+	}
+
+	wg.Wait()
+
+	// Filter out failed inspections (empty structs)
+	var filteredResults []network.Inspect
+	for _, res := range results {
+		if res.ID != "" {
+			filteredResults = append(filteredResults, res)
 		}
 	}
-	return results, nil
+
+	return filteredResults, nil
 }
 
 // StreamContainerLogs returns a channel with the last lines of log
@@ -235,27 +255,32 @@ func (c *Client) StreamContainerLogs(ctx context.Context, containerID string) (<
 					return
 				}
 				if n > 0 {
-					// Remove 8-byte header from Docker multiplexed stream
-					content := string(buf[:n])
-					// Split by lines and send each one
-					lines := strings.Split(content, "\n")
-					for _, line := range lines {
-						// Clean Docker header control characters
-						cleaned := cleanLogLine(line)
-						if cleaned != "" {
-							select {
-							case logCh <- cleaned:
-							default:
-								// Buffer full, discard old line
-							}
-						}
-					}
+					processLogChunk(n, buf, logCh)
 				}
 			}
 		}
 	}()
 
 	return logCh, nil
+}
+
+// processLogChunk splits a multiplexed log chunk into lines and sends them to the channel.
+func processLogChunk(n int, buf []byte, logCh chan<- string) {
+	// Remove 8-byte header from Docker multiplexed stream
+	content := string(buf[:n])
+	// Split by lines and send each one
+	lines := strings.Split(content, "\n")
+	for _, line := range lines {
+		// Clean Docker header control characters
+		cleaned := cleanLogLine(line)
+		if cleaned != "" {
+			select {
+			case logCh <- cleaned:
+			default:
+				// Buffer full, discard old line
+			}
+		}
+	}
 }
 
 // cleanLogLine removes the 8-byte header from Docker multiplexed stream.
@@ -686,19 +711,35 @@ func (c *Client) ListRunningContainersDetailed(ctx context.Context, all bool) ([
 		return nil, fmt.Errorf("docker.ListRunningContainersDetailed: failed to list: %w", err)
 	}
 
-	result := make([]logger.ContainerDisplay, 0, len(containers))
-
+	// First pass: filter monitored containers and create base display structs
+	monitored := make([]logger.ContainerDisplay, 0, len(containers))
+	ids := make([]string, 0, len(containers))
 	for _, ct := range containers {
 		cd := toContainerDisplay(ct)
-		if !c.isMonitored(cd.Name) {
-			continue
+		if c.isMonitored(cd.Name) {
+			monitored = append(monitored, cd)
+			ids = append(ids, ct.ID)
 		}
-
-		c.enrichContainerDetails(ctx, ct.ID, &cd)
-		result = append(result, cd)
 	}
 
-	return result, nil
+	if len(monitored) == 0 {
+		return monitored, nil
+	}
+
+	// Second pass: fetch details concurrently
+	var wg sync.WaitGroup
+	wg.Add(len(monitored))
+
+	for i := range monitored {
+		go func(idx int) {
+			defer wg.Done()
+			c.enrichContainerDetails(ctx, ids[idx], &monitored[idx])
+		}(i)
+	}
+
+	wg.Wait()
+
+	return monitored, nil
 }
 
 // enrichContainerDetails acquires metadata from ContainerInspect and fills the display struct.

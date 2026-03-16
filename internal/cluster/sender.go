@@ -48,7 +48,7 @@ func StartSender(ctx context.Context, dockerClient *docker.Client, cfg config.Co
 				continue
 			}
 
-			// Collect full metrics in parallel via WaitGroup (GetAllContainerStats already does this)
+			// Collect full metrics in parallel
 			metricsMap, err := dockerClient.GetAllContainerStats(ctx, true)
 			if err != nil {
 				log.Error("Sender: error fetching stats", slog.String("error", err.Error()))
@@ -73,6 +73,7 @@ func StartSender(ctx context.Context, dockerClient *docker.Client, cfg config.Co
 				Metrics:    metricsList,
 			}
 
+			// Resolvido: Chamada utilizando SharedSecret para suporte a criptografia
 			sendPushPayload(ctx, httpClient, cfg.Cluster.LeaderURL, cfg.Cluster.SharedSecret, payload, log)
 		}
 	}
@@ -87,6 +88,7 @@ func sendPushPayload(ctx context.Context, client *http.Client, url string, secre
 
 	encrypted := false
 	if secret != "" {
+		// A função Encrypt deve estar definida no pacote cluster (crypto.go provavelmente)
 		data, err = Encrypt(data, secret)
 		if err != nil {
 			log.Error("Sender: error encrypting payload", slog.String("error", err.Error()))
@@ -103,6 +105,9 @@ func sendPushPayload(ctx context.Context, client *http.Client, url string, secre
 		return
 	}
 
+	// Lógica de Headers Resolvida:
+	// Se estiver criptografado, enviamos como stream binário.
+	// Caso contrário, enviamos como JSON padrão.
 	if encrypted {
 		req.Header.Set("Content-Type", "application/octet-stream")
 		req.Header.Set("X-CastleRock-Encrypted", "true")
