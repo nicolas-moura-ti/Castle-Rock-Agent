@@ -42,7 +42,7 @@ type Collector interface {
 	Name() string
 }
 
-// ContainerCollector is a scaffold for the main container collector.
+// ContainerCollector is the main container collector.
 type ContainerCollector struct {
 	dockerClient docker.ContainerEngine
 	cfg          config.Config

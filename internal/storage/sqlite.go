@@ -55,24 +55,35 @@ func NewSQLiteStore(dbPath string) (*SQLiteStore, error) {
 	return &SQLiteStore{db: db}, nil
 }
 
-// SaveEvent persists a Docker event in the local history.
-// Should be called asynchronously to avoid blocking the UI.
+// save persiste um evento ou alerta no banco de dados de forma assíncrona.
+// Utilizamos context.WithoutCancel para garantir que o registro seja salvo mesmo que 
+// o contexto de quem chamou (ex: uma request HTTP ou ação da TUI) seja cancelado.
+func (s *SQLiteStore) save(ctx context.Context, recordType, actionOrSeverity, container, message string) {
+	go func() {
+		query := `INSERT INTO events (timestamp, type, action, container, message) VALUES (?, ?, ?, ?, ?)`
+		s.db.ExecContext(
+			context.WithoutCancel(ctx),
+			query,
+			time.Now().UTC(),
+			recordType,
+			actionOrSeverity,
+			container,
+			message,
+		)
+	}()
+}
+
+// SaveEvent persiste um evento do Docker (start, stop, etc) no histórico local.
 func (s *SQLiteStore) SaveEvent(ctx context.Context, action, container, message string) {
-	go func() {
-		query := `INSERT INTO events (timestamp, type, action, container, message) VALUES (?, ?, ?, ?, ?)`
-		s.db.ExecContext(context.WithoutCancel(ctx), query, time.Now().UTC(), "event", action, container, message)
-	}()
+	s.save(ctx, "event", action, container, message)
 }
 
-// SaveAlert persists the firing of a monitoring or security alert.
+// SaveAlert persiste o disparo de um alerta de monitoramento ou segurança.
 func (s *SQLiteStore) SaveAlert(ctx context.Context, severity, container, message string) {
-	go func() {
-		query := `INSERT INTO events (timestamp, type, action, container, message) VALUES (?, ?, ?, ?, ?)`
-		s.db.ExecContext(context.WithoutCancel(ctx), query, time.Now().UTC(), "alert", severity, container, message)
-	}()
+	s.save(ctx, "alert", severity, container, message)
 }
 
-// GetRecent retrieves the last N events for history or UI restoration.
+// GetRecent recupera os últimos N eventos para o histórico da TUI.
 func (s *SQLiteStore) GetRecent(limit int) ([]EventRecord, error) {
 	query := `SELECT id, timestamp, type, action, container, message FROM events ORDER BY timestamp DESC LIMIT ?`
 	rows, err := s.db.Query(query, limit)
@@ -100,7 +111,7 @@ func (s *SQLiteStore) GetRecent(limit int) ([]EventRecord, error) {
 	return results, nil
 }
 
-// Close ensures proper shutdown of the database and WAL file.
+// Close garante o fechamento correto do banco e do arquivo WAL.
 func (s *SQLiteStore) Close() error {
 	return s.db.Close()
 }

@@ -30,21 +30,10 @@ import (
 const Version = "0.3.0"
 
 func main() {
-	cfg, err := config.Load("configs/config.yaml")
-	if err != nil {
-		slog.Warn("failed to load config, using defaults",
-			slog.String("error", err.Error()),
-		)
-		cfg = config.DefaultConfig()
-	}
-
+	cfg := loadConfig()
 	log := logger.Setup(cfg.LogLevel)
 
-	ctx, stop := signal.NotifyContext(
-		context.Background(),
-		syscall.SIGINT,
-		syscall.SIGTERM,
-	)
+	ctx, stop := setupContext()
 	defer stop()
 
 	log.Info("Castle Rock Agent starting",
@@ -57,58 +46,97 @@ func main() {
 	if err != nil {
 		return
 	}
-	defer func() {
-		if err := dockerClient.Close(); err != nil {
-			log.Warn("error closing docker client",
-				slog.String("error", err.Error()),
-			)
-		}
-	}()
+	defer closeDockerClient(dockerClient, log)
 
 	clusterProvider := setupClusterReceiver(&cfg, log)
-	
-	// Start mDNS Service Discovery Advertising (if in leader mode)
-	if cfg.Cluster.Mode == "leader" {
-		if advertiser, err := cluster.NewAdvertiser(cfg.Prometheus.Port, log); err == nil {
-			defer advertiser.Close()
-		} else {
-			log.Warn("mDNS: failed to start advertiser", slog.String("error", err.Error()))
-		}
-	}
+
+	defer startMDNSAdvertiser(&cfg, log)()
 
 	startPrometheusExporter(ctx, &cfg, log, dockerClient, clusterProvider)
 
-	// ─────────────────────────────────────────────────────────────────────
-	// EXECUTION MODE
-	// ─────────────────────────────────────────────────────────────────────
+	runExecutionMode(ctx, cfg, log, dockerClient, clusterProvider, sysInfo)
+}
+
+func loadConfig() config.Config {
+	cfg, err := config.Load("configs/config.yaml")
+	if err != nil {
+		slog.Warn("failed to load config, using defaults",
+			slog.String("error", err.Error()),
+		)
+		cfg = config.DefaultConfig()
+	}
+	return cfg
+}
+
+func setupContext() (context.Context, context.CancelFunc) {
+	return signal.NotifyContext(
+		context.Background(),
+		syscall.SIGINT,
+		syscall.SIGTERM,
+	)
+}
+
+func closeDockerClient(dockerClient *docker.Client, log *slog.Logger) {
+	if err := dockerClient.Close(); err != nil {
+		log.Warn("error closing docker client",
+			slog.String("error", err.Error()),
+		)
+	}
+}
+
+func startMDNSAdvertiser(cfg *config.Config, log *slog.Logger) func() {
+	if cfg.Cluster.Mode == "leader" {
+		advertiser, err := cluster.NewAdvertiser(cfg.Prometheus.Port, log)
+		if err == nil {
+			return func() {
+				_ = advertiser.Close()
+			}
+		}
+		log.Warn("mDNS: failed to start advertiser", slog.String("error", err.Error()))
+	}
+	return func() {}
+}
+
+func runExecutionMode(ctx context.Context, cfg config.Config, log *slog.Logger, dockerClient *docker.Client, clusterProvider metrics.ClusterProvider, sysInfo map[string]string) {
 	mode := os.Getenv("CASTLE_ROCK_MODE")
 
 	if cfg.Cluster.Mode == "worker" {
-		log.Info("starting in worker mode",
-			slog.String("leader_url", cfg.Cluster.LeaderURL),
-		)
-		go cluster.StartSender(ctx, dockerClient, cfg, log)
-
-		<-ctx.Done()
-		log.Info("Castle Rock Agent stopped (worker)")
+		runWorkerMode(ctx, cfg, log, dockerClient)
 		return
 	}
 
 	if mode == "headless" || cfg.Cluster.Mode == "leader" {
-		log.Info("headless/leader mode — waiting for connections and scraping",
-			slog.Int("port", cfg.Prometheus.Port),
-		)
-		<-ctx.Done()
-		log.Info("Castle Rock Agent stopped (headless/leader)")
+		runHeadlessMode(ctx, cfg, log)
 		return
 	}
 
+	runTUIMode(ctx, cfg, log, dockerClient, clusterProvider, sysInfo)
+}
+
+func runWorkerMode(ctx context.Context, cfg config.Config, log *slog.Logger, dockerClient *docker.Client) {
+	log.Info("starting in worker mode",
+		slog.String("leader_url", cfg.Cluster.LeaderURL),
+	)
+	go cluster.StartSender(ctx, dockerClient, cfg, log)
+
+	<-ctx.Done()
+	log.Info("Castle Rock Agent stopped (worker)")
+}
+
+func runHeadlessMode(ctx context.Context, cfg config.Config, log *slog.Logger) {
+	log.Info("headless/leader mode — waiting for connections and scraping",
+		slog.Int("port", cfg.Prometheus.Port),
+	)
+	<-ctx.Done()
+	log.Info("Castle Rock Agent stopped (headless/leader)")
+}
+
+func runTUIMode(ctx context.Context, cfg config.Config, log *slog.Logger, dockerClient *docker.Client, clusterProvider metrics.ClusterProvider, sysInfo map[string]string) {
 	store, err := setupStorageAndPruner(ctx, &cfg, log, dockerClient)
 	if err == nil && store != nil {
 		defer store.Close()
 	}
 
-	// TUI Mode
 	log.Info("starting interactive dashboard...")
 	if err := tui.Run(dockerClient, clusterProvider, ctx, sysInfo, Version, cfg, store); err != nil {
 		log.Error("TUI error", slog.String("error", err.Error()))
