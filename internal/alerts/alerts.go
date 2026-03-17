@@ -105,15 +105,13 @@ func (e *Engine) Evaluate(stats map[string]models.ContainerMetrics) []Alert {
 
 // clearInactiveAlerts removes alerts for containers that no longer exist.
 func (e *Engine) clearInactiveAlerts(stats map[string]models.ContainerMetrics) {
-	for key := range e.activeAlerts {
-		found := false
-		for _, s := range stats {
-			if key == e.alertKey(s.ContainerID, e.activeAlerts[key].RuleName) {
-				found = true
-				break
-			}
-		}
-		if !found {
+	validContainers := make(map[string]struct{}, len(stats))
+	for _, s := range stats {
+		validContainers[s.ContainerID] = struct{}{}
+	}
+
+	for key, alert := range e.activeAlerts {
+		if _, found := validContainers[alert.ContainerID]; !found {
 			delete(e.activeAlerts, key)
 			delete(e.conditionStart, key)
 		}
