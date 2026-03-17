@@ -1,19 +1,25 @@
 # Binários compilados
 /bin/
+/agent
+castle-rock-agent
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
-castle-rock-agent
 
-# Arquivos de teste
+# Arquivos de teste e cobertura
 *.test
 *.out
+*.prof
 coverage.html
 
 # Diretórios de dependência
 /vendor/
+
+# Go Workspace
+go.work
+go.work.sum
 
 # IDE / Editor
 .idea/
@@ -27,5 +33,14 @@ coverage.html
 .env
 .env.local
 
-# Arquivos temporários
+# Banco de Dados (SQLite)
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+
+# Arquivos temporários e patches
 /tmp/
+*.diff
+*.patch
+*.orig
