@@ -26,7 +26,17 @@ type SQLiteStore struct {
 
 // NewSQLiteStore initializes or creates the database at the specified file path.
 func NewSQLiteStore(dbPath string) (*SQLiteStore, error) {
-	dsn := fmt.Sprintf("%s?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)", dbPath)
+	dsn := dbPath
+	if dbPath != ":memory:" {
+		dsn = fmt.Sprintf("%s?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)", dbPath)
+	} else {
+		// modernc.org/sqlite requires a unique memory URI or a shared connection
+		// When we use :memory: each new connection gets its own private database,
+		// so GetRecent() doesn't see what save() wrote in another goroutine.
+		// A common way to share the memory db across multiple connections is:
+		dsn = fmt.Sprintf("file:memdb_%d?mode=memory&cache=shared", time.Now().UnixNano())
+	}
+
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("storage: failed to open sqlite: %w", err)
