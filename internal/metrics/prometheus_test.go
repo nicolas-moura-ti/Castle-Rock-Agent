@@ -76,7 +76,7 @@ func setupMockDockerServer(t *testing.T) *httptest.Server {
 	return httptest.NewServer(handler)
 }
 
-func getMockDockerClient(t *testing.T, ts *httptest.Server) *docker.Client {
+func getMockClient(t *testing.T, ts *httptest.Server) *docker.Client {
 	t.Helper()
 	// Set DOCKER_HOST to point to our mock server
 	origDockerHost := os.Getenv("DOCKER_HOST")
@@ -99,7 +99,7 @@ func TestNewExporter(t *testing.T) {
 	ts := setupMockDockerServer(t)
 	defer ts.Close()
 
-	client := getMockDockerClient(t, ts)
+	client := getMockClient(t, ts)
 	defer client.Close()
 
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
@@ -118,7 +118,7 @@ func TestExporter_Start(t *testing.T) {
 	ts := setupMockDockerServer(t)
 	defer ts.Close()
 
-	client := getMockDockerClient(t, ts)
+	client := getMockClient(t, ts)
 	defer client.Close()
 
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
@@ -176,7 +176,7 @@ func TestExporter_Collect(t *testing.T) {
 	ts := setupMockDockerServer(t)
 	defer ts.Close()
 
-	client := getMockDockerClient(t, ts)
+	client := getMockClient(t, ts)
 	defer client.Close()
 
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))

@@ -82,7 +82,7 @@ var (
 // ─── Mensagens ───────────────────────────────────────────────────────────────
 
 type containerListMsg struct{ containers []logger.ContainerDisplay }
-type dockerEventMsg struct{ event docker.DockerEvent }
+type dockerEventMsg struct{ event docker.ContainerEvent }
 type dockerErrorMsg struct{ err error }
 type statsMsg struct {
 	stats map[string]models.ContainerMetrics
@@ -168,7 +168,7 @@ type Model struct {
 	// Meta
 	startTime    time.Time
 	version      string
-	dockerClient *docker.Client
+	dockerClient docker.ContainerEngine
 	receiver     metrics.ClusterProvider
 	store        *storage.SQLiteStore
 	ctx          context.Context
@@ -181,7 +181,7 @@ type Model struct {
 	hostMem      float64
 }
 
-func NewModel(dockerClient *docker.Client, receiver metrics.ClusterProvider, ctx context.Context, sysInfo map[string]string, version string, cfg config.Config, store *storage.SQLiteStore) Model {
+func NewModel(dockerClient docker.ContainerEngine, receiver metrics.ClusterProvider, ctx context.Context, sysInfo map[string]string, version string, cfg config.Config, store *storage.SQLiteStore) Model {
 	var engine *alerts.Engine
 	if cfg.Alerts.Enabled {
 		engine = alerts.NewEngine(cfg.Alerts.Rules)
@@ -1686,7 +1686,7 @@ func min(a, b int) int {
 
 // ─── Run ─────────────────────────────────────────────────────────────────────
 
-func Run(dockerClient *docker.Client, receiver metrics.ClusterProvider, ctx context.Context, sysInfo map[string]string, version string, cfg config.Config, store *storage.SQLiteStore) error {
+func Run(dockerClient docker.ContainerEngine, receiver metrics.ClusterProvider, ctx context.Context, sysInfo map[string]string, version string, cfg config.Config, store *storage.SQLiteStore) error {
 	model := NewModel(dockerClient, receiver, ctx, sysInfo, version, cfg, store)
 	p := tea.NewProgram(model, tea.WithAltScreen(), tea.WithMouseCellMotion())
 

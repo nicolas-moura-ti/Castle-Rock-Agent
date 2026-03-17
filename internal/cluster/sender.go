@@ -18,14 +18,22 @@ import (
 
 // StartSender starts the routine that collects local Docker data
 // and sends it (HTTP POST) to the Leader at defined intervals.
-func StartSender(ctx context.Context, dockerClient *docker.Client, cfg config.Config, log *slog.Logger) {
+func StartSender(ctx context.Context, dockerClient docker.ContainerEngine, cfg config.Config, log *slog.Logger) {
 	// Only runs in worker mode
 	if cfg.Cluster.Mode != "worker" {
 		return
 	}
 
+	leaderURL := cfg.Cluster.LeaderURL
+	if leaderURL == "" {
+		log.Info("Sender: LeaderURL not set, attempting mDNS discovery...")
+		if url, err := DiscoverLeader(ctx, log); err == nil {
+			leaderURL = url
+		}
+	}
+
 	log.Info("Starting Worker Sender",
-		slog.String("leader_url", cfg.Cluster.LeaderURL),
+		slog.String("leader_url", leaderURL),
 		slog.String("host_id", cfg.Cluster.HostID),
 		slog.Duration("interval", cfg.Stats.Interval),
 	)
@@ -77,7 +85,14 @@ func StartSender(ctx context.Context, dockerClient *docker.Client, cfg config.Co
 			}
 
 			// Resolvido: Passando Token e Segredo independentes
-			sendPushPayload(ctx, httpClient, cfg.Cluster.LeaderURL, cfg.Cluster.SharedSecret, cfg.Cluster.AuthToken, payload, log)
+			if leaderURL != "" {
+				sendPushPayload(ctx, httpClient, leaderURL, cfg.Cluster.SharedSecret, cfg.Cluster.AuthToken, payload, log)
+			} else {
+				// Retry discovery
+				if url, err := DiscoverLeader(ctx, log); err == nil {
+					leaderURL = url
+				}
+			}
 		}
 	}
 }

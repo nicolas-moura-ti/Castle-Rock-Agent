@@ -44,8 +44,40 @@ type staticContainerData struct {
 	MemoryLimit   int64
 }
 
-// Client wraps the official Docker client, adding high-level methods
-// specific to the Castle Rock Agent.
+// ContainerEvent represents a container lifecycle event.
+type ContainerEvent struct {
+	Action        string    `json:"action"`
+	ContainerID   string    `json:"container_id"`
+	ContainerName string    `json:"container_name"`
+	Image         string    `json:"image"`
+	Status        string    `json:"status"`
+	Time          time.Time `json:"time"`
+}
+
+// ContainerEngine defines the high-level interface for container management.
+// This abstraction follows the Dependency Inversion Principle (DIP),
+// allowing the agent to support multiple backends like Docker, Podman, or CRI-O.
+type ContainerEngine interface {
+	Close() error
+	ListRunningContainers(ctx context.Context, all bool) ([]models.ContainerInfo, error)
+	ListRunningContainersDetailed(ctx context.Context, all bool) ([]logger.ContainerDisplay, error)
+	GetAllContainerStats(ctx context.Context, containers []models.ContainerInfo) (map[string]models.ContainerMetrics, error)
+	StreamContainerLogs(ctx context.Context, containerID string) (<-chan string, error)
+	StopContainer(ctx context.Context, id string) error
+	RestartContainer(ctx context.Context, id string) error
+	InspectContainer(ctx context.Context, id string) (types.ContainerJSON, error)
+	WatchEvents(ctx context.Context) (<-chan ContainerEvent, <-chan error)
+	SetIncludeContainers(includes []string)
+	RunStressTest(ctx context.Context, mode string, duration int) error
+	PruneUnused(ctx context.Context) (uint64, error)
+	PruneImages(ctx context.Context) (uint64, error)
+	PruneVolumes(ctx context.Context) (uint64, error)
+	GetDiskUsage(ctx context.Context) (SystemDiskUsage, error)
+	ListNetworks(ctx context.Context) ([]network.Inspect, error)
+	GetSystemInfo(ctx context.Context) (map[string]string, error)
+}
+
+// Client wraps the official Docker client, implementing the ContainerEngine interface.
 type Client struct {
 	cli *client.Client
 	includeContainers []string
@@ -89,13 +121,6 @@ func (c *Client) isMonitored(name string) bool {
 }
 
 // Close closes the connection to the Docker daemon.
-//
-// ALWAYS call Close() when done using the client.
-// The idiomatic Go pattern is to use defer right after creation:
-//
-//	client, err := docker.NewClient()
-//	if err != nil { ... }
-//	defer client.Close()
 func (c *Client) Close() error {
 	return c.cli.Close()
 }
@@ -141,9 +166,9 @@ func (c *Client) InspectContainer(ctx context.Context, containerID string) (type
 	return inspectJSON, nil
 }
 
-// PruneSystem performs a safe cleanup (Garbage Collection):
+// PruneUnused performs a safe cleanup (Garbage Collection):
 // Removes stopped containers, empty networks, and dangling images.
-func (c *Client) PruneSystem(ctx context.Context) (uint64, error) {
+func (c *Client) PruneUnused(ctx context.Context) (uint64, error) {
 	var totalReclaimed uint64
 
 	// Prune Containers (exited)
@@ -335,7 +360,7 @@ func (c *Client) PruneVolumes(ctx context.Context) (uint64, error) {
 	return report.SpaceReclaimed, nil
 }
 
-// DockerEvent represents a container lifecycle event.
+// ContainerEvent represents a container lifecycle event.
 //
 // Docker events are the native mechanism for real-time monitoring.
 // Instead of periodic polling (slow and inefficient), the Docker daemon
@@ -349,19 +374,6 @@ func (c *Client) PruneVolumes(ctx context.Context) (uint64, error) {
 //   - "destroy" → container was removed
 //   - "pause"   → container was paused
 //   - "unpause" → container was resumed
-type DockerEvent struct {
-	// Action is the event type (start, stop, die, create, destroy, etc.)
-	Action string
-
-	// ContainerID is the full ID of the affected container.
-	ContainerID string
-
-	// ContainerName is the container name (without "/" prefix).
-	ContainerName string
-
-	// Image is the container's Docker image.
-	Image string
-}
 
 // WatchEvents listens for container events from the Docker daemon in real-time.
 //
@@ -376,7 +388,7 @@ type DockerEvent struct {
 //
 // CHANNELS IN GO:
 //
-//	The function returns a channel (<-chan DockerEvent) which is Go's
+//	The function returns a channel (<-chan ContainerEvent) which is Go's
 //	native mechanism for communication between goroutines. The caller
 //	reads events from this channel using range or select.
 //
@@ -385,8 +397,8 @@ type DockerEvent struct {
 //	The channel is automatically closed when the context is cancelled
 //	(Ctrl+C or SIGTERM). This guarantees the internal goroutine does
 //	not leak, even in error scenarios.
-func (c *Client) WatchEvents(ctx context.Context) (<-chan DockerEvent, <-chan error) {
-	eventCh := make(chan DockerEvent)
+func (c *Client) WatchEvents(ctx context.Context) (<-chan ContainerEvent, <-chan error) {
+	eventCh := make(chan ContainerEvent)
 	errCh := make(chan error, 1) // buffer 1 to avoid blocking the goroutine
 
 	// Filter only container events (ignore images, volumes, networks).
@@ -436,7 +448,7 @@ func (c *Client) WatchEvents(ctx context.Context) (<-chan DockerEvent, <-chan er
 					continue
 				}
 
-				eventCh <- DockerEvent{
+				eventCh <- ContainerEvent{
 					Action:        string(msg.Action),
 					ContainerID:   msg.Actor.ID[:12],
 					ContainerName: name,

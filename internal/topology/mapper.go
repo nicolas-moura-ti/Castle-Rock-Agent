@@ -24,11 +24,11 @@ type NetworkEdge struct {
 
 // Mapper is the visual container topology extractor.
 type Mapper struct {
-	dockerClient *docker.Client
+	dockerClient docker.ContainerEngine
 }
 
 // NewMapper initializes the topology service.
-func NewMapper(client *docker.Client) *Mapper {
+func NewMapper(client docker.ContainerEngine) *Mapper {
 	return &Mapper{dockerClient: client}
 }
 

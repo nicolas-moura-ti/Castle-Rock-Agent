@@ -13,7 +13,7 @@ import (
 
 // AutoPruner manages the disk check and cleanup cycle.
 type AutoPruner struct {
-	dockerClient *docker.Client
+	dockerClient docker.ContainerEngine
 	store        *storage.SQLiteStore
 	log          *slog.Logger
 
@@ -29,7 +29,7 @@ type AutoPruner struct {
 }
 
 // NewAutoPruner creates a configured pruner instance to watch a path and threshold.
-func NewAutoPruner(client *docker.Client, store *storage.SQLiteStore, triggerPct float64) *AutoPruner {
+func NewAutoPruner(client docker.ContainerEngine, store *storage.SQLiteStore, triggerPct float64) *AutoPruner {
 	// In most systems (even containerized via docker-socket),
 	// checking the root FS ("/") is sufficient, or the host-mapped volume.
 	return &AutoPruner{
@@ -72,7 +72,7 @@ func (p *AutoPruner) checkAndPrune(ctx context.Context) {
 	}
 
 	if usage.UsedPercent >= p.thresholdPct {
-		reclaimed, err := p.dockerClient.PruneSystem(ctx)
+		reclaimed, err := p.dockerClient.PruneUnused(ctx)
 		p.lastPrune = time.Now()
 
 		if p.store != nil {

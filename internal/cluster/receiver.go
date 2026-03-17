@@ -33,58 +33,83 @@ type ClusterStore interface {
 	GetAllContainers() []models.ContainerInfo
 }
 
-// MemoryStore is an in-memory implementation of ClusterStore.
+// MemoryStore is a sharded in-memory implementation of ClusterStore.
+// Sharding reduces lock contention by splitting the map into multiple buckets,
+// each with its own Mutex. This allows concurrent updates to different shards.
 type MemoryStore struct {
+	shards    [16]*shard
+	shardMask uint32
+	log       *slog.Logger
+}
+
+type shard struct {
 	mu    sync.RWMutex
 	hosts map[string]HostData
-	log   *slog.Logger
 }
 
 func NewMemoryStore(log *slog.Logger) *MemoryStore {
-	return &MemoryStore{
-		hosts: make(map[string]HostData),
-		log:   log,
+	s := &MemoryStore{
+		shardMask: 15, // 16 shards - 1
+		log:       log,
 	}
+	for i := 0; i < 16; i++ {
+		s.shards[i] = &shard{
+			hosts: make(map[string]HostData),
+		}
+	}
+	return s
+}
+
+// hashHostID computes a simple hash for shard distribution.
+func (s *MemoryStore) getShard(hostID string) *shard {
+	var h uint32 = 2166136261
+	for i := 0; i < len(hostID); i++ {
+		h = (h ^ uint32(hostID[i])) * 16777619
+	}
+	return s.shards[h&s.shardMask]
 }
 
 func (s *MemoryStore) UpdateHost(payload models.PushPayload) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.hosts[payload.HostID] = HostData{
+	shard := s.getShard(payload.HostID)
+	shard.mu.Lock()
+	defer shard.mu.Unlock()
+	shard.hosts[payload.HostID] = HostData{
 		LastUpdate: time.Now(),
 		Payload:    payload,
 	}
 }
 
 func (s *MemoryStore) GetAllMetrics() []models.ContainerMetrics {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
 	var all []models.ContainerMetrics
 	now := time.Now()
 
-	for hostID, data := range s.hosts {
-		if now.Sub(data.LastUpdate) > 30*time.Second {
-			s.log.Debug("store: inactive host ignored", slog.String("host", hostID))
-			continue
+	for _, shard := range s.shards {
+		shard.mu.RLock()
+		for hostID, data := range shard.hosts {
+			if now.Sub(data.LastUpdate) > 30*time.Second {
+				s.log.Debug("store: inactive host ignored", slog.String("host", hostID))
+				continue
+			}
+			all = append(all, data.Payload.Metrics...)
 		}
-		all = append(all, data.Payload.Metrics...)
+		shard.mu.RUnlock()
 	}
 	return all
 }
 
 func (s *MemoryStore) GetAllContainers() []models.ContainerInfo {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
 	var all []models.ContainerInfo
 	now := time.Now()
 
-	for _, data := range s.hosts {
-		if now.Sub(data.LastUpdate) > 30*time.Second {
-			continue
+	for _, shard := range s.shards {
+		shard.mu.RLock()
+		for _, data := range shard.hosts {
+			if now.Sub(data.LastUpdate) > 30*time.Second {
+				continue
+			}
+			all = append(all, data.Payload.Containers...)
 		}
-		all = append(all, data.Payload.Containers...)
+		shard.mu.RUnlock()
 	}
 	return all
 }

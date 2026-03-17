@@ -23,7 +23,7 @@ type SecurityRule interface {
 
 // Auditor analyzes running containers looking for risky configurations.
 type Auditor struct {
-	dockerClient *docker.Client
+	dockerClient docker.ContainerEngine
 	rules        []SecurityRule
 
 	// Cache to avoid running 'docker inspect' every second.
@@ -32,7 +32,7 @@ type Auditor struct {
 }
 
 // NewAuditor creates a new auditor with a default set of security rules.
-func NewAuditor(client *docker.Client) *Auditor {
+func NewAuditor(client docker.ContainerEngine) *Auditor {
 	a := &Auditor{
 		dockerClient: client,
 		cache:        make(map[string][]alerts.Alert),

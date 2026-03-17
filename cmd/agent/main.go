@@ -66,6 +66,16 @@ func main() {
 	}()
 
 	clusterProvider := setupClusterReceiver(&cfg, log)
+	
+	// Start mDNS Service Discovery Advertising (if in leader mode)
+	if cfg.Cluster.Mode == "leader" {
+		if advertiser, err := cluster.NewAdvertiser(cfg.Prometheus.Port, log); err == nil {
+			defer advertiser.Close()
+		} else {
+			log.Warn("mDNS: failed to start advertiser", slog.String("error", err.Error()))
+		}
+	}
+
 	startPrometheusExporter(ctx, &cfg, log, dockerClient, clusterProvider)
 
 	// ─────────────────────────────────────────────────────────────────────

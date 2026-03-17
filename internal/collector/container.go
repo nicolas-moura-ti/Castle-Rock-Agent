@@ -43,18 +43,14 @@ type Collector interface {
 }
 
 // ContainerCollector is a scaffold for the main container collector.
-// In the future, this struct will be expanded with necessary dependencies
-// (Docker client, configuration, etc.).
 type ContainerCollector struct {
-	dockerClient *docker.Client
+	dockerClient docker.ContainerEngine
 	cfg          config.Config
 	interval     time.Duration
 }
 
 // NewContainerCollector creates a new ContainerCollector instance.
-//
-// Follows the Go constructor pattern New<Type>.
-func NewContainerCollector(dockerClient *docker.Client, cfg config.Config, interval time.Duration) *ContainerCollector {
+func NewContainerCollector(dockerClient docker.ContainerEngine, cfg config.Config, interval time.Duration) *ContainerCollector {
 	return &ContainerCollector{
 		dockerClient: dockerClient,
 		cfg:          cfg,
