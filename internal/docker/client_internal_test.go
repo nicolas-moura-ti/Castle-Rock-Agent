@@ -175,6 +175,11 @@ func TestCalculateCPUPercent(t *testing.T) {
 			},
 			expected: 0.0,
 		},
+		{
+			name:     "nil stats",
+			stats:    nil,
+			expected: 0.0,
+		},
 	}
 
 	for _, tt := range tests {
