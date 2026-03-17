@@ -81,11 +81,6 @@ func (s *SQLiteStore) SaveEvent(ctx context.Context, action, container, message 
 	s.save(ctx, "event", action, container, message)
 }
 
-// SaveAlert persists the firing of a monitoring or security alert.
-func (s *SQLiteStore) SaveAlert(ctx context.Context, severity, container, message string) {
-	s.save(ctx, "alert", severity, container, message)
-}
-
 // GetRecent retrieves the last N events for history or UI restoration.
 func (s *SQLiteStore) GetRecent(limit int) ([]EventRecord, error) {
 	query := `SELECT id, timestamp, type, action, container, message FROM events ORDER BY timestamp DESC LIMIT ?`
