@@ -46,3 +46,36 @@ func TestSaveEvent(t *testing.T) {
 		assert.WithinDuration(t, time.Now(), event.Timestamp, 5*time.Second)
 	}
 }
+
+func TestSaveAlert(t *testing.T) {
+	// Create a temporary file for the database
+	tmpfile, err := os.CreateTemp("", "testdb-alert-*.sqlite")
+	require.NoError(t, err)
+	defer os.Remove(tmpfile.Name())
+
+	store, err := NewSQLiteStore(tmpfile.Name())
+	require.NoError(t, err)
+	defer store.Close()
+
+	// Call SaveAlert
+	ctx := context.Background()
+	store.SaveAlert(ctx, "critical", "nginx-web", "High CPU usage")
+
+	var events []EventRecord
+	require.Eventually(t, func() bool {
+		events, err = store.GetRecent(10)
+		return err == nil && len(events) > 0
+	}, 2*time.Second, 50*time.Millisecond, "Alert should be saved asynchronously")
+
+	// Verify the alert details
+	assert.Len(t, events, 1)
+	if len(events) > 0 {
+		event := events[0]
+		assert.Equal(t, "alert", event.Type)
+		assert.Equal(t, "critical", event.Action)
+		assert.Equal(t, "nginx-web", event.Container)
+		assert.Equal(t, "High CPU usage", event.Message)
+		// Check that timestamp is recent
+		assert.WithinDuration(t, time.Now(), event.Timestamp, 5*time.Second)
+	}
+}
