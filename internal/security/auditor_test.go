@@ -16,7 +16,9 @@ func TestIsDBPort(t *testing.T) {
 		{"PostgreSQL TCP", "5432/tcp", true},
 		{"PostgreSQL UDP", "5432/udp", true},
 		{"MongoDB TCP", "27017/tcp", true},
+		{"MongoDB UDP", "27017/udp", true},
 		{"Redis TCP", "6379/tcp", true},
+		{"Redis UDP", "6379/udp", true},
 
 		// Edge cases on DB ports
 		{"MySQL without protocol", "3306", false}, // Function checks for "3306/"
