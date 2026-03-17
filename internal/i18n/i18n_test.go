@@ -1,8 +1,37 @@
 package i18n
 
 import (
+	"reflect"
 	"testing"
 )
+
+func TestMessagesPopulated(t *testing.T) {
+	langs := []struct {
+		name string
+		msg  Messages
+	}{
+		{"English", En},
+		{"Portuguese", Pt},
+	}
+
+	for _, l := range langs {
+		t.Run(l.name, func(t *testing.T) {
+			v := reflect.ValueOf(l.msg)
+			typ := v.Type()
+
+			for i := 0; i < v.NumField(); i++ {
+				field := v.Field(i)
+				fieldName := typ.Field(i).Name
+
+				if field.Kind() == reflect.String {
+					if field.String() == "" {
+						t.Errorf("Language %q: Field %q is empty", l.name, fieldName)
+					}
+				}
+			}
+		})
+	}
+}
 
 func TestGet(t *testing.T) {
 	tests := []struct {
