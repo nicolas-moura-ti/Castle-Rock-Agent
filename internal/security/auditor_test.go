@@ -2,6 +2,11 @@ package security
 
 import (
 	"testing"
+	"time"
+
+	"github.com/docker/docker/api/types"
+	"github.com/docker/go-connections/nat"
+	"github.com/nicolas-moura-ti/castle-rock-agent/internal/logger"
 )
 
 func TestIsDBPort(t *testing.T) {
@@ -19,7 +24,7 @@ func TestIsDBPort(t *testing.T) {
 		{"Redis TCP", "6379/tcp", true},
 
 		// Edge cases on DB ports
-		{"MySQL without protocol", "3306", false}, // Function checks for "3306/"
+		{"MySQL without protocol", "3306", false},   // Function checks for "3306/"
 		{"MySQL partial match", "33060/tcp", false}, // Function checks for "3306/"
 
 		// Non-DB ports
@@ -67,6 +72,133 @@ func TestIsGloballyExposed(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := isGloballyExposed(tt.ip); got != tt.want {
 				t.Errorf("isGloballyExposed() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDBPortExposedRule_Evaluate(t *testing.T) {
+	rule := &DBPortExposedRule{}
+	now := time.Now()
+
+	container := logger.ContainerDisplay{
+		ID:   "test-id",
+		Name: "test-db",
+	}
+
+	tests := []struct {
+		name     string
+		networks *types.NetworkSettings
+		want     int // Number of expected alerts
+	}{
+		{
+			name:     "NetworkSettings is nil",
+			networks: nil,
+			want:     0,
+		},
+		{
+			name: "Valid DB port globally exposed",
+			networks: &types.NetworkSettings{
+				NetworkSettingsBase: types.NetworkSettingsBase{
+					Ports: nat.PortMap{
+						"3306/tcp": []nat.PortBinding{
+							{HostIP: "0.0.0.0", HostPort: "3306"},
+						},
+					},
+				},
+			},
+			want: 1,
+		},
+		{
+			name: "Valid DB port globally exposed (empty HostIP)",
+			networks: &types.NetworkSettings{
+				NetworkSettingsBase: types.NetworkSettingsBase{
+					Ports: nat.PortMap{
+						"5432/tcp": []nat.PortBinding{
+							{HostIP: "", HostPort: "5432"},
+						},
+					},
+				},
+			},
+			want: 1,
+		},
+		{
+			name: "Valid DB port globally exposed (IPv6)",
+			networks: &types.NetworkSettings{
+				NetworkSettingsBase: types.NetworkSettingsBase{
+					Ports: nat.PortMap{
+						"27017/tcp": []nat.PortBinding{
+							{HostIP: "::", HostPort: "27017"},
+						},
+					},
+				},
+			},
+			want: 1,
+		},
+		{
+			name: "Valid DB port not globally exposed",
+			networks: &types.NetworkSettings{
+				NetworkSettingsBase: types.NetworkSettingsBase{
+					Ports: nat.PortMap{
+						"3306/tcp": []nat.PortBinding{
+							{HostIP: "127.0.0.1", HostPort: "3306"},
+						},
+					},
+				},
+			},
+			want: 0,
+		},
+		{
+			name: "Non-DB port globally exposed",
+			networks: &types.NetworkSettings{
+				NetworkSettingsBase: types.NetworkSettingsBase{
+					Ports: nat.PortMap{
+						"80/tcp": []nat.PortBinding{
+							{HostIP: "0.0.0.0", HostPort: "80"},
+						},
+					},
+				},
+			},
+			want: 0,
+		},
+		{
+			name: "Multiple valid DB ports globally exposed",
+			networks: &types.NetworkSettings{
+				NetworkSettingsBase: types.NetworkSettingsBase{
+					Ports: nat.PortMap{
+						"3306/tcp": []nat.PortBinding{
+							{HostIP: "0.0.0.0", HostPort: "3306"},
+						},
+						"5432/tcp": []nat.PortBinding{
+							{HostIP: "0.0.0.0", HostPort: "5432"},
+						},
+					},
+				},
+			},
+			want: 2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			j := types.ContainerJSON{
+				NetworkSettings: tt.networks,
+			}
+			got := rule.Evaluate(container, j, now)
+			if len(got) != tt.want {
+				t.Errorf("DBPortExposedRule.Evaluate() returned %d alerts, want %d", len(got), tt.want)
+			}
+
+			// If we expect alerts, do some basic validation
+			if tt.want > 0 {
+				for _, alert := range got {
+					if alert.Severity != "critical" {
+						t.Errorf("Expected severity 'critical', got %s", alert.Severity)
+					}
+					if alert.ContainerID != container.ID {
+						t.Errorf("Expected ContainerID %s, got %s", container.ID, alert.ContainerID)
+					}
+				}
 			}
 		})
 	}
