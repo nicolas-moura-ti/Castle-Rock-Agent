@@ -32,7 +32,7 @@ func TestContainerCollector_Collect_Success(t *testing.T) {
 		}
 
 		// Mock container stats
-		if r.URL.Path == "/v1.43/containers/test-container-id/stats" {
+		if r.URL.Path == "/v1.43/containers/test-container-id/stats" || r.URL.Path == "/v1.43/containers/test-contain/stats" {
 			w.Header().Set("Content-Type", "application/json")
 			statsJSON := `{
 				"read":"2023-01-01T00:00:00Z",
@@ -178,7 +178,7 @@ func TestContainerCollector_Collect_Error(t *testing.T) {
 	metrics, err := c.Collect(context.Background())
 	require.Error(t, err)
 	assert.Nil(t, metrics)
-	assert.Contains(t, err.Error(), "collector: failed to get container stats:")
+	assert.Contains(t, err.Error(), "collector: failed to list running containers:")
 }
 
 func TestContainerCollector_Name(t *testing.T) {
