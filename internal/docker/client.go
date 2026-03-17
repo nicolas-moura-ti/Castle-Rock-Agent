@@ -590,6 +590,10 @@ func (c *Client) getContainerStats(ctx context.Context, containerID string) (mod
 //
 // REFERENCE: https://github.com/moby/moby/blob/master/api/types/stats.go
 func calculateCPUPercent(stats *types.StatsJSON) float64 {
+	if stats == nil {
+		return 0.0
+	}
+
 	cpuDelta := float64(stats.CPUStats.CPUUsage.TotalUsage) -
 		float64(stats.PreCPUStats.CPUUsage.TotalUsage)
 
