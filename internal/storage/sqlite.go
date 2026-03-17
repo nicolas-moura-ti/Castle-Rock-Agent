@@ -55,20 +55,32 @@ func NewSQLiteStore(dbPath string) (*SQLiteStore, error) {
 	return &SQLiteStore{db: db}, nil
 }
 
-// SaveEvent persists a Docker event in the local history.
-func (s *SQLiteStore) SaveEvent(ctx context.Context, action, container, message string) {
+// save asynchronously persists an event or alert to the database.
+// It uses context.WithoutCancel to ensure the record is saved even if the caller's
+// context is canceled prematurely.
+func (s *SQLiteStore) save(ctx context.Context, recordType, actionOrSeverity, container, message string) {
 	go func() {
 		query := `INSERT INTO events (timestamp, type, action, container, message) VALUES (?, ?, ?, ?, ?)`
-		s.db.ExecContext(context.WithoutCancel(ctx), query, time.Now().UTC(), "event", action, container, message)
+		s.db.ExecContext(
+			context.WithoutCancel(ctx),
+			query,
+			time.Now().UTC(),
+			recordType,
+			actionOrSeverity,
+			container,
+			message,
+		)
 	}()
+}
+
+// SaveEvent persists a Docker event in the local history.
+func (s *SQLiteStore) SaveEvent(ctx context.Context, action, container, message string) {
+	s.save(ctx, "event", action, container, message)
 }
 
 // SaveAlert persists the firing of a monitoring or security alert.
 func (s *SQLiteStore) SaveAlert(ctx context.Context, severity, container, message string) {
-	go func() {
-		query := `INSERT INTO events (timestamp, type, action, container, message) VALUES (?, ?, ?, ?, ?)`
-		s.db.ExecContext(context.WithoutCancel(ctx), query, time.Now().UTC(), "alert", severity, container, message)
-	}()
+	s.save(ctx, "alert", severity, container, message)
 }
 
 // GetRecent retrieves the last N events for history or UI restoration.
