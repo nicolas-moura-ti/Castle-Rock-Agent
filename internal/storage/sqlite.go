@@ -55,22 +55,19 @@ func NewSQLiteStore(dbPath string) (*SQLiteStore, error) {
 	return &SQLiteStore{db: db}, nil
 }
 
-// save persiste os dados de forma assíncrona.
+// save asynchronously persists an event or alert to the database.
+// It uses context.WithoutCancel to ensure the record is saved even if the caller's
+// context (e.g., an HTTP request) is canceled prematurely.
 func (s *SQLiteStore) save(ctx context.Context, recordType, actionOrSeverity, container, message string) {
 	go func() {
 		query := `INSERT INTO events (timestamp, type, action, container, message) VALUES (?, ?, ?, ?, ?)`
-		
-		// RESOLUÇÃO:
-		// Usamos context.WithoutCancel(ctx) para garantir que o registro seja salvo 
-		// mesmo se o contexto original (ex: uma requisição HTTP) for cancelado.
-		// E usamos os parâmetros dinâmicos (recordType, actionOrSeverity) da main.
 		s.db.ExecContext(
-			context.WithoutCancel(ctx), 
-			query, 
-			time.Now().UTC(), 
-			recordType, 
-			actionOrSeverity, 
-			container, 
+			context.WithoutCancel(ctx),
+			query,
+			time.Now().UTC(),
+			recordType,
+			actionOrSeverity,
+			container,
 			message,
 		)
 	}()
