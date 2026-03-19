@@ -32,7 +32,7 @@ func TestContainerCollector_Collect_Success(t *testing.T) {
 			return
 		}
 
-		// Mock container stats utilizando o ID truncado (12 caracteres) - Resolução baseada na Main
+		// Mock container stats utilizando o ID truncado (12 caracteres)
 		if strings.HasSuffix(r.URL.Path, "/containers/123456789012/stats") {
 			w.Header().Set("Content-Type", "application/json")
 			statsJSON := `{
