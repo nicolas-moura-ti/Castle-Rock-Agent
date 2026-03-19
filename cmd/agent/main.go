@@ -42,19 +42,33 @@ func main() {
 		slog.String("log_level", cfg.LogLevel),
 	)
 
-	dockerClient, sysInfo, err := initDockerClient(ctx, &cfg, log)
+	dockerClient, clusterProvider, sysInfo, cleanup, err := initializeDependencies(ctx, &cfg, log)
 	if err != nil {
 		return
 	}
-	defer closeDockerClient(dockerClient, log)
-
-	clusterProvider := setupClusterReceiver(&cfg, log)
-
-	defer startMDNSAdvertiser(&cfg, log)()
-
-	startPrometheusExporter(ctx, &cfg, log, dockerClient, clusterProvider)
+	defer cleanup()
 
 	runExecutionMode(ctx, cfg, log, dockerClient, clusterProvider, sysInfo)
+}
+
+func initializeDependencies(ctx context.Context, cfg *config.Config, log *slog.Logger) (*docker.Client, metrics.ClusterProvider, map[string]string, func(), error) {
+	dockerClient, sysInfo, err := initDockerClient(ctx, cfg, log)
+	if err != nil {
+		return nil, nil, nil, func() {}, err
+	}
+
+	clusterProvider := setupClusterReceiver(cfg, log)
+
+	stopMDNS := startMDNSAdvertiser(cfg, log)
+
+	startPrometheusExporter(ctx, cfg, log, dockerClient, clusterProvider)
+
+	cleanup := func() {
+		stopMDNS()
+		closeDockerClient(dockerClient, log)
+	}
+
+	return dockerClient, clusterProvider, sysInfo, cleanup, nil
 }
 
 func loadConfig() config.Config {

@@ -32,7 +32,7 @@ func TestContainerCollector_Collect_Success(t *testing.T) {
 			return
 		}
 
-		// Mock container stats - Resolvido utilizando a lógica da main (ID correto)
+		// Mock container stats - Resolved using the main logic (correct ID)
 		if strings.HasSuffix(r.URL.Path, "/containers/test-container-id/stats") {
 			w.Header().Set("Content-Type", "application/json")
 			statsJSON := `{
@@ -179,7 +179,7 @@ func TestContainerCollector_Collect_Error(t *testing.T) {
 	metrics, err := c.Collect(context.Background())
 	require.Error(t, err)
 	assert.Nil(t, metrics)
-	// Ajuste do erro esperado conforme a implementação atual do coletor
+	// Adjust the expected error according to the current implementation of the collector
 	assert.Contains(t, err.Error(), "collector: failed to get container stats")
 }
 
