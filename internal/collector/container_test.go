@@ -2,118 +2,175 @@ package collector_test
 
 import (
 	"context"
-	"net/http"
-	"net/http/httptest"
-	"strings"
 	"testing"
 	"time"
 
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/network"
 	"github.com/nicolas-moura-ti/castle-rock-agent/internal/collector"
 	"github.com/nicolas-moura-ti/castle-rock-agent/internal/config"
 	"github.com/nicolas-moura-ti/castle-rock-agent/internal/docker"
+	"github.com/nicolas-moura-ti/castle-rock-agent/internal/logger"
+	"github.com/nicolas-moura-ti/castle-rock-agent/pkg/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
+// mockContainerEngine is a mock implementation of docker.ContainerEngine for testing.
+type mockContainerEngine struct {
+	ListRunningContainersFunc         func(ctx context.Context, all bool) ([]models.ContainerInfo, error)
+	ListRunningContainersDetailedFunc func(ctx context.Context, all bool) ([]logger.ContainerDisplay, error)
+	GetAllContainerStatsFunc          func(ctx context.Context, containers []models.ContainerInfo) (map[string]models.ContainerMetrics, error)
+	StreamContainerLogsFunc           func(ctx context.Context, containerID string) (<-chan string, error)
+	StopContainerFunc                 func(ctx context.Context, id string) error
+	RestartContainerFunc              func(ctx context.Context, id string) error
+	InspectContainerFunc              func(ctx context.Context, id string) (types.ContainerJSON, error)
+	WatchEventsFunc                   func(ctx context.Context) (<-chan docker.ContainerEvent, <-chan error)
+	SetIncludeContainersFunc          func(includes []string)
+	RunStressTestFunc                 func(ctx context.Context, mode string, duration int) error
+	PruneUnusedFunc                   func(ctx context.Context) (uint64, error)
+	PruneImagesFunc                   func(ctx context.Context) (uint64, error)
+	PruneVolumesFunc                  func(ctx context.Context) (uint64, error)
+	GetDiskUsageFunc                  func(ctx context.Context) (docker.SystemDiskUsage, error)
+	ListNetworksFunc                  func(ctx context.Context) ([]network.Inspect, error)
+	GetSystemInfoFunc                 func(ctx context.Context) (map[string]string, error)
+	CloseFunc                         func() error
+}
+
+func (m *mockContainerEngine) Close() error {
+	if m.CloseFunc != nil {
+		return m.CloseFunc()
+	}
+	return nil
+}
+func (m *mockContainerEngine) ListRunningContainers(ctx context.Context, all bool) ([]models.ContainerInfo, error) {
+	if m.ListRunningContainersFunc != nil {
+		return m.ListRunningContainersFunc(ctx, all)
+	}
+	return nil, nil
+}
+func (m *mockContainerEngine) ListRunningContainersDetailed(ctx context.Context, all bool) ([]logger.ContainerDisplay, error) {
+	if m.ListRunningContainersDetailedFunc != nil {
+		return m.ListRunningContainersDetailedFunc(ctx, all)
+	}
+	return nil, nil
+}
+func (m *mockContainerEngine) GetAllContainerStats(ctx context.Context, containers []models.ContainerInfo) (map[string]models.ContainerMetrics, error) {
+	if m.GetAllContainerStatsFunc != nil {
+		return m.GetAllContainerStatsFunc(ctx, containers)
+	}
+	return nil, nil
+}
+func (m *mockContainerEngine) StreamContainerLogs(ctx context.Context, containerID string) (<-chan string, error) {
+	if m.StreamContainerLogsFunc != nil {
+		return m.StreamContainerLogsFunc(ctx, containerID)
+	}
+	return nil, nil
+}
+func (m *mockContainerEngine) StopContainer(ctx context.Context, id string) error {
+	if m.StopContainerFunc != nil {
+		return m.StopContainerFunc(ctx, id)
+	}
+	return nil
+}
+func (m *mockContainerEngine) RestartContainer(ctx context.Context, id string) error {
+	if m.RestartContainerFunc != nil {
+		return m.RestartContainerFunc(ctx, id)
+	}
+	return nil
+}
+func (m *mockContainerEngine) InspectContainer(ctx context.Context, id string) (types.ContainerJSON, error) {
+	if m.InspectContainerFunc != nil {
+		return m.InspectContainerFunc(ctx, id)
+	}
+	return types.ContainerJSON{}, nil
+}
+func (m *mockContainerEngine) WatchEvents(ctx context.Context) (<-chan docker.ContainerEvent, <-chan error) {
+	if m.WatchEventsFunc != nil {
+		return m.WatchEventsFunc(ctx)
+	}
+	return nil, nil
+}
+func (m *mockContainerEngine) SetIncludeContainers(includes []string) {
+	if m.SetIncludeContainersFunc != nil {
+		m.SetIncludeContainersFunc(includes)
+	}
+}
+func (m *mockContainerEngine) RunStressTest(ctx context.Context, mode string, duration int) error {
+	if m.RunStressTestFunc != nil {
+		return m.RunStressTestFunc(ctx, mode, duration)
+	}
+	return nil
+}
+func (m *mockContainerEngine) PruneUnused(ctx context.Context) (uint64, error) {
+	if m.PruneUnusedFunc != nil {
+		return m.PruneUnusedFunc(ctx)
+	}
+	return 0, nil
+}
+func (m *mockContainerEngine) PruneImages(ctx context.Context) (uint64, error) {
+	if m.PruneImagesFunc != nil {
+		return m.PruneImagesFunc(ctx)
+	}
+	return 0, nil
+}
+func (m *mockContainerEngine) PruneVolumes(ctx context.Context) (uint64, error) {
+	if m.PruneVolumesFunc != nil {
+		return m.PruneVolumesFunc(ctx)
+	}
+	return 0, nil
+}
+func (m *mockContainerEngine) GetDiskUsage(ctx context.Context) (docker.SystemDiskUsage, error) {
+	if m.GetDiskUsageFunc != nil {
+		return m.GetDiskUsageFunc(ctx)
+	}
+	return docker.SystemDiskUsage{}, nil
+}
+func (m *mockContainerEngine) ListNetworks(ctx context.Context) ([]network.Inspect, error) {
+	if m.ListNetworksFunc != nil {
+		return m.ListNetworksFunc(ctx)
+	}
+	return nil, nil
+}
+func (m *mockContainerEngine) GetSystemInfo(ctx context.Context) (map[string]string, error) {
+	if m.GetSystemInfoFunc != nil {
+		return m.GetSystemInfoFunc(ctx)
+	}
+	return nil, nil
+}
+
 func TestContainerCollector_Collect_Success(t *testing.T) {
-	// Setup a mock Docker daemon API
-	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Mock ping for API negotiation
-		if r.URL.Path == "/_ping" {
-			w.Header().Set("API-Version", "1.43")
-			w.Write([]byte("OK"))
-			return
-		}
-
-		// Mock container list
-		if strings.HasSuffix(r.URL.Path, "/containers/json") {
-			w.Header().Set("Content-Type", "application/json")
-			w.Write([]byte(`[{"Id":"test-container-id","Names":["/test-container"],"Image":"test-image"}]`))
-			return
-		}
-
-		// Mock container stats - Resolvido utilizando a lógica da main (ID correto)
-		if strings.HasSuffix(r.URL.Path, "/containers/test-container-id/stats") {
-			w.Header().Set("Content-Type", "application/json")
-			statsJSON := `{
-				"read":"2023-01-01T00:00:00Z",
-				"preread":"2023-01-01T00:00:00Z",
-				"pids_stats":{},
-				"blkio_stats":{
-					"io_service_bytes_recursive":[
-						{"op":"Read","value":100},
-						{"op":"Write","value":200}
-					]
+	mockEngine := &mockContainerEngine{
+		ListRunningContainersFunc: func(ctx context.Context, all bool) ([]models.ContainerInfo, error) {
+			return []models.ContainerInfo{
+				{
+					ID:    "test-container-id",
+					Name:  "test-container",
+					Image: "test-image",
 				},
-				"num_procs":0,
-				"storage_stats":{},
-				"cpu_stats":{
-					"cpu_usage":{
-						"total_usage":100,
-						"percpu_usage":[50,50],
-						"usage_in_kernelmode":0,
-						"usage_in_usermode":0
-					},
-					"system_cpu_usage":200,
-					"online_cpus":2,
-					"throttling_data":{
-						"periods":0,
-						"throttled_periods":0,
-						"throttled_time":0
-					}
+			}, nil
+		},
+		GetAllContainerStatsFunc: func(ctx context.Context, containers []models.ContainerInfo) (map[string]models.ContainerMetrics, error) {
+			return map[string]models.ContainerMetrics{
+				"test-container-id": {
+					ContainerID:   "test-container-id",
+					ContainerName: "test-container",
+					Image:         "test-image",
+					CPUPercent:    100.0,
+					MemoryUsage:   500,
+					MemoryLimit:   1000,
+					MemoryPercent: 50.0,
+					NetworkRx:     10,
+					NetworkTx:     20,
+					BlockRead:     100,
+					BlockWrite:    200,
 				},
-				"precpu_stats":{
-					"cpu_usage":{
-						"total_usage":50,
-						"percpu_usage":[25,25],
-						"usage_in_kernelmode":0,
-						"usage_in_usermode":0
-					},
-					"system_cpu_usage":100,
-					"online_cpus":2,
-					"throttling_data":{
-						"periods":0,
-						"throttled_periods":0,
-						"throttled_time":0
-					}
-				},
-				"memory_stats":{
-					"usage":500,
-					"max_usage":0,
-					"stats":{},
-					"limit":1000
-				},
-				"networks":{
-					"eth0":{
-						"rx_bytes":10,
-						"rx_packets":0,
-						"rx_errors":0,
-						"rx_dropped":0,
-						"tx_bytes":20,
-						"tx_packets":0,
-						"tx_errors":0,
-						"tx_dropped":0
-					}
-				}
-			}`
-			w.Write([]byte(statsJSON))
-			return
-		}
-
-		w.WriteHeader(http.StatusNotFound)
-	}))
-	defer mockServer.Close()
-
-	// Redirect Docker client to the mock server
-	t.Setenv("DOCKER_HOST", mockServer.URL)
-
-	// Create new client
-	cli, err := docker.NewClient()
-	require.NoError(t, err)
-	defer cli.Close()
+			}, nil
+		},
+	}
 
 	cfg := config.DefaultConfig()
-	c := collector.NewContainerCollector(cli, cfg, 1*time.Second)
+	c := collector.NewContainerCollector(mockEngine, cfg, 1*time.Second)
 
 	metrics, err := c.Collect(context.Background())
 	require.NoError(t, err)
@@ -145,36 +202,23 @@ func TestContainerCollector_Collect_NilClient(t *testing.T) {
 }
 
 func TestContainerCollector_Collect_Error(t *testing.T) {
-	// Setup a mock Docker daemon API that returns an error
-	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Mock ping for API negotiation
-		if r.URL.Path == "/_ping" {
-			w.Header().Set("API-Version", "1.43")
-			w.Write([]byte("OK"))
-			return
-		}
-
-		// Mock container list returning 500 Internal Server Error
-		if strings.HasSuffix(r.URL.Path, "/containers/json") {
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(`{"message": "internal server error"}`))
-			return
-		}
-
-		w.WriteHeader(http.StatusNotFound)
-	}))
-	defer mockServer.Close()
-
-	// Redirect Docker client to the mock server
-	t.Setenv("DOCKER_HOST", mockServer.URL)
-
-	// Create new client
-	cli, err := docker.NewClient()
-	require.NoError(t, err)
-	defer cli.Close()
+	mockEngine := &mockContainerEngine{
+		ListRunningContainersFunc: func(ctx context.Context, all bool) ([]models.ContainerInfo, error) {
+			return []models.ContainerInfo{
+				{
+					ID:    "test-container-id",
+					Name:  "test-container",
+					Image: "test-image",
+				},
+			}, nil
+		},
+		GetAllContainerStatsFunc: func(ctx context.Context, containers []models.ContainerInfo) (map[string]models.ContainerMetrics, error) {
+			return nil, assert.AnError
+		},
+	}
 
 	cfg := config.DefaultConfig()
-	c := collector.NewContainerCollector(cli, cfg, 1*time.Second)
+	c := collector.NewContainerCollector(mockEngine, cfg, 1*time.Second)
 
 	metrics, err := c.Collect(context.Background())
 	require.Error(t, err)
