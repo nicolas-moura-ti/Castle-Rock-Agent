@@ -50,6 +50,8 @@ type ContainerCollector struct {
 }
 
 // NewContainerCollector creates a new ContainerCollector instance.
+//
+// Follows the Go constructor pattern New<Type>.
 func NewContainerCollector(dockerClient docker.ContainerEngine, cfg config.Config, interval time.Duration) *ContainerCollector {
 	return &ContainerCollector{
 		dockerClient: dockerClient,
@@ -63,7 +65,6 @@ func NewContainerCollector(dockerClient docker.ContainerEngine, cfg config.Confi
 // The Docker Stats API provides real-time CPU, memory,
 // network I/O and disk metrics for each container.
 func (c *ContainerCollector) Collect(ctx context.Context) ([]models.ContainerMetrics, error) {
-	// Verificação de segurança vinda da branch feat
 	if c.dockerClient == nil {
 		return nil, fmt.Errorf("collector: docker client is not initialized")
 	}
@@ -75,7 +76,6 @@ func (c *ContainerCollector) Collect(ctx context.Context) ([]models.ContainerMet
 
 	statsMap, err := c.dockerClient.GetAllContainerStats(ctx, containers)
 	if err != nil {
-		// Uso do %w para permitir o unwrap do erro original posteriormente, se necessário
 		return nil, fmt.Errorf("collector: failed to get container stats: %w", err)
 	}
 
