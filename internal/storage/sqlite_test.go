@@ -10,7 +10,7 @@ import (
 )
 
 func TestSaveEvent(t *testing.T) {
-	// Uso de banco em memória: rápido e limpo para testes unitários.
+	// Use an in-memory database: fast and clean for unit tests.
 	store, err := NewSQLiteStore(":memory:")
 	require.NoError(t, err)
 	defer store.Close()
@@ -18,7 +18,7 @@ func TestSaveEvent(t *testing.T) {
 	ctx := context.Background()
 	store.SaveEvent(ctx, "start", "test-container", "Container started")
 
-	// Poll para verificar a escrita assíncrona
+	// Poll to verify asynchronous write
 	var events []EventRecord
 	require.Eventually(t, func() bool {
 		events, err = store.GetRecent(10)
@@ -36,18 +36,21 @@ func TestSaveEvent(t *testing.T) {
 	}
 }
 
-// TestSaveWithCanceledContext valida se o uso de context.WithoutCancel está funcionando.
+// TestSaveWithCanceledContext validates that the use of context.WithoutCancel is working.
+// The log MUST be saved even if the original context has been canceled.
 func TestSaveWithCanceledContext(t *testing.T) {
 	store, err := NewSQLiteStore(":memory:")
 	require.NoError(t, err)
 	defer store.Close()
 
+	// Create a context and cancel it immediately
 	ctx, cancel := context.WithCancel(context.Background())
-	cancel() // Cancela imediatamente
+	cancel() 
 
 	require.ErrorIs(t, ctx.Err(), context.Canceled)
 
-	// O log DEVE ser salvo mesmo com contexto cancelado
+	// Attempt to save with the already canceled context.
+	// The log MUST be saved because of the inner use of context.WithoutCancel.
 	store.SaveEvent(ctx, "stop", "test-container-2", "Container stopped")
 
 	var events []EventRecord
@@ -63,6 +66,7 @@ func TestSaveWithCanceledContext(t *testing.T) {
 }
 
 func TestSaveAlert(t *testing.T) {
+	// Standardized to use :memory: instead of temporary files.
 	store, err := NewSQLiteStore(":memory:")
 	require.NoError(t, err)
 	defer store.Close()
@@ -87,7 +91,7 @@ func TestSaveAlert(t *testing.T) {
 }
 
 func TestNewSQLiteStore_PersistentFile(t *testing.T) {
-	// Teste de integração: valida se o banco cria o arquivo fisicamente
+	// Integration test: validates if the database creates the file physically.
 	tempDir := t.TempDir()
 	dbPath := tempDir + "/test.db"
 
@@ -109,7 +113,7 @@ func TestNewSQLiteStore_PersistentFile(t *testing.T) {
 }
 
 func TestNewSQLiteStore_ErrorHandling(t *testing.T) {
-	// Tenta abrir um diretório como se fosse um arquivo de banco (deve falhar)
+	// Attempts to open a directory instead of a database file (should fail).
 	tempDir := t.TempDir()
 
 	store, err := NewSQLiteStore(tempDir)
