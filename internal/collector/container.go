@@ -63,7 +63,7 @@ func NewContainerCollector(dockerClient docker.ContainerEngine, cfg config.Confi
 // The Docker Stats API provides real-time CPU, memory,
 // network I/O and disk metrics for each container.
 func (c *ContainerCollector) Collect(ctx context.Context) ([]models.ContainerMetrics, error) {
-	// Verificação de segurança vinda da branch feat
+	// Security check from feat branch
 	if c.dockerClient == nil {
 		return nil, fmt.Errorf("collector: docker client is not initialized")
 	}
@@ -75,7 +75,7 @@ func (c *ContainerCollector) Collect(ctx context.Context) ([]models.ContainerMet
 
 	statsMap, err := c.dockerClient.GetAllContainerStats(ctx, containers)
 	if err != nil {
-		// Uso do %w para permitir o unwrap do erro original posteriormente, se necessário
+		// Use %w to allow unwrapping the original error later if needed
 		return nil, fmt.Errorf("collector: failed to get container stats: %w", err)
 	}
 
