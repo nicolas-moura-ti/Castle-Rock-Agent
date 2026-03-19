@@ -89,3 +89,38 @@ func TestSaveAlert(t *testing.T) {
 		assert.WithinDuration(t, time.Now(), event.Timestamp, 5*time.Second)
 	}
 }
+func TestNewSQLiteStore_PersistentFile(t *testing.T) {
+	// Create a temporary directory
+	tempDir := t.TempDir()
+	dbPath := tempDir + "/test.db"
+
+	// Initialize the store with a file path
+	store, err := NewSQLiteStore(dbPath)
+	require.NoError(t, err)
+	defer store.Close()
+
+	// Verify the database works
+	ctx := context.Background()
+	store.SaveEvent(ctx, "start", "test-persistent", "Container started")
+
+	var events []EventRecord
+	require.Eventually(t, func() bool {
+		events, err = store.GetRecent(10)
+		return err == nil && len(events) > 0
+	}, 2*time.Second, 50*time.Millisecond, "Event should be saved asynchronously")
+
+	assert.Len(t, events, 1)
+	if len(events) > 0 {
+		assert.Equal(t, "test-persistent", events[0].Container)
+	}
+}
+
+func TestNewSQLiteStore_ErrorHandling(t *testing.T) {
+	// Provide a directory path instead of a file path, which should cause
+	// sqlite to fail when trying to open/create the database file.
+	tempDir := t.TempDir()
+
+	store, err := NewSQLiteStore(tempDir)
+	assert.Error(t, err, "Should fail when given a directory path instead of a file path")
+	assert.Nil(t, store)
+}
