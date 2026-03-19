@@ -66,7 +66,7 @@ func NewSQLiteStore(dbPath string) (*SQLiteStore, error) {
 }
 
 // save persiste um evento ou alerta no banco de dados de forma assíncrona.
-// Utilizamos context.WithoutCancel para garantir que o registro seja salvo mesmo que 
+// Utilizamos context.WithoutCancel para garantir que o registro seja salvo mesmo que
 // o contexto de quem chamou (ex: uma request HTTP ou ação da TUI) seja cancelado.
 func (s *SQLiteStore) save(ctx context.Context, recordType, actionOrSeverity, container, message string) {
 	go func() {
@@ -88,11 +88,6 @@ func (s *SQLiteStore) SaveEvent(ctx context.Context, action, container, message 
 	s.save(ctx, "event", action, container, message)
 }
 
-// SaveAlert persiste o disparo de um alerta de monitoramento ou segurança.
-func (s *SQLiteStore) SaveAlert(ctx context.Context, severity, container, message string) {
-	s.save(ctx, "alert", severity, container, message)
-}
-
 // GetRecent recupera os últimos N eventos para o histórico da TUI.
 func (s *SQLiteStore) GetRecent(limit int) ([]EventRecord, error) {
 	query := `SELECT id, timestamp, type, action, container, message FROM events ORDER BY timestamp DESC LIMIT ?`
@@ -109,7 +104,7 @@ func (s *SQLiteStore) GetRecent(limit int) ([]EventRecord, error) {
 		if err := rows.Scan(&r.ID, &tsStr, &r.Type, &r.Action, &r.Container, &r.Message); err != nil {
 			return nil, err
 		}
-		
+
 		if t, err := time.Parse("2006-01-02 15:04:05", tsStr); err == nil {
 			r.Timestamp = t.Local()
 		} else {
