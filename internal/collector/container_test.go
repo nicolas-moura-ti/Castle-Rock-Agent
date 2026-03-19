@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// mockContainerEngine implementa a interface docker.ContainerEngine para testes puros em Go.
+// mockContainerEngine implementa a interface docker.ContainerEngine para testes unitários.
 type mockContainerEngine struct {
 	ListRunningContainersFunc         func(ctx context.Context, all bool) ([]models.ContainerInfo, error)
 	ListRunningContainersDetailedFunc func(ctx context.Context, all bool) ([]logger.ContainerDisplay, error)
@@ -37,15 +37,20 @@ type mockContainerEngine struct {
 	CloseFunc                         func() error
 }
 
-// Implementação dos métodos da interface (necessário para o Mock funcionar)
+// Implementações mínimas necessárias para satisfazer a interface durante o teste
 func (m *mockContainerEngine) Close() error { return nil }
 func (m *mockContainerEngine) ListRunningContainers(ctx context.Context, all bool) ([]models.ContainerInfo, error) {
-	return m.ListRunningContainersFunc(ctx, all)
+	if m.ListRunningContainersFunc != nil {
+		return m.ListRunningContainersFunc(ctx, all)
+	}
+	return nil, nil
 }
 func (m *mockContainerEngine) GetAllContainerStats(ctx context.Context, containers []models.ContainerInfo) (map[string]models.ContainerMetrics, error) {
-	return m.GetAllContainerStatsFunc(ctx, containers)
+	if m.GetAllContainerStatsFunc != nil {
+		return m.GetAllContainerStatsFunc(ctx, containers)
+	}
+	return nil, nil
 }
-// ... (outros métodos omitidos para brevidade, mas devem existir no seu arquivo)
 
 func TestContainerCollector_Collect_Success(t *testing.T) {
 	// Usando IDs reais para validar o truncamento da lógica da Main
@@ -95,7 +100,8 @@ func TestContainerCollector_Collect_NilClient(t *testing.T) {
 func TestContainerCollector_Collect_Error(t *testing.T) {
 	mockEngine := &mockContainerEngine{
 		ListRunningContainersFunc: func(ctx context.Context, all bool) ([]models.ContainerInfo, error) {
-			return nil, docker.ErrDockerConnection // Simula erro de conexão
+			// Simula falha logo no primeiro passo (listagem)
+			return nil, assert.AnError 
 		},
 	}
 
@@ -105,7 +111,7 @@ func TestContainerCollector_Collect_Error(t *testing.T) {
 	metrics, err := c.Collect(context.Background())
 	require.Error(t, err)
 	assert.Nil(t, metrics)
-	// Ajuste do erro esperado vindo da implementação do coletor
+	// Resolvido: Erro esperado quando a listagem falha, conforme a Main
 	assert.Contains(t, err.Error(), "collector: failed to list running containers")
 }
 
