@@ -88,7 +88,7 @@ func DefaultConfig() Config {
 		Cluster: ClusterConfig{
 			Mode:         "standalone",
 			LeaderURL:    "http://127.0.0.1:9110/api/v1/push",
-			HostID:       "", 
+			HostID:       "",
 			SharedSecret: "", // Resolvido: Alterado de Token para SharedSecret
 			AuthToken:    "", // Resolvido: Token de autenticação separado da chave AES
 		},

@@ -28,8 +28,6 @@ import (
 //   - Interfaces are defined by the consumer, not the implementer
 //   - A small interface is better than a large one (Interface Segregation)
 //   - Go convention: "Accept interfaces, return structs"
-//   - Don't create interfaces prematurely — extract them when there's
-//     a real need for polymorphism
 type Collector interface {
 	// Collect executes metric collection for all containers.
 	//
@@ -50,6 +48,8 @@ type ContainerCollector struct {
 }
 
 // NewContainerCollector creates a new ContainerCollector instance.
+//
+// Follows the Go constructor pattern New<Type>.
 func NewContainerCollector(dockerClient docker.ContainerEngine, cfg config.Config, interval time.Duration) *ContainerCollector {
 	return &ContainerCollector{
 		dockerClient: dockerClient,
@@ -63,7 +63,7 @@ func NewContainerCollector(dockerClient docker.ContainerEngine, cfg config.Confi
 // The Docker Stats API provides real-time CPU, memory,
 // network I/O and disk metrics for each container.
 func (c *ContainerCollector) Collect(ctx context.Context) ([]models.ContainerMetrics, error) {
-	// Security check from feat branch
+	// Security check to ensure dependencies are properly injected
 	if c.dockerClient == nil {
 		return nil, fmt.Errorf("collector: docker client is not initialized")
 	}
@@ -75,7 +75,7 @@ func (c *ContainerCollector) Collect(ctx context.Context) ([]models.ContainerMet
 
 	statsMap, err := c.dockerClient.GetAllContainerStats(ctx, containers)
 	if err != nil {
-		// Use %w to allow unwrapping the original error later if needed
+		// Use %w to allow unwrapping the original error later if needed for SRE debugging
 		return nil, fmt.Errorf("collector: failed to get container stats: %w", err)
 	}
 

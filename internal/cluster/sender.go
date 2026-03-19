@@ -166,10 +166,10 @@ func sendPushPayload(ctx context.Context, client *http.Client, url string, secre
 		}
 
 		if i < maxRetries {
-			log.Warn("Sender: push failed, retrying...", 
-				slog.Int("attempt", i+1), 
+			log.Warn("Sender: push failed, retrying...",
+				slog.Int("attempt", i+1),
 				slog.Duration("next_retry_in", backoff))
-			
+
 			select {
 			case <-time.After(backoff):
 				backoff *= 2 // Exponential backoff

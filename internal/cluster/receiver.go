@@ -219,7 +219,7 @@ func (r *Receiver) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 }
 
-// Proxied methods to maintain compatibility if needed, 
+// Proxied methods to maintain compatibility if needed,
 // though direct access to store is preferred.
 func (r *Receiver) GetAllMetrics() []models.ContainerMetrics {
 	return r.store.GetAllMetrics()
