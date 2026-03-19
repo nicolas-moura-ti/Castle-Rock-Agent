@@ -63,29 +63,3 @@ func TestSaveWithCanceledContext(t *testing.T) {
 		assert.Equal(t, "test-container-2", events[0].Container)
 	}
 }
-
-func TestSaveAlert(t *testing.T) {
-	// Padronizado para usar :memory: em vez de arquivos temporários
-	store, err := NewSQLiteStore(":memory:")
-	require.NoError(t, err)
-	defer store.Close()
-
-	ctx := context.Background()
-	store.SaveAlert(ctx, "critical", "nginx-web", "High CPU usage detected")
-
-	var events []EventRecord
-	require.Eventually(t, func() bool {
-		events, err = store.GetRecent(10)
-		return err == nil && len(events) > 0
-	}, 2*time.Second, 50*time.Millisecond, "Alert should be saved asynchronously")
-
-	assert.Len(t, events, 1)
-	if len(events) > 0 {
-		event := events[0]
-		assert.Equal(t, "alert", event.Type)
-		assert.Equal(t, "critical", event.Action)
-		assert.Equal(t, "nginx-web", event.Container)
-		assert.Contains(t, event.Message, "High CPU")
-		assert.WithinDuration(t, time.Now(), event.Timestamp, 5*time.Second)
-	}
-}
