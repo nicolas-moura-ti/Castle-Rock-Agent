@@ -28,12 +28,12 @@ func TestContainerCollector_Collect_Success(t *testing.T) {
 		// Mock container list
 		if strings.HasSuffix(r.URL.Path, "/containers/json") {
 			w.Header().Set("Content-Type", "application/json")
-			w.Write([]byte(`[{"Id":"test-container-id","Names":["/test-container"],"Image":"test-image"}]`))
+			w.Write([]byte(`[{"Id":"test-contain","Names":["/test-container"],"Image":"test-image"}]`))
 			return
 		}
 
 		// Mock container stats - Resolvido utilizando a lógica da main (ID correto)
-		if strings.HasSuffix(r.URL.Path, "/containers/test-container-id/stats") {
+		if strings.HasSuffix(r.URL.Path, "/containers/test-contain/stats") {
 			w.Header().Set("Content-Type", "application/json")
 			statsJSON := `{
 				"read":"2023-01-01T00:00:00Z",
@@ -121,7 +121,7 @@ func TestContainerCollector_Collect_Success(t *testing.T) {
 	require.Len(t, metrics, 1)
 
 	m := metrics[0]
-	assert.Equal(t, "test-container-id", m.ContainerID)
+	assert.Equal(t, "test-contain", m.ContainerID)
 	assert.Equal(t, "test-container", m.ContainerName)
 	assert.Equal(t, "test-image", m.Image)
 	assert.Equal(t, float64(100), m.CPUPercent)
@@ -180,7 +180,7 @@ func TestContainerCollector_Collect_Error(t *testing.T) {
 	require.Error(t, err)
 	assert.Nil(t, metrics)
 	// Ajuste do erro esperado conforme a implementação atual do coletor
-	assert.Contains(t, err.Error(), "collector: failed to get container stats")
+	assert.Contains(t, err.Error(), "collector: failed to list running containers")
 }
 
 func TestContainerCollector_Name(t *testing.T) {

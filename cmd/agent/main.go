@@ -29,35 +29,16 @@ import (
 
 const Version = "0.3.0"
 
-func main() {
-	cfg := loadConfig()
-	log := logger.Setup(cfg.LogLevel)
-
-	ctx, stop := setupContext()
-	defer stop()
-
-	log.Info("Castle Rock Agent starting",
-		slog.String("version", Version),
-		slog.String("go_version", runtime.Version()),
-		slog.String("log_level", cfg.LogLevel),
-	)
-
-	dockerClient, sysInfo, err := initDockerClient(ctx, &cfg, log)
-	if err != nil {
-		return
-	}
-	defer closeDockerClient(dockerClient, log)
-
-	clusterProvider := setupClusterReceiver(&cfg, log)
-
-	defer startMDNSAdvertiser(&cfg, log)()
-
-	startPrometheusExporter(ctx, &cfg, log, dockerClient, clusterProvider)
-
-	runExecutionMode(ctx, cfg, log, dockerClient, clusterProvider, sysInfo)
+type Agent struct {
+	cfg             config.Config
+	log             *slog.Logger
+	dockerClient    *docker.Client
+	sysInfo         map[string]string
+	clusterProvider metrics.ClusterProvider
+	store           *storage.SQLiteStore
 }
 
-func loadConfig() config.Config {
+func main() {
 	cfg, err := config.Load("configs/config.yaml")
 	if err != nil {
 		slog.Warn("failed to load config, using defaults",
@@ -65,153 +46,174 @@ func loadConfig() config.Config {
 		)
 		cfg = config.DefaultConfig()
 	}
-	return cfg
-}
 
-func setupContext() (context.Context, context.CancelFunc) {
-	return signal.NotifyContext(
+	log := logger.Setup(cfg.LogLevel)
+
+	ctx, stop := signal.NotifyContext(
 		context.Background(),
 		syscall.SIGINT,
 		syscall.SIGTERM,
 	)
+	defer stop()
+
+	agent := &Agent{
+		cfg: cfg,
+		log: log,
+	}
+
+	agent.log.Info("Castle Rock Agent starting",
+		slog.String("version", Version),
+		slog.String("go_version", runtime.Version()),
+		slog.String("log_level", agent.cfg.LogLevel),
+	)
+
+	if err := agent.initDockerClient(ctx); err != nil {
+		return
+	}
+	defer agent.closeDockerClient()
+
+	agent.setupClusterReceiver()
+	defer agent.startMDNSAdvertiser()()
+	agent.startPrometheusExporter(ctx)
+
+	agent.runExecutionMode(ctx)
 }
 
-func closeDockerClient(dockerClient *docker.Client, log *slog.Logger) {
-	if err := dockerClient.Close(); err != nil {
-		log.Warn("error closing docker client",
+func (a *Agent) initDockerClient(ctx context.Context) error {
+	dockerClient, err := docker.NewClient()
+	if err != nil {
+		a.log.Error("failed to create docker client",
+			slog.String("error", err.Error()),
+			slog.String("hint", "check if Docker Desktop is running"),
+		)
+		return err
+	}
+
+	dockerClient.SetIncludeContainers(a.cfg.Stats.IncludeContainers)
+	a.log.Info("docker daemon connected")
+
+	a.sysInfo = make(map[string]string)
+	info, err := dockerClient.GetSystemInfo(ctx)
+	if err != nil {
+		a.log.Warn("unable to get docker info",
 			slog.String("error", err.Error()),
 		)
+	} else {
+		a.sysInfo = info
+		a.log.Info("docker info collected",
+			slog.String("version", a.sysInfo["Server Version"]),
+		)
+	}
+
+	a.dockerClient = dockerClient
+	return nil
+}
+
+func (a *Agent) closeDockerClient() {
+	if a.dockerClient != nil {
+		if err := a.dockerClient.Close(); err != nil {
+			a.log.Warn("error closing docker client",
+				slog.String("error", err.Error()),
+			)
+		}
 	}
 }
 
-func startMDNSAdvertiser(cfg *config.Config, log *slog.Logger) func() {
-	if cfg.Cluster.Mode == "leader" {
-		advertiser, err := cluster.NewAdvertiser(cfg.Prometheus.Port, log)
+func (a *Agent) setupClusterReceiver() {
+	if a.cfg.Cluster.Mode == "leader" {
+		memStore := cluster.NewMemoryStore(a.log)
+		a.clusterProvider = cluster.NewReceiver(a.log, memStore, a.cfg.Cluster.SharedSecret, a.cfg.Cluster.AuthToken)
+		a.log.Info("Starting in LEADER mode. Will receive metrics on /api/v1/push",
+			slog.Bool("auth_token_enabled", a.cfg.Cluster.AuthToken != ""),
+			slog.Bool("aes_encryption_enabled", a.cfg.Cluster.SharedSecret != ""),
+			slog.String("host_id", a.cfg.Cluster.HostID))
+	}
+}
+
+func (a *Agent) startMDNSAdvertiser() func() {
+	if a.cfg.Cluster.Mode == "leader" {
+		advertiser, err := cluster.NewAdvertiser(a.cfg.Prometheus.Port, a.log)
 		if err == nil {
 			return func() {
 				_ = advertiser.Close()
 			}
 		}
-		log.Warn("mDNS: failed to start advertiser", slog.String("error", err.Error()))
+		a.log.Warn("mDNS: failed to start advertiser", slog.String("error", err.Error()))
 	}
 	return func() {}
 }
 
-func runExecutionMode(ctx context.Context, cfg config.Config, log *slog.Logger, dockerClient *docker.Client, clusterProvider metrics.ClusterProvider, sysInfo map[string]string) {
+func (a *Agent) startPrometheusExporter(ctx context.Context) {
+	if a.cfg.Prometheus.Enabled {
+		exporter := metrics.NewExporter(a.dockerClient, a.clusterProvider, a.cfg.Cluster.HostID, a.cfg.Stats.Interval, a.cfg.Prometheus.Port, a.log)
+		exporter.Start(ctx)
+		a.log.Info("prometheus exporter active",
+			slog.Int("port", a.cfg.Prometheus.Port),
+			slog.Duration("interval", a.cfg.Stats.Interval),
+		)
+	}
+}
+
+func (a *Agent) runExecutionMode(ctx context.Context) {
 	mode := os.Getenv("CASTLE_ROCK_MODE")
 
-	if cfg.Cluster.Mode == "worker" {
-		runWorkerMode(ctx, cfg, log, dockerClient)
+	if a.cfg.Cluster.Mode == "worker" {
+		a.runWorkerMode(ctx)
 		return
 	}
 
-	if mode == "headless" || cfg.Cluster.Mode == "leader" {
-		runHeadlessMode(ctx, cfg, log)
+	if mode == "headless" || a.cfg.Cluster.Mode == "leader" {
+		a.runHeadlessMode(ctx)
 		return
 	}
 
-	runTUIMode(ctx, cfg, log, dockerClient, clusterProvider, sysInfo)
+	a.runTUIMode(ctx)
 }
 
-func runWorkerMode(ctx context.Context, cfg config.Config, log *slog.Logger, dockerClient *docker.Client) {
-	log.Info("starting in worker mode",
-		slog.String("leader_url", cfg.Cluster.LeaderURL),
+func (a *Agent) runWorkerMode(ctx context.Context) {
+	a.log.Info("starting in worker mode",
+		slog.String("leader_url", a.cfg.Cluster.LeaderURL),
 	)
-	go cluster.StartSender(ctx, dockerClient, cfg, log)
+	go cluster.StartSender(ctx, a.dockerClient, a.cfg, a.log)
 
 	<-ctx.Done()
-	log.Info("Castle Rock Agent stopped (worker)")
+	a.log.Info("Castle Rock Agent stopped (worker)")
 }
 
-func runHeadlessMode(ctx context.Context, cfg config.Config, log *slog.Logger) {
-	log.Info("headless/leader mode — waiting for connections and scraping",
-		slog.Int("port", cfg.Prometheus.Port),
+func (a *Agent) runHeadlessMode(ctx context.Context) {
+	a.log.Info("headless/leader mode — waiting for connections and scraping",
+		slog.Int("port", a.cfg.Prometheus.Port),
 	)
 	<-ctx.Done()
-	log.Info("Castle Rock Agent stopped (headless/leader)")
+	a.log.Info("Castle Rock Agent stopped (headless/leader)")
 }
 
-func runTUIMode(ctx context.Context, cfg config.Config, log *slog.Logger, dockerClient *docker.Client, clusterProvider metrics.ClusterProvider, sysInfo map[string]string) {
-	store, err := setupStorageAndPruner(ctx, &cfg, log, dockerClient)
-	if err == nil && store != nil {
-		defer store.Close()
+func (a *Agent) runTUIMode(ctx context.Context) {
+	a.setupStorageAndPruner(ctx)
+	if a.store != nil {
+		defer a.store.Close()
 	}
 
-	log.Info("starting interactive dashboard...")
-	if err := tui.Run(dockerClient, clusterProvider, ctx, sysInfo, Version, cfg, store); err != nil {
-		log.Error("TUI error", slog.String("error", err.Error()))
+	a.log.Info("starting interactive dashboard...")
+	if err := tui.Run(a.dockerClient, a.clusterProvider, ctx, a.sysInfo, Version, a.cfg, a.store); err != nil {
+		a.log.Error("TUI error", slog.String("error", err.Error()))
 		return
 	}
-	log.Info("Castle Rock Agent stopped")
+	a.log.Info("Castle Rock Agent stopped")
 }
 
-func initDockerClient(ctx context.Context, cfg *config.Config, log *slog.Logger) (*docker.Client, map[string]string, error) {
-	dockerClient, err := docker.NewClient()
-	if err != nil {
-		log.Error("failed to create docker client",
-			slog.String("error", err.Error()),
-			slog.String("hint", "check if Docker Desktop is running"),
-		)
-		return nil, nil, err
-	}
-
-	dockerClient.SetIncludeContainers(cfg.Stats.IncludeContainers)
-
-	log.Info("docker daemon connected")
-
-	sysInfo := make(map[string]string)
-	info, err := dockerClient.GetSystemInfo(ctx)
-	if err != nil {
-		log.Warn("unable to get docker info",
-			slog.String("error", err.Error()),
-		)
-	} else {
-		sysInfo = info
-		log.Info("docker info collected",
-			slog.String("version", sysInfo["Server Version"]),
-		)
-	}
-
-	return dockerClient, sysInfo, nil
-}
-
-func setupClusterReceiver(cfg *config.Config, log *slog.Logger) metrics.ClusterProvider {
-	var clusterProvider metrics.ClusterProvider
-	if cfg.Cluster.Mode == "leader" {
-		store := cluster.NewMemoryStore(log)
-		clusterProvider = cluster.NewReceiver(log, store, cfg.Cluster.SharedSecret, cfg.Cluster.AuthToken)
-		log.Info("Starting in LEADER mode. Will receive metrics on /api/v1/push",
-			slog.Bool("auth_token_enabled", cfg.Cluster.AuthToken != ""),
-			slog.Bool("aes_encryption_enabled", cfg.Cluster.SharedSecret != ""),
-			slog.String("host_id", cfg.Cluster.HostID))
-	}
-	return clusterProvider
-}
-
-func startPrometheusExporter(ctx context.Context, cfg *config.Config, log *slog.Logger, dockerClient *docker.Client, clusterProvider metrics.ClusterProvider) {
-	if cfg.Prometheus.Enabled {
-		exporter := metrics.NewExporter(dockerClient, clusterProvider, cfg.Cluster.HostID, cfg.Stats.Interval, cfg.Prometheus.Port, log)
-		exporter.Start(ctx)
-		log.Info("prometheus exporter active",
-			slog.Int("port", cfg.Prometheus.Port),
-			slog.Duration("interval", cfg.Stats.Interval),
-		)
-	}
-}
-
-func setupStorageAndPruner(ctx context.Context, cfg *config.Config, log *slog.Logger, dockerClient *docker.Client) (*storage.SQLiteStore, error) {
+func (a *Agent) setupStorageAndPruner(ctx context.Context) {
 	// Storage (SQLite)
 	store, err := storage.NewSQLiteStore("castle-rock-events.db")
 	if err != nil {
-		log.Error("failed to init sqlite store", slog.String("error", err.Error()))
+		a.log.Error("failed to init sqlite store", slog.String("error", err.Error()))
 	}
+	a.store = store
 
 	// Auto Pruner (Garbage Collector)
-	if cfg.Prune.Enabled {
-		pruner := prune.NewAutoPruner(dockerClient, store, cfg.Prune.TriggerDiskPercent)
+	if a.cfg.Prune.Enabled {
+		pruner := prune.NewAutoPruner(a.dockerClient, store, a.cfg.Prune.TriggerDiskPercent)
 		go pruner.Start(ctx)
-		log.Info("auto-prune enabled", slog.Float64("threshold_pct", cfg.Prune.TriggerDiskPercent))
+		a.log.Info("auto-prune enabled", slog.Float64("threshold_pct", a.cfg.Prune.TriggerDiskPercent))
 	}
-
-	return store, err
 }
