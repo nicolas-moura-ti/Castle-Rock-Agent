@@ -92,7 +92,7 @@ alerts:
 		{
 			name: "environment variables take precedence",
 			envVars: map[string]string{
-				"CASTLE_ROCK_LOG_LEVEL":       "error",
+				"CASTLE_ROCK_LOG_LEVEL":             "error",
 				"CASTLE_ROCK_PROMETHEUS_PORT":       "3000",
 				"CASTLE_ROCK_CLUSTER_SHARED_SECRET": "env-secret-token",
 				"CASTLE_ROCK_CLUSTER_AUTH_TOKEN":    "env-auth-token",
