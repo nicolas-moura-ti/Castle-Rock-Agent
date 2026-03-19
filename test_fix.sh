@@ -1,2 +1,2 @@
 #!/bin/bash
-go test ./internal/collector/... -v
+go test -v ./internal/collector/...
