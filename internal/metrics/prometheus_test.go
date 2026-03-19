@@ -186,7 +186,7 @@ func TestExporter_Collect(t *testing.T) {
 	// In a black-box test (metrics_test), we use the public API.
 	// Since Start() calls collect, we already tested it above.
 	// For this test, let's just verify GetLastStats() is thread-safe and works.
-	
+
 	stats := exporter.GetLastStats()
 	if stats == nil {
 		t.Fatal("Expected last stats to be non-nil")

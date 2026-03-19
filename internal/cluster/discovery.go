@@ -48,7 +48,7 @@ func DiscoverLeader(ctx context.Context, log *slog.Logger) (string, error) {
 	log.Info("mDNS: Searching for Castle Rock Leader...")
 
 	entriesCh := make(chan *mdns.ServiceEntry, 4)
-	
+
 	// Start the lookup
 	go func() {
 		params := &mdns.QueryParam{

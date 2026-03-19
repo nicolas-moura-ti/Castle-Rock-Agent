@@ -79,7 +79,7 @@ type ContainerEngine interface {
 
 // Client wraps the official Docker client, implementing the ContainerEngine interface.
 type Client struct {
-	cli *client.Client
+	cli               *client.Client
 	includeContainers []string
 
 	metadataCache   map[string]staticContainerData

@@ -1,3 +1,4 @@
+// Package storage manages the local SQLite database for event and alert history.
 package storage
 
 import (
@@ -107,7 +108,7 @@ func (s *SQLiteStore) GetRecent(limit int) ([]EventRecord, error) {
 		if err := rows.Scan(&r.ID, &tsStr, &r.Type, &r.Action, &r.Container, &r.Message); err != nil {
 			return nil, err
 		}
-		
+
 		if t, err := time.Parse("2006-01-02 15:04:05", tsStr); err == nil {
 			r.Timestamp = t.Local()
 		} else {

@@ -45,7 +45,7 @@ func TestSaveWithCanceledContext(t *testing.T) {
 
 	// Create a context and cancel it immediately
 	ctx, cancel := context.WithCancel(context.Background())
-	cancel() 
+	cancel()
 
 	require.ErrorIs(t, ctx.Err(), context.Canceled)
 
