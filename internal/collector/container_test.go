@@ -68,6 +68,7 @@ func TestContainerCollector_Collect_Success(t *testing.T) {
 				shortID: {
 					ContainerID:   shortID,
 					ContainerName: "test-container",
+					Image:         "test-image",
 					CPUPercent:    100.0,
 					MemoryUsage:   500,
 				},
@@ -85,6 +86,8 @@ func TestContainerCollector_Collect_Success(t *testing.T) {
 	m := metrics[0]
 	// Validando o truncamento de 12 caracteres consolidado na Main
 	assert.Equal(t, shortID, m.ContainerID)
+	assert.Equal(t, "test-container", m.ContainerName)
+	assert.Equal(t, "test-image", m.Image)
 	assert.Equal(t, float64(100), m.CPUPercent)
 }
 
