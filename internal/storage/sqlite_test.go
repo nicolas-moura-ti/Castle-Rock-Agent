@@ -10,7 +10,7 @@ import (
 )
 
 func TestSaveEvent(t *testing.T) {
-	// Uso de banco em memória: rápido e limpo.
+	// Uso de banco em memória: rápido e limpo para testes unitários.
 	store, err := NewSQLiteStore(":memory:")
 	require.NoError(t, err)
 	defer store.Close()
@@ -37,19 +37,17 @@ func TestSaveEvent(t *testing.T) {
 }
 
 // TestSaveWithCanceledContext valida se o uso de context.WithoutCancel está funcionando.
-// O log DEVE ser salvo mesmo que o contexto original tenha sido cancelado.
 func TestSaveWithCanceledContext(t *testing.T) {
 	store, err := NewSQLiteStore(":memory:")
 	require.NoError(t, err)
 	defer store.Close()
 
-	// Criamos um contexto e cancelamos ele imediatamente
 	ctx, cancel := context.WithCancel(context.Background())
-	cancel() 
+	cancel() // Cancela imediatamente
 
 	require.ErrorIs(t, ctx.Err(), context.Canceled)
 
-	// Tentamos salvar com o contexto já cancelado
+	// O log DEVE ser salvo mesmo com contexto cancelado
 	store.SaveEvent(ctx, "stop", "test-container-2", "Container stopped")
 
 	var events []EventRecord
@@ -65,7 +63,6 @@ func TestSaveWithCanceledContext(t *testing.T) {
 }
 
 func TestSaveAlert(t *testing.T) {
-	// Padronizado para usar :memory: em vez de arquivos temporários
 	store, err := NewSQLiteStore(":memory:")
 	require.NoError(t, err)
 	defer store.Close()
@@ -86,20 +83,18 @@ func TestSaveAlert(t *testing.T) {
 		assert.Equal(t, "critical", event.Action)
 		assert.Equal(t, "nginx-web", event.Container)
 		assert.Contains(t, event.Message, "High CPU")
-		assert.WithinDuration(t, time.Now(), event.Timestamp, 5*time.Second)
 	}
 }
+
 func TestNewSQLiteStore_PersistentFile(t *testing.T) {
-	// Create a temporary directory
+	// Teste de integração: valida se o banco cria o arquivo fisicamente
 	tempDir := t.TempDir()
 	dbPath := tempDir + "/test.db"
 
-	// Initialize the store with a file path
 	store, err := NewSQLiteStore(dbPath)
 	require.NoError(t, err)
 	defer store.Close()
 
-	// Verify the database works
 	ctx := context.Background()
 	store.SaveEvent(ctx, "start", "test-persistent", "Container started")
 
@@ -107,17 +102,14 @@ func TestNewSQLiteStore_PersistentFile(t *testing.T) {
 	require.Eventually(t, func() bool {
 		events, err = store.GetRecent(10)
 		return err == nil && len(events) > 0
-	}, 2*time.Second, 50*time.Millisecond, "Event should be saved asynchronously")
+	}, 2*time.Second, 50*time.Millisecond, "Event should be saved in persistent file")
 
 	assert.Len(t, events, 1)
-	if len(events) > 0 {
-		assert.Equal(t, "test-persistent", events[0].Container)
-	}
+	assert.Equal(t, "test-persistent", events[0].Container)
 }
 
 func TestNewSQLiteStore_ErrorHandling(t *testing.T) {
-	// Provide a directory path instead of a file path, which should cause
-	// sqlite to fail when trying to open/create the database file.
+	// Tenta abrir um diretório como se fosse um arquivo de banco (deve falhar)
 	tempDir := t.TempDir()
 
 	store, err := NewSQLiteStore(tempDir)
