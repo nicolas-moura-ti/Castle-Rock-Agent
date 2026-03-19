@@ -23,8 +23,16 @@ func TestAutoPruner_Start(t *testing.T) {
 	cli, _ := docker.NewClient()
 
 	pruner := NewAutoPruner(cli, nil, 80.0)
+
+	checkCalled := make(chan struct{}, 1)
+
 	// Explicitly mock the diskCheckFunc to return 0% usage to prevent any pruning logic
+	// and signal that it was called.
 	pruner.diskCheckFunc = func(ctx context.Context, path string) (*disk.UsageStat, error) {
+		select {
+		case checkCalled <- struct{}{}:
+		default:
+		}
 		return &disk.UsageStat{UsedPercent: 0.0}, nil
 	}
 
@@ -40,8 +48,13 @@ func TestAutoPruner_Start(t *testing.T) {
 		close(done)
 	}()
 
-	// Wait slightly longer than the check period to ensure the loop iterates at least once
-	time.Sleep(30 * time.Millisecond)
+	// Wait for the loop to iterate at least once
+	select {
+	case <-checkCalled:
+		// success, checkAndPrune was executed
+	case <-time.After(1 * time.Second):
+		t.Fatal("checkAndPrune was not called within timeout")
+	}
 
 	// Cancel context to stop the goroutine
 	cancel()
