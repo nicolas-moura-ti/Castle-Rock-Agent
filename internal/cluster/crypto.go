@@ -4,23 +4,24 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
-	"crypto/sha256"
 	"errors"
 	"io"
 
-	"golang.org/x/crypto/pbkdf2"
+	"golang.org/x/crypto/argon2"
 )
 
 const (
 	saltSize   = 16
-	iterations = 100000
+	argonTime  = 1
+	argonMem   = 64 * 1024
+	argonThred = 4
 	keySize    = 32
 )
 
 // deriveKey takes a shared secret and a salt, returning a 32-byte key
-// for use with AES-256.
+// for use with AES-256. Uses Argon2id for strong GPU resistance.
 func deriveKey(secret string, salt []byte) []byte {
-	return pbkdf2.Key([]byte(secret), salt, iterations, keySize, sha256.New)
+	return argon2.IDKey([]byte(secret), salt, argonTime, argonMem, argonThred, keySize)
 }
 
 // Encrypt payload using AES-GCM
