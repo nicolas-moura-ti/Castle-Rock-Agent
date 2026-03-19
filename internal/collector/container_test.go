@@ -25,14 +25,14 @@ func TestContainerCollector_Collect_Success(t *testing.T) {
 			return
 		}
 
-		// Mock container list com ID de 64 caracteres
+		// Mock container list com ID de 64 caracteres (Padrão Docker)
 		if strings.HasSuffix(r.URL.Path, "/containers/json") {
 			w.Header().Set("Content-Type", "application/json")
 			w.Write([]byte(`[{"Id":"1234567890123456789012345678901234567890123456789012345678901234","Names":["/test-container"],"Image":"test-image"}]`))
 			return
 		}
 
-		// Mock container stats utilizando o ID truncado (12 caracteres), conforme a main
+		// Mock container stats utilizando o ID truncado (12 caracteres)
 		if strings.HasSuffix(r.URL.Path, "/containers/123456789012/stats") {
 			w.Header().Set("Content-Type", "application/json")
 			statsJSON := `{
@@ -46,53 +46,24 @@ func TestContainerCollector_Collect_Success(t *testing.T) {
 					]
 				},
 				"num_procs":0,
-				"storage_stats":{},
 				"cpu_stats":{
-					"cpu_usage":{
-						"total_usage":100,
-						"percpu_usage":[50,50],
-						"usage_in_kernelmode":0,
-						"usage_in_usermode":0
-					},
+					"cpu_usage":{"total_usage":100, "percpu_usage":[50,50]},
 					"system_cpu_usage":200,
-					"online_cpus":2,
-					"throttling_data":{
-						"periods":0,
-						"throttled_periods":0,
-						"throttled_time":0
-					}
+					"online_cpus":2
 				},
 				"precpu_stats":{
-					"cpu_usage":{
-						"total_usage":50,
-						"percpu_usage":[25,25],
-						"usage_in_kernelmode":0,
-						"usage_in_usermode":0
-					},
+					"cpu_usage":{"total_usage":50, "percpu_usage":[25,25]},
 					"system_cpu_usage":100,
-					"online_cpus":2,
-					"throttling_data":{
-						"periods":0,
-						"throttled_periods":0,
-						"throttled_time":0
-					}
+					"online_cpus":2
 				},
 				"memory_stats":{
 					"usage":500,
-					"max_usage":0,
-					"stats":{},
 					"limit":1000
 				},
 				"networks":{
 					"eth0":{
 						"rx_bytes":10,
-						"rx_packets":0,
-						"rx_errors":0,
-						"rx_dropped":0,
-						"tx_bytes":20,
-						"tx_packets":0,
-						"tx_errors":0,
-						"tx_dropped":0
+						"tx_bytes":20
 					}
 				}
 			}`
@@ -104,7 +75,6 @@ func TestContainerCollector_Collect_Success(t *testing.T) {
 	}))
 	defer mockServer.Close()
 
-	// Redirect Docker client to the mock server
 	t.Setenv("DOCKER_HOST", mockServer.URL)
 
 	cli, err := docker.NewClient()
@@ -120,8 +90,59 @@ func TestContainerCollector_Collect_Success(t *testing.T) {
 	require.Len(t, metrics, 1)
 
 	m := metrics[0]
-	// Verificando o ID truncado de 12 caracteres
+	// Verificando o ID truncado de 12 caracteres (Lógica da Main)
 	assert.Equal(t, "123456789012", m.ContainerID)
 	assert.Equal(t, "test-container", m.ContainerName)
 	assert.Equal(t, "test-image", m.Image)
-	assert.Equal(t, float6
+	assert.Equal(t, float64(100), m.CPUPercent)
+	assert.Equal(t, uint64(500), m.MemoryUsage)
+	assert.Equal(t, uint64(1000), m.MemoryLimit)
+	assert.Equal(t, float64(50), m.MemoryPercent)
+	assert.Equal(t, uint64(10), m.NetworkRx)
+	assert.Equal(t, uint64(20), m.NetworkTx)
+}
+
+func TestContainerCollector_Collect_NilClient(t *testing.T) {
+	cfg := config.DefaultConfig()
+	c := collector.NewContainerCollector(nil, cfg, 1*time.Second)
+
+	metrics, err := c.Collect(context.Background())
+	require.Error(t, err)
+	assert.Nil(t, metrics)
+	assert.Contains(t, err.Error(), "collector: docker client is not initialized")
+}
+
+func TestContainerCollector_Collect_Error(t *testing.T) {
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/_ping" {
+			w.Header().Set("API-Version", "1.43")
+			w.Write([]byte("OK"))
+			return
+		}
+		if strings.HasSuffix(r.URL.Path, "/containers/json") {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(`{"message": "internal server error"}`))
+			return
+		}
+	}))
+	defer mockServer.Close()
+
+	t.Setenv("DOCKER_HOST", mockServer.URL)
+	cli, err := docker.NewClient()
+	require.NoError(t, err)
+	defer cli.Close()
+
+	cfg := config.DefaultConfig()
+	c := collector.NewContainerCollector(cli, cfg, 1*time.Second)
+
+	metrics, err := c.Collect(context.Background())
+	require.Error(t, err)
+	assert.Nil(t, metrics)
+	assert.Contains(t, err.Error(), "collector: failed to list running containers")
+}
+
+func TestContainerCollector_Name(t *testing.T) {
+	cfg := config.DefaultConfig()
+	c := collector.NewContainerCollector(nil, cfg, 1*time.Second)
+	assert.Equal(t, "container", c.Name())
+}
