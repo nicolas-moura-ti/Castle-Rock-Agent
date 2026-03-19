@@ -65,9 +65,9 @@ func NewSQLiteStore(dbPath string) (*SQLiteStore, error) {
 	return &SQLiteStore{db: db}, nil
 }
 
-// save persiste um evento ou alerta no banco de dados de forma assíncrona.
-// Utilizamos context.WithoutCancel para garantir que o registro seja salvo mesmo que 
-// o contexto de quem chamou (ex: uma request HTTP ou ação da TUI) seja cancelado.
+// save persists an event or alert in the database asynchronously.
+// We use context.WithoutCancel to ensure the record is saved even if
+// the caller's context (e.g., an HTTP request or TUI action) is canceled.
 func (s *SQLiteStore) save(ctx context.Context, recordType, actionOrSeverity, container, message string) {
 	go func() {
 		query := `INSERT INTO events (timestamp, type, action, container, message) VALUES (?, ?, ?, ?, ?)`
@@ -83,17 +83,17 @@ func (s *SQLiteStore) save(ctx context.Context, recordType, actionOrSeverity, co
 	}()
 }
 
-// SaveEvent persiste um evento do Docker (start, stop, etc) no histórico local.
+// SaveEvent persists a Docker event (start, stop, etc.) in the local history.
 func (s *SQLiteStore) SaveEvent(ctx context.Context, action, container, message string) {
 	s.save(ctx, "event", action, container, message)
 }
 
-// SaveAlert persiste o disparo de um alerta de monitoramento ou segurança.
+// SaveAlert persists the firing of a monitoring or security alert.
 func (s *SQLiteStore) SaveAlert(ctx context.Context, severity, container, message string) {
 	s.save(ctx, "alert", severity, container, message)
 }
 
-// GetRecent recupera os últimos N eventos para o histórico da TUI.
+// GetRecent retrieves the last N events for the TUI history.
 func (s *SQLiteStore) GetRecent(limit int) ([]EventRecord, error) {
 	query := `SELECT id, timestamp, type, action, container, message FROM events ORDER BY timestamp DESC LIMIT ?`
 	rows, err := s.db.Query(query, limit)
@@ -121,7 +121,7 @@ func (s *SQLiteStore) GetRecent(limit int) ([]EventRecord, error) {
 	return results, nil
 }
 
-// Close garante o fechamento correto do banco e do arquivo WAL.
+// Close ensures the proper closing of the database and the WAL file.
 func (s *SQLiteStore) Close() error {
 	return s.db.Close()
 }
