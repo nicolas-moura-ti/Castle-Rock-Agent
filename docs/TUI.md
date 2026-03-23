@@ -37,7 +37,7 @@ When running `make run`, the agent opens a fullscreen dashboard designed for sea
 | `Shift+L` | Toggle aggregated logs for **all selected** containers |
 | `/` | Apply Live Grep (filter) while viewing logs |
 | `f` | Return to auto-tailing at the bottom of the logs |
-| `E` | Export current log view to `/tmp/castle-rock-logs-*.txt` |
+| `E` | Export current log view to a secure temporary file (`/tmp/castle-rock-logs-*.txt`) |
 | `x` | Open Interactive Shell inside container (`/bin/sh` or `/bin/bash`) |
 | `C` | Open Interactive Prune Dashboard (Cleanup images/volumes) |
 | `s` | **Stop** container (asks for `y` confirmation) |
@@ -106,7 +106,7 @@ The TUI includes a native **Advanced Logs Viewer** packed with modern CLI featur
 3. **⏪ History Pagination:** Scroll back without losing context.
 4. **🎨 JSON Highlighting:** Automatically colorizes standard JSON log levels (`error`, `warn`, `info`).
 5. **⏱️ Timestamps:** Renders exact ISO8601 timestamps in muted gray.
-6. **📤 Quick Export:** Press `E` while viewing a log panel to save a snapshot directly to `/tmp/castle-rock-logs-[name]-[timestamp].txt`.
+6. **📤 Quick Export:** Press `E` while viewing a log panel to save a snapshot directly to a secure temporary file in `/tmp` (e.g., `castle-rock-logs-[name]-[random].txt`).
 
 ---
 

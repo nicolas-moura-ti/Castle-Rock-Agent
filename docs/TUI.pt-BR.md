@@ -37,7 +37,7 @@ Quando você roda `make run`, o agente abre um dashboard fullscreen, desenvolvid
 | `Shift+L` | Juntar logs de **todos os selecionados** em um lugar só |
 | `/` | Live Grep (filtro rápido) nos logs |
 | `f` | Voltar para o fim dos logs (auto-scroll) |
-| `E` | Exportar logs atuais direto para `/tmp/castle-rock-logs-*.txt` |
+| `E` | Exportar logs atuais para um arquivo temporário seguro (`/tmp/castle-rock-logs-*.txt`) |
 | `x` | Abrir Shell Interativo dentro do container (`/bin/sh` ou `/bin/bash`) |
 | `C` | Dashboard Interativo de Prune (Limpeza instantânea de imagens/volumes) |
 | `s` | **Stop** container (pede confirmação com `y`) |
@@ -105,7 +105,7 @@ A TUI inclui um **Visualizador de Logs Avançado** nativo repleto de recursos mo
 3. **⏪ Paginação do Histórico:** Volte atrás na história com `↑/↓` (ou `k/j`).
 4. **🎨 Highlighting de JSON:** O visualizador colore automaticamente saídas JSON em `error`, `warn` e `info`.
 5. **⏱️ Timestamps Precisos:** Renderiza o tempo exato em ISO8601 acinzentado no início da linha para correlacionar logs com gráficos.
-6. **📤 Quick Export:** Aperte `E` enquanto vê um log para exportar um retrato daquele buffer instantaneamente para `/tmp/castle-rock-logs-*.txt`.
+6. **📤 Quick Export:** Aperte `E` enquanto vê um log para exportar um retrato daquele buffer instantaneamente para um arquivo temporário seguro em `/tmp` (ex: `castle-rock-logs-[nome]-[random].txt`).
 
 ---
 

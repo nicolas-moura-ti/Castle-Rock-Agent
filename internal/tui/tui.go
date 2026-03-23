@@ -630,15 +630,22 @@ func (m Model) exportLogs() (tea.Model, tea.Cmd) {
 			lineCount++
 		}
 	}
-	fileName := "/tmp/castle-rock-logs"
+	pattern := "castle-rock-logs-"
 	if len(m.logContainers) == 1 {
-		fileName += "-" + m.logContainers[0]
+		pattern += m.logContainers[0] + "-"
 	} else {
-		fileName += "-multi"
+		pattern += "multi-"
 	}
-	fileName += fmt.Sprintf("-%d.txt", time.Now().Unix())
+	pattern += "*.txt"
 
-	err := os.WriteFile(fileName, []byte(content.String()), 0644)
+	f, err := os.CreateTemp("", pattern)
+	var fileName string
+	if err == nil {
+		fileName = f.Name()
+		_, err = f.WriteString(content.String())
+		f.Close()
+	}
+
 	if err != nil {
 		m.events = append([]EventLogEntry{{
 			Time: time.Now(), Icon: "❌", Action: "export fail", Name: err.Error(),
