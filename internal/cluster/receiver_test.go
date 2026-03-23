@@ -11,6 +11,31 @@ import (
 	"github.com/nicolas-moura-ti/castle-rock-agent/pkg/models"
 )
 
+func TestNewReceiver(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), nil))
+	store := NewMemoryStore(logger)
+	secret := "shared-secret"
+	token := "auth-token"
+
+	receiver := NewReceiver(logger, store, secret, token)
+
+	if receiver == nil {
+		t.Fatal("expected receiver to be not nil")
+	}
+	if receiver.store != store {
+		t.Errorf("expected store %v, got %v", store, receiver.store)
+	}
+	if receiver.log != logger {
+		t.Errorf("expected logger %v, got %v", logger, receiver.log)
+	}
+	if receiver.sharedSecret != secret {
+		t.Errorf("expected sharedSecret %s, got %s", secret, receiver.sharedSecret)
+	}
+	if receiver.token != token {
+		t.Errorf("expected token %s, got %s", token, receiver.token)
+	}
+}
+
 func TestReceiver_ServeHTTP(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), nil))
 	token := "secret-key"
