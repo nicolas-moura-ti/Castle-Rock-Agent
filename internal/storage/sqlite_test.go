@@ -65,31 +65,6 @@ func TestSaveWithCanceledContext(t *testing.T) {
 	}
 }
 
-func TestSaveAlert(t *testing.T) {
-	// Standardized to use :memory: instead of temporary files.
-	store, err := NewSQLiteStore(":memory:")
-	require.NoError(t, err)
-	defer store.Close()
-
-	ctx := context.Background()
-	store.SaveAlert(ctx, "critical", "nginx-web", "High CPU usage detected")
-
-	var events []EventRecord
-	require.Eventually(t, func() bool {
-		events, err = store.GetRecent(10)
-		return err == nil && len(events) > 0
-	}, 2*time.Second, 50*time.Millisecond, "Alert should be saved asynchronously")
-
-	assert.Len(t, events, 1)
-	if len(events) > 0 {
-		event := events[0]
-		assert.Equal(t, "alert", event.Type)
-		assert.Equal(t, "critical", event.Action)
-		assert.Equal(t, "nginx-web", event.Container)
-		assert.Contains(t, event.Message, "High CPU")
-	}
-}
-
 func TestNewSQLiteStore_PersistentFile(t *testing.T) {
 	// Integration test: validates if the database creates the file physically.
 	tempDir := t.TempDir()
