@@ -1054,34 +1054,39 @@ func (m Model) appendSecurityAlerts(b *strings.Builder, containerID string, maxW
 
 func (m Model) appendCommandAndMounts(b *strings.Builder, c logger.ContainerDisplay) {
 	if c.Entrypoint != "" {
-		b.WriteString(lipgloss.NewStyle().Bold(true).Foreground(secondaryColor).Render("\n ⚙️  Command") + "\n")
-		b.WriteString(lipgloss.NewStyle().Foreground(primaryColor).Render(
-			fmt.Sprintf("   %s", c.Entrypoint)) + "\n")
+		b.WriteString(lipgloss.NewStyle().Bold(true).Foreground(secondaryColor).Render("\n ⚙️  Command"))
+		b.WriteByte('\n')
+		b.WriteString("   ")
+		b.WriteString(lipgloss.NewStyle().Foreground(primaryColor).Render(c.Entrypoint))
+		b.WriteByte('\n')
 	}
 
 	if len(c.Mounts) > 0 {
-		b.WriteString(lipgloss.NewStyle().Bold(true).Foreground(secondaryColor).Render("\n 📂 Volumes / Mounts") + "\n")
+		b.WriteString(lipgloss.NewStyle().Bold(true).Foreground(secondaryColor).Render("\n 📂 Volumes / Mounts"))
+		b.WriteByte('\n')
 		for i, mt := range c.Mounts {
 			if i >= 8 {
-				b.WriteString(lipgloss.NewStyle().Foreground(mutedColor).Render(
-					fmt.Sprintf("   ... +%d more", len(c.Mounts)-8)) + "\n")
+				fmt.Fprintf(b, "   %s\n", lipgloss.NewStyle().Foreground(mutedColor).Render(
+					fmt.Sprintf("... +%d more", len(c.Mounts)-8)))
 				break
 			}
-			b.WriteString(lipgloss.NewStyle().Foreground(mutedColor).Render(
-				fmt.Sprintf("   %s", mt)) + "\n")
+			fmt.Fprintf(b, "   %s\n", lipgloss.NewStyle().Foreground(mutedColor).Render(mt))
 		}
 	}
 }
 
 func (m Model) appendRestartAndLimits(b *strings.Builder, c logger.ContainerDisplay) {
 	if c.RestartPolicy != "" {
-		b.WriteString(lipgloss.NewStyle().Bold(true).Foreground(secondaryColor).Render("\n 🔄 Restart Policy") + "\n")
-		policyStr := c.RestartPolicy
+		b.WriteString(lipgloss.NewStyle().Bold(true).Foreground(secondaryColor).Render("\n 🔄 Restart Policy"))
+		b.WriteByte('\n')
+
+		b.WriteString("   ")
+		b.WriteString(c.RestartPolicy)
 		if c.RestartCount > 0 {
-			policyStr += lipgloss.NewStyle().Foreground(lipgloss.Color("#BF616A")).Render(
-				fmt.Sprintf("  (crashed %dx)", c.RestartCount))
+			b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#BF616A")).Render(
+				fmt.Sprintf("  (crashed %dx)", c.RestartCount)))
 		}
-		b.WriteString(fmt.Sprintf("   %s\n", policyStr))
+		b.WriteByte('\n')
 	}
 
 	cpuLabel := lipgloss.NewStyle().Foreground(lipgloss.Color("#BF616A")).Render("unlimited ⚠")
@@ -1094,8 +1099,8 @@ func (m Model) appendRestartAndLimits(b *strings.Builder, c logger.ContainerDisp
 		memLabel = lipgloss.NewStyle().Foreground(lipgloss.Color("#A3BE8C")).Render(
 			formatBytes(uint64(c.MemoryLimit)))
 	}
-	b.WriteString(lipgloss.NewStyle().Bold(true).Foreground(secondaryColor).Render("\n 🚧 Resource Limits") + "\n")
-	b.WriteString(fmt.Sprintf("   CPU: %s   MEM: %s\n", cpuLabel, memLabel))
+	fmt.Fprintf(b, "\n %s\n", lipgloss.NewStyle().Bold(true).Foreground(secondaryColor).Render("🚧 Resource Limits"))
+	fmt.Fprintf(b, "   CPU: %s   MEM: %s\n", cpuLabel, memLabel)
 }
 
 func (m Model) appendHealthAndEnv(b *strings.Builder, c logger.ContainerDisplay) {
@@ -1110,20 +1115,21 @@ func (m Model) appendHealthAndEnv(b *strings.Builder, c logger.ContainerDisplay)
 			healthIcon = "⏳"
 			healthColor = lipgloss.Color("#EBCB8B")
 		}
-		b.WriteString(lipgloss.NewStyle().Bold(true).Foreground(healthColor).Render(
-			fmt.Sprintf("\n %s Health: %s", healthIcon, c.HealthStatus)) + "\n")
+		fmt.Fprintf(b, "\n %s\n", lipgloss.NewStyle().Bold(true).Foreground(healthColor).Render(
+			fmt.Sprintf("%s Health: %s", healthIcon, c.HealthStatus)))
 		if c.HealthLog != "" {
-			b.WriteString(lipgloss.NewStyle().Foreground(mutedColor).Render(
-				fmt.Sprintf("   Last check: %s", c.HealthLog)) + "\n")
+			fmt.Fprintf(b, "   %s\n", lipgloss.NewStyle().Foreground(mutedColor).Render(
+				fmt.Sprintf("Last check: %s", c.HealthLog)))
 		}
 	}
 
 	if len(c.Env) > 0 {
-		b.WriteString(lipgloss.NewStyle().Bold(true).Foreground(secondaryColor).Render("\n 🔎 Env Variables") + "\n")
+		b.WriteString(lipgloss.NewStyle().Bold(true).Foreground(secondaryColor).Render("\n 🔎 Env Variables"))
+		b.WriteByte('\n')
 		for i, env := range c.Env {
 			if i >= 15 {
-				b.WriteString(lipgloss.NewStyle().Foreground(mutedColor).Render(
-					fmt.Sprintf("   ... +%d more", len(c.Env)-15)) + "\n")
+				fmt.Fprintf(b, "   %s\n", lipgloss.NewStyle().Foreground(mutedColor).Render(
+					fmt.Sprintf("... +%d more", len(c.Env)-15)))
 				break
 			}
 			parts := strings.SplitN(env, "=", 2)
@@ -1133,9 +1139,9 @@ func (m Model) appendHealthAndEnv(b *strings.Builder, c logger.ContainerDisplay)
 				if len(val) > 50 {
 					val = val[:47] + "..."
 				}
-				b.WriteString(fmt.Sprintf("   %s=%s\n", key, val))
+				fmt.Fprintf(b, "   %s=%s\n", key, val)
 			} else {
-				b.WriteString(fmt.Sprintf("   %s\n", env))
+				fmt.Fprintf(b, "   %s\n", env)
 			}
 		}
 	}
@@ -1143,12 +1149,12 @@ func (m Model) appendHealthAndEnv(b *strings.Builder, c logger.ContainerDisplay)
 
 func (m Model) appendStats(b *strings.Builder, c logger.ContainerDisplay) {
 	if stats, ok := m.stats[c.ID]; ok {
-		b.WriteString(lipgloss.NewStyle().Bold(true).Foreground(secondaryColor).Render("\n 📊 "+m.msg.Metrics) + "\n")
-		b.WriteString(fmt.Sprintf(" CPU:      %s\n", formatCPU(stats.CPUPercent)))
-		b.WriteString(fmt.Sprintf(" %-9s %s / %s (%s)\n",
-			m.msg.Memory, formatBytes(stats.MemoryUsage), formatBytes(stats.MemoryLimit), formatMemPercent(stats.MemoryPercent)))
-		b.WriteString(fmt.Sprintf(" %-9s %-12s %-9s %s\n",
-			m.msg.NetworkDown, formatBytes(stats.NetworkRx), m.msg.NetworkUp, formatBytes(stats.NetworkTx)))
+		fmt.Fprintf(b, "\n %s\n", lipgloss.NewStyle().Bold(true).Foreground(secondaryColor).Render("📊 "+m.msg.Metrics))
+		fmt.Fprintf(b, " CPU:      %s\n", formatCPU(stats.CPUPercent))
+		fmt.Fprintf(b, " %-9s %s / %s (%s)\n",
+			m.msg.Memory, formatBytes(stats.MemoryUsage), formatBytes(stats.MemoryLimit), formatMemPercent(stats.MemoryPercent))
+		fmt.Fprintf(b, " %-9s %-12s %-9s %s\n",
+			m.msg.NetworkDown, formatBytes(stats.NetworkRx), m.msg.NetworkUp, formatBytes(stats.NetworkTx))
 	}
 }
 
