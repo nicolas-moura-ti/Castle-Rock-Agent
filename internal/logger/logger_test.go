@@ -9,6 +9,29 @@ import (
 	"time"
 )
 
+func TestNewPrettyHandler(t *testing.T) {
+	var buf bytes.Buffer
+
+	// Test with nil options
+	h1 := NewPrettyHandler(&buf, nil)
+	if h1.w != &buf {
+		t.Error("Expected writer to be set correctly")
+	}
+	if h1.level != slog.LevelInfo {
+		t.Errorf("Expected default level Info, got %v", h1.level)
+	}
+
+	// Test with provided options
+	opts := &PrettyHandlerOptions{Level: slog.LevelDebug}
+	h2 := NewPrettyHandler(&buf, opts)
+	if h2.w != &buf {
+		t.Error("Expected writer to be set correctly")
+	}
+	if h2.level != slog.LevelDebug {
+		t.Errorf("Expected provided level Debug, got %v", h2.level)
+	}
+}
+
 func TestPrettyHandler_Enabled(t *testing.T) {
 	// Create a handler with Info level
 	h := NewPrettyHandler(nil, &PrettyHandlerOptions{Level: slog.LevelInfo})
