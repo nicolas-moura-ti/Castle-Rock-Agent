@@ -64,27 +64,40 @@ func NewSQLiteStore(dbPath string) (*SQLiteStore, error) {
 	return &SQLiteStore{db: db}, nil
 }
 
+// saveOptions holds the parameters for the save function.
+type saveOptions struct {
+	RecordType       string
+	ActionOrSeverity string
+	Container        string
+	Message          string
+}
+
 // save persists an event or alert in the database asynchronously.
 // We use context.WithoutCancel to ensure the record is saved even if
 // the caller's context (e.g., an HTTP request or TUI action) is canceled.
-func (s *SQLiteStore) save(ctx context.Context, recordType, actionOrSeverity, container, message string) {
+func (s *SQLiteStore) save(ctx context.Context, opts saveOptions) {
 	go func() {
 		query := `INSERT INTO events (timestamp, type, action, container, message) VALUES (?, ?, ?, ?, ?)`
 		s.db.ExecContext(
 			context.WithoutCancel(ctx),
 			query,
 			time.Now().UTC(),
-			recordType,
-			actionOrSeverity,
-			container,
-			message,
+			opts.RecordType,
+			opts.ActionOrSeverity,
+			opts.Container,
+			opts.Message,
 		)
 	}()
 }
 
 // SaveEvent persists a Docker event (start, stop, etc.) in the local history.
 func (s *SQLiteStore) SaveEvent(ctx context.Context, action, container, message string) {
-	s.save(ctx, "event", action, container, message)
+	s.save(ctx, saveOptions{
+		RecordType:       "event",
+		ActionOrSeverity: action,
+		Container:        container,
+		Message:          message,
+	})
 }
 
 // GetRecent retrieves the last N events for the TUI history.
