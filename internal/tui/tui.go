@@ -126,10 +126,11 @@ type Model struct {
 
 	// Alerts
 	alertEngine    *alerts.Engine
-	activeAlerts   []alerts.Alert
-	securityAlerts []alerts.Alert
-	alertMarks     map[string]string // ContainerID -> Alert mark string
-	auditor        *security.Auditor
+	activeAlerts      []alerts.Alert
+	securityAlerts    []alerts.Alert
+	securityAlertsMap map[string][]alerts.Alert
+	alertMarks        map[string]string // ContainerID -> Alert mark string
+	auditor           *security.Auditor
 
 	// Logs
 	logLines      []LogEntry
@@ -193,10 +194,11 @@ func NewModel(dockerClient docker.ContainerEngine, receiver metrics.ClusterProvi
 		events:         []EventLogEntry{},
 		sysInfo:        sysInfo,
 		alertEngine:    engine,
-		activeAlerts:   []alerts.Alert{},
-		securityAlerts: []alerts.Alert{},
-		alertMarks:     make(map[string]string),
-		auditor:        security.NewAuditor(dockerClient),
+		activeAlerts:      []alerts.Alert{},
+		securityAlerts:    []alerts.Alert{},
+		securityAlertsMap: make(map[string][]alerts.Alert),
+		alertMarks:        make(map[string]string),
+		auditor:           security.NewAuditor(dockerClient),
 		mapper:         topology.NewMapper(dockerClient),
 		logLines:       []LogEntry{},
 		selectedIDs:    make(map[string]bool),
@@ -303,6 +305,12 @@ func (m Model) processSecurityAlerts() Model {
 
 	oldAlertsCount := len(m.securityAlerts)
 	m.securityAlerts = m.auditor.Audit(m.ctx, m.containers)
+
+	m.securityAlertsMap = make(map[string][]alerts.Alert)
+	for _, a := range m.securityAlerts {
+		m.securityAlertsMap[a.ContainerID] = append(m.securityAlertsMap[a.ContainerID], a)
+	}
+
 	if len(m.securityAlerts) > oldAlertsCount {
 		m.events = append([]EventLogEntry{{
 			Time:   time.Now(),
@@ -1009,12 +1017,7 @@ func (m Model) renderContainerDetail() string {
 }
 
 func (m Model) appendSecurityAlerts(b *strings.Builder, containerID string, maxW int) {
-	var cSecAlerts []alerts.Alert
-	for _, a := range m.securityAlerts {
-		if a.ContainerID == containerID {
-			cSecAlerts = append(cSecAlerts, a)
-		}
-	}
+	cSecAlerts := m.securityAlertsMap[containerID]
 
 	if len(cSecAlerts) > 0 {
 		b.WriteString(lipgloss.NewStyle().Bold(true).Foreground(warningColor).Render("\n 🛡️ "+m.msg.SecurityAudit) + "\n")
