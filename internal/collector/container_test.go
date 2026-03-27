@@ -95,7 +95,7 @@ func TestContainerCollector_Collect_NilClient(t *testing.T) {
 	cfg := config.DefaultConfig()
 	c := collector.NewContainerCollector(nil, cfg, 1*time.Second)
 
-	metrics, err := c.Collect(context.Background())
+	_, err := c.Collect(context.Background())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "collector: docker client is not initialized")
 }
@@ -121,4 +121,51 @@ func TestContainerCollector_Collect_Error(t *testing.T) {
 func TestContainerCollector_Name(t *testing.T) {
 	c := collector.NewContainerCollector(nil, config.DefaultConfig(), 1*time.Second)
 	assert.Equal(t, "container", c.Name())
+}
+// Add missing methods to mockContainerEngine to satisfy docker.ContainerEngine interface
+func (m *mockContainerEngine) GetDiskUsage(ctx context.Context) (docker.SystemDiskUsage, error) {
+	return docker.SystemDiskUsage{}, nil
+}
+func (m *mockContainerEngine) ListNetworks(ctx context.Context) ([]network.Inspect, error) {
+	return nil, nil
+}
+func (m *mockContainerEngine) GetSystemInfo(ctx context.Context) (map[string]string, error) {
+	return nil, nil
+}
+
+func (m *mockContainerEngine) InspectContainer(ctx context.Context, id string) (types.ContainerJSON, error) {
+	return types.ContainerJSON{}, nil
+}
+
+func (m *mockContainerEngine) ListRunningContainersDetailed(ctx context.Context, all bool) ([]logger.ContainerDisplay, error) {
+	return nil, nil
+}
+
+func (m *mockContainerEngine) PruneImages(ctx context.Context) (uint64, error) {
+	return 0, nil
+}
+func (m *mockContainerEngine) PruneUnused(ctx context.Context) (uint64, error) {
+	return 0, nil
+}
+func (m *mockContainerEngine) PruneVolumes(ctx context.Context) (uint64, error) {
+	return 0, nil
+}
+
+func (m *mockContainerEngine) RestartContainer(ctx context.Context, id string) error {
+	return nil
+}
+func (m *mockContainerEngine) RunStressTest(ctx context.Context, mode string, duration int) error {
+	return nil
+}
+func (m *mockContainerEngine) StopContainer(ctx context.Context, id string) error {
+	return nil
+}
+func (m *mockContainerEngine) StreamContainerLogs(ctx context.Context, containerID string) (<-chan string, error) {
+	return nil, nil
+}
+
+func (m *mockContainerEngine) SetIncludeContainers(includes []string) {}
+
+func (m *mockContainerEngine) WatchEvents(ctx context.Context) (<-chan docker.ContainerEvent, <-chan error) {
+	return nil, nil
 }

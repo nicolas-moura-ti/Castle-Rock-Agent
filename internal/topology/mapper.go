@@ -39,7 +39,7 @@ func (m *Mapper) BuildMap(ctx context.Context) ([]NetworkEdge, error) {
 		return nil, err
 	}
 
-	var edges []NetworkEdge
+	edges := make([]NetworkEdge, 0, len(nets))
 
 	for _, n := range nets {
 		// Skip empty built-in networks
@@ -47,14 +47,25 @@ func (m *Mapper) BuildMap(ctx context.Context) ([]NetworkEdge, error) {
 			continue
 		}
 
-		var nodes []NetworkNode
+		nodes := make([]NetworkNode, 0, len(n.Containers))
 		for id, endpoint := range n.Containers {
 			// EndpointName usually has the clean name without slash
 			name := endpoint.Name
+
+			ip := endpoint.IPv4Address
+			if idx := strings.IndexByte(ip, '/'); idx != -1 {
+				ip = ip[:idx]
+			}
+
+			idStr := id
+			if len(idStr) > 12 {
+				idStr = idStr[:12]
+			}
+
 			nodes = append(nodes, NetworkNode{
 				ContainerName: name,
-				ContainerID:   id[:12],
-				IPv4Address:   strings.Split(endpoint.IPv4Address, "/")[0],
+				ContainerID:   idStr,
+				IPv4Address:   ip,
 			})
 		}
 
