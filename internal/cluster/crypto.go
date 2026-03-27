@@ -12,7 +12,7 @@ import (
 
 const (
 	saltSize   = 16
-	argonTime  = 1
+	argonTime  = 3
 	argonMem   = 64 * 1024
 	argonThred = 4
 	keySize    = 32
