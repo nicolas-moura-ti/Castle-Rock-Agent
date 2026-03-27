@@ -253,3 +253,164 @@ func TestNewEngine(t *testing.T) {
 		})
 	}
 }
+
+// TestGetActiveAlerts verifies the retrieval and deduplication
+// of active alerts by the Engine.
+func TestGetActiveAlerts(t *testing.T) {
+	tests := []struct {
+		name         string
+		activeAlerts map[string]Alert
+		expected     []Alert
+	}{
+		{
+			name:         "Empty state",
+			activeAlerts: map[string]Alert{},
+			expected:     []Alert{},
+		},
+		{
+			name: "Single alert",
+			activeAlerts: map[string]Alert{
+				"container1:cpu_percent": {
+					ContainerID: "container1",
+					Metric:      "cpu_percent",
+					Severity:    "warning",
+				},
+			},
+			expected: []Alert{
+				{
+					ContainerID: "container1",
+					Metric:      "cpu_percent",
+					Severity:    "warning",
+				},
+			},
+		},
+		{
+			name: "Multiple independent alerts",
+			activeAlerts: map[string]Alert{
+				"container1:cpu_percent": {
+					ContainerID: "container1",
+					Metric:      "cpu_percent",
+					Severity:    "warning",
+				},
+				"container2:memory_percent": {
+					ContainerID: "container2",
+					Metric:      "memory_percent",
+					Severity:    "critical",
+				},
+			},
+			expected: []Alert{
+				{
+					ContainerID: "container1",
+					Metric:      "cpu_percent",
+					Severity:    "warning",
+				},
+				{
+					ContainerID: "container2",
+					Metric:      "memory_percent",
+					Severity:    "critical",
+				},
+			},
+		},
+		{
+			name: "Deduplication: higher severity overwrites lower",
+			activeAlerts: map[string]Alert{
+				"container1:rule1": {
+					ContainerID: "container1",
+					Metric:      "cpu_percent",
+					Severity:    "warning",
+				},
+				"container1:rule2": {
+					ContainerID: "container1",
+					Metric:      "cpu_percent",
+					Severity:    "critical",
+				},
+			},
+			expected: []Alert{
+				{
+					ContainerID: "container1",
+					Metric:      "cpu_percent",
+					Severity:    "critical",
+				},
+			},
+		},
+		{
+			name: "Deduplication: higher severity already exists",
+			activeAlerts: map[string]Alert{
+				"container1:rule2": {
+					ContainerID: "container1",
+					Metric:      "cpu_percent",
+					Severity:    "critical",
+				},
+				"container1:rule1": {
+					ContainerID: "container1",
+					Metric:      "cpu_percent",
+					Severity:    "warning",
+				},
+			},
+			expected: []Alert{
+				{
+					ContainerID: "container1",
+					Metric:      "cpu_percent",
+					Severity:    "critical",
+				},
+			},
+		},
+		{
+			name: "Deduplication: same severity",
+			activeAlerts: map[string]Alert{
+				"container1:rule1": {
+					ContainerID: "container1",
+					Metric:      "cpu_percent",
+					Severity:    "critical",
+					RuleName:    "rule1",
+				},
+				"container1:rule2": {
+					ContainerID: "container1",
+					Metric:      "cpu_percent",
+					Severity:    "critical",
+					RuleName:    "rule2", // this one is kept or the first one depending on map iteration order, but the logic just takes the first and doesn't update if weight is not strictly greater
+				},
+			},
+			// map iteration is random, but GetActiveAlerts does not overwrite if weight is not strictly greater
+			// So it's non-deterministic which one we get unless we use assert.ElementsMatch,
+			// but we expect exactly 1 element. Let's just check length and severity.
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			engine := NewEngine(nil)
+			engine.activeAlerts = tt.activeAlerts
+
+			result := engine.GetActiveAlerts()
+
+			if tt.name == "Deduplication: same severity" {
+				if len(result) != 1 {
+					t.Fatalf("expected 1 alert, got %d", len(result))
+				}
+				if result[0].Severity != "critical" {
+					t.Errorf("expected severity critical, got %s", result[0].Severity)
+				}
+				return
+			}
+
+			if len(result) != len(tt.expected) {
+				t.Fatalf("expected %d alerts, got %d", len(tt.expected), len(result))
+			}
+
+			// For simplicity since order is random, just verify each expected alert exists in result
+			for _, exp := range tt.expected {
+				found := false
+				for _, res := range result {
+					if res.ContainerID == exp.ContainerID && res.Metric == exp.Metric && res.Severity == exp.Severity {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("expected to find alert %v in result %v", exp, result)
+				}
+			}
+		})
+	}
+}
