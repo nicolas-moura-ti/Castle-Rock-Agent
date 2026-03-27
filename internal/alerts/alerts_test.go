@@ -190,3 +190,66 @@ func TestAlertResolvesWhenConditionClears(t *testing.T) {
 		t.Errorf("Expected 0 active alerts after CPU normalized, got %d", len(active))
 	}
 }
+
+// TestNewEngine verifies that the engine is properly initialized
+// with different variations of input rules.
+func TestNewEngine(t *testing.T) {
+	tests := []struct {
+		name  string
+		rules []config.AlertRule
+	}{
+		{
+			name:  "nil rules",
+			rules: nil,
+		},
+		{
+			name:  "empty rules",
+			rules: []config.AlertRule{},
+		},
+		{
+			name: "with rules",
+			rules: []config.AlertRule{
+				{
+					Name:      "High CPU",
+					Metric:    "cpu_percent",
+					Operator:  ">",
+					Threshold: 80.0,
+					Duration:  1 * time.Minute,
+					Severity:  "critical",
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			engine := NewEngine(tt.rules)
+
+			if engine == nil {
+				t.Fatalf("NewEngine returned nil")
+			}
+
+			if tt.rules == nil {
+				if engine.rules != nil {
+					t.Errorf("Expected engine.rules to be nil, got %v", engine.rules)
+				}
+			} else {
+				if len(engine.rules) != len(tt.rules) {
+					t.Errorf("Expected rules length %d, got %d", len(tt.rules), len(engine.rules))
+				}
+			}
+
+			if engine.conditionStart == nil {
+				t.Errorf("Expected engine.conditionStart to be initialized, got nil")
+			}
+
+			if engine.activeAlerts == nil {
+				t.Errorf("Expected engine.activeAlerts to be initialized, got nil")
+			}
+
+			if engine.firedAlerts == nil {
+				t.Errorf("Expected engine.firedAlerts to be initialized, got nil")
+			}
+		})
+	}
+}
