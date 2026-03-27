@@ -414,3 +414,74 @@ func TestGetActiveAlerts(t *testing.T) {
 		})
 	}
 }
+
+// TestGetPendingCount verifies the count of conditions being evaluated.
+func TestGetPendingCount(t *testing.T) {
+	tests := []struct {
+		name           string
+		conditionStart map[string]time.Time
+		activeAlerts   map[string]Alert
+		expected       int
+	}{
+		{
+			name:           "Empty state",
+			conditionStart: map[string]time.Time{},
+			activeAlerts:   map[string]Alert{},
+			expected:       0,
+		},
+		{
+			name: "Only pending conditions",
+			conditionStart: map[string]time.Time{
+				"container1:rule1": time.Now(),
+				"container2:rule1": time.Now(),
+			},
+			activeAlerts: map[string]Alert{},
+			expected:     2,
+		},
+		{
+			name: "Only active alerts",
+			conditionStart: map[string]time.Time{
+				"container1:rule1": time.Now(),
+			},
+			activeAlerts: map[string]Alert{
+				"container1:rule1": {},
+			},
+			expected: 0,
+		},
+		{
+			name: "Mixed state",
+			conditionStart: map[string]time.Time{
+				"container1:rule1": time.Now(), // active alert
+				"container2:rule1": time.Now(), // pending
+				"container3:rule2": time.Now(), // pending
+			},
+			activeAlerts: map[string]Alert{
+				"container1:rule1": {},
+			},
+			expected: 2,
+		},
+		{
+			name: "Edge case: orphaned active alert (not in conditionStart)",
+			conditionStart: map[string]time.Time{
+				"container1:rule1": time.Now(), // pending
+			},
+			activeAlerts: map[string]Alert{
+				"container2:rule2": {}, // orphaned
+			},
+			expected: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			engine := NewEngine(nil)
+			engine.conditionStart = tt.conditionStart
+			engine.activeAlerts = tt.activeAlerts
+
+			result := engine.GetPendingCount()
+			if result != tt.expected {
+				t.Errorf("expected %d pending conditions, got %d", tt.expected, result)
+			}
+		})
+	}
+}
