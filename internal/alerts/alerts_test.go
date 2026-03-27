@@ -43,6 +43,61 @@ func TestEvaluateCondition(t *testing.T) {
 	}
 }
 
+// TestFormatAlert verifies that formatting an alert works correctly.
+func TestFormatAlert(t *testing.T) {
+	tests := []struct {
+		name     string
+		alert    Alert
+		expected string
+	}{
+		{
+			name: "Critical high CPU",
+			alert: Alert{
+				Severity:      "critical",
+				RuleName:      "High CPU",
+				Metric:        "cpu_percent",
+				CurrentValue:  95.5,
+				Threshold:     80.0,
+				ContainerName: "web-server",
+			},
+			expected: "[critical] High CPU: cpu_percent 95.5% > 80.0% (container: web-server)",
+		},
+		{
+			name: "Warning high memory",
+			alert: Alert{
+				Severity:      "warning",
+				RuleName:      "High Memory",
+				Metric:        "memory_percent",
+				CurrentValue:  75.0,
+				Threshold:     70.0,
+				ContainerName: "db-server",
+			},
+			expected: "[warning] High Memory: memory_percent 75.0% > 70.0% (container: db-server)",
+		},
+		{
+			name: "Integer values",
+			alert: Alert{
+				Severity:      "info",
+				RuleName:      "Disk Usage",
+				Metric:        "disk_percent",
+				CurrentValue:  99.0,
+				Threshold:     90.0,
+				ContainerName: "storage",
+			},
+			expected: "[info] Disk Usage: disk_percent 99.0% > 90.0% (container: storage)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := FormatAlert(tt.alert)
+			if result != tt.expected {
+				t.Errorf("FormatAlert() = %q, want %q", result, tt.expected)
+			}
+		})
+	}
+}
+
 // TestGetMetricValue tests metric value extraction.
 func TestGetMetricValue(t *testing.T) {
 	engine := NewEngine(nil)
