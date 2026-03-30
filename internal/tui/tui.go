@@ -629,8 +629,9 @@ func (m Model) exportLogs() (tea.Model, tea.Cmd) {
 	}
 	var content strings.Builder
 	lineCount := 0
+	searchLower := strings.ToLower(m.logSearch)
 	for _, entry := range m.logLines {
-		if m.logSearch == "" || strings.Contains(strings.ToLower(entry.Text), strings.ToLower(m.logSearch)) {
+		if m.logSearch == "" || strings.Contains(strings.ToLower(entry.Text), searchLower) {
 			if len(m.logContainers) > 1 {
 				content.WriteString("[" + entry.Container + "] ")
 			}
@@ -1210,8 +1211,9 @@ func (m Model) renderLogPanel() string {
 
 func (m Model) filterAndFormatLogs() []LogEntry {
 	var filtered []LogEntry
+	searchLower := strings.ToLower(m.logSearch)
 	for _, entry := range m.logLines {
-		if m.logSearch == "" || strings.Contains(strings.ToLower(entry.Text), strings.ToLower(m.logSearch)) {
+		if m.logSearch == "" || strings.Contains(strings.ToLower(entry.Text), searchLower) {
 			text := entry.Text
 
 			if len(text) > 30 && text[4] == '-' && text[7] == '-' && text[10] == 'T' {
