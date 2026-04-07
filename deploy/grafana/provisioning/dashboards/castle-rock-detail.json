@@ -1,566 +1,239 @@
 {
-    "annotations": {
-        "list": []
+  "uid": "castle-rock-detail",
+  "title": "Castle Rock — Container Detail",
+  "tags": ["castle-rock", "docker", "detail"],
+  "editable": true,
+  "graphTooltip": 2,
+  "schemaVersion": 39,
+  "time": { "from": "now-30m", "to": "now" },
+  "refresh": "5s",
+  "annotations": { "list": [] },
+  "templating": {
+    "list": [
+      {
+        "name": "container",
+        "label": "Container",
+        "type": "query",
+        "datasource": { "type": "prometheus" },
+        "definition": "label_values(castle_rock_container_info, container_name)",
+        "query": "label_values(castle_rock_container_info, container_name)",
+        "refresh": 2,
+        "sort": 1,
+        "includeAll": false,
+        "multi": false
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "row",
+      "id": 100,
+      "title": "📊 $container — Resumo",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }
     },
-    "editable": true,
-    "graphTooltip": 2,
-    "links": [
-        {
-            "icon": "external link",
-            "title": "← Voltar ao Overview",
-            "type": "link",
-            "url": "/d/castle-rock-dashboard/castle-rock-overview"
+    {
+      "type": "gauge",
+      "id": 1,
+      "title": "CPU Atual",
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 1 },
+      "datasource": { "type": "prometheus" },
+      "targets": [
+        { "expr": "castle_rock_container_cpu_percent{container_name=\"$container\"}", "instant": true }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [
+            { "color": "#22C55E", "value": null },
+            { "color": "#F59E0B", "value": 50 },
+            { "color": "#EF4444", "value": 80 }
+          ]},
+          "unit": "percent", "min": 0, "max": 100
         }
-    ],
-    "templating": {
-        "list": [
-            {
-                "current": {},
-                "datasource": {
-                    "type": "prometheus"
-                },
-                "definition": "label_values(castle_rock_container_info, container_name)",
-                "name": "container",
-                "label": "Container",
-                "type": "query",
-                "refresh": 2,
-                "sort": 1,
-                "includeAll": false,
-                "multi": false,
-                "query": {
-                    "query": "label_values(castle_rock_container_info, container_name)"
-                }
-            }
+      }
+    },
+    {
+      "type": "gauge",
+      "id": 2,
+      "title": "Memória Atual",
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 1 },
+      "datasource": { "type": "prometheus" },
+      "targets": [
+        { "expr": "castle_rock_container_memory_percent{container_name=\"$container\"}", "instant": true }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [
+            { "color": "#22C55E", "value": null },
+            { "color": "#F59E0B", "value": 60 },
+            { "color": "#EF4444", "value": 85 }
+          ]},
+          "unit": "percent", "min": 0, "max": 100
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "id": 3,
+      "title": "RAM Usada",
+      "gridPos": { "h": 5, "w": 4, "x": 12, "y": 1 },
+      "datasource": { "type": "prometheus" },
+      "targets": [
+        { "expr": "castle_rock_container_memory_usage_bytes{container_name=\"$container\"}", "instant": true }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [{ "color": "#3B82F6", "value": null }] },
+          "unit": "decbytes"
+        }
+      },
+      "options": { "colorMode": "background_solid", "graphMode": "none", "textMode": "value" }
+    },
+    {
+      "type": "stat",
+      "id": 4,
+      "title": "RAM Limite",
+      "gridPos": { "h": 5, "w": 4, "x": 16, "y": 1 },
+      "datasource": { "type": "prometheus" },
+      "targets": [
+        { "expr": "castle_rock_container_memory_limit_bytes{container_name=\"$container\"}", "instant": true }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [{ "color": "#6B7280", "value": null }] },
+          "unit": "decbytes"
+        }
+      },
+      "options": { "colorMode": "background_solid", "graphMode": "none", "textMode": "value" }
+    },
+    {
+      "type": "stat",
+      "id": 5,
+      "title": "Network Total",
+      "gridPos": { "h": 5, "w": 4, "x": 20, "y": 1 },
+      "datasource": { "type": "prometheus" },
+      "targets": [
+        { "expr": "castle_rock_container_network_rx_bytes{container_name=\"$container\"} + castle_rock_container_network_tx_bytes{container_name=\"$container\"}", "instant": true }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [{ "color": "#8B5CF6", "value": null }] },
+          "unit": "decbytes"
+        }
+      },
+      "options": { "colorMode": "background_solid", "graphMode": "none", "textMode": "value" }
+    },
+
+    {
+      "type": "row",
+      "id": 101,
+      "title": "📈 CPU",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 6 }
+    },
+    {
+      "type": "timeseries",
+      "id": 10,
+      "title": "CPU % — $container",
+      "description": "Histórico de uso de CPU. Linhas horizontais: warning 50%, critical 80%.",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 7 },
+      "datasource": { "type": "prometheus" },
+      "targets": [
+        { "expr": "castle_rock_container_cpu_percent{container_name=\"$container\"}", "legendFormat": "CPU %" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "fixedColor": "#3B82F6", "mode": "fixed" },
+          "custom": { "fillOpacity": 15, "lineInterpolation": "smooth", "lineWidth": 2, "showPoints": "never", "thresholdsStyle": { "mode": "dashed" } },
+          "unit": "percent", "min": 0,
+          "thresholds": { "steps": [
+            { "color": "transparent", "value": null },
+            { "color": "#F59E0B", "value": 50 },
+            { "color": "#EF4444", "value": 80 }
+          ]}
+        }
+      }
+    },
+
+    {
+      "type": "row",
+      "id": 102,
+      "title": "💾 Memória",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 15 }
+    },
+    {
+      "type": "timeseries",
+      "id": 20,
+      "title": "Memória — Uso vs Limite",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 },
+      "datasource": { "type": "prometheus" },
+      "targets": [
+        { "expr": "castle_rock_container_memory_usage_bytes{container_name=\"$container\"}", "legendFormat": "Uso" },
+        { "expr": "castle_rock_container_memory_limit_bytes{container_name=\"$container\"}", "legendFormat": "Limite" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "fillOpacity": 10, "lineInterpolation": "smooth", "lineWidth": 2, "showPoints": "never" },
+          "unit": "decbytes"
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Limite" },
+            "properties": [
+              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } },
+              { "id": "custom.fillOpacity", "value": 0 },
+              { "id": "color", "value": { "fixedColor": "#EF4444", "mode": "fixed" } }
+            ]
+          }
         ]
+      }
     },
-    "panels": [
-        {
-            "gridPos": {
-                "h": 1,
-                "w": 24,
-                "x": 0,
-                "y": 0
-            },
-            "id": 100,
-            "title": "📊 $container — Resumo",
-            "type": "row"
-        },
-        {
-            "datasource": {
-                "type": "prometheus"
-            },
-            "fieldConfig": {
-                "defaults": {
-                    "color": {
-                        "mode": "thresholds"
-                    },
-                    "unit": "percent",
-                    "min": 0,
-                    "max": 100,
-                    "thresholds": {
-                        "steps": [
-                            {
-                                "color": "#22C55E",
-                                "value": null
-                            },
-                            {
-                                "color": "#EAB308",
-                                "value": 40
-                            },
-                            {
-                                "color": "#EF4444",
-                                "value": 80
-                            }
-                        ]
-                    }
-                }
-            },
-            "gridPos": {
-                "h": 5,
-                "w": 6,
-                "x": 0,
-                "y": 1
-            },
-            "id": 1,
-            "title": "CPU Atual",
-            "type": "gauge",
-            "targets": [
-                {
-                    "expr": "castle_rock_container_cpu_percent{container_name=\"$container\"}",
-                    "instant": true
-                }
-            ],
-            "options": {
-                "showThresholdMarkers": true
-            }
-        },
-        {
-            "datasource": {
-                "type": "prometheus"
-            },
-            "fieldConfig": {
-                "defaults": {
-                    "color": {
-                        "mode": "thresholds"
-                    },
-                    "unit": "percent",
-                    "min": 0,
-                    "max": 100,
-                    "thresholds": {
-                        "steps": [
-                            {
-                                "color": "#22C55E",
-                                "value": null
-                            },
-                            {
-                                "color": "#EAB308",
-                                "value": 50
-                            },
-                            {
-                                "color": "#EF4444",
-                                "value": 85
-                            }
-                        ]
-                    }
-                }
-            },
-            "gridPos": {
-                "h": 5,
-                "w": 6,
-                "x": 6,
-                "y": 1
-            },
-            "id": 2,
-            "title": "Memória Atual",
-            "type": "gauge",
-            "targets": [
-                {
-                    "expr": "castle_rock_container_memory_percent{container_name=\"$container\"}",
-                    "instant": true
-                }
-            ],
-            "options": {
-                "showThresholdMarkers": true
-            }
-        },
-        {
-            "datasource": {
-                "type": "prometheus"
-            },
-            "fieldConfig": {
-                "defaults": {
-                    "color": {
-                        "mode": "thresholds"
-                    },
-                    "unit": "decbytes",
-                    "thresholds": {
-                        "steps": [
-                            {
-                                "color": "#06B6D4",
-                                "value": null
-                            }
-                        ]
-                    }
-                }
-            },
-            "gridPos": {
-                "h": 5,
-                "w": 4,
-                "x": 12,
-                "y": 1
-            },
-            "id": 3,
-            "title": "RAM Usada",
-            "type": "stat",
-            "targets": [
-                {
-                    "expr": "castle_rock_container_memory_usage_bytes{container_name=\"$container\"}",
-                    "instant": true
-                }
-            ],
-            "options": {
-                "colorMode": "background_solid",
-                "graphMode": "area",
-                "textMode": "value"
-            }
-        },
-        {
-            "datasource": {
-                "type": "prometheus"
-            },
-            "fieldConfig": {
-                "defaults": {
-                    "color": {
-                        "mode": "thresholds"
-                    },
-                    "unit": "decbytes",
-                    "thresholds": {
-                        "steps": [
-                            {
-                                "color": "#6B7280",
-                                "value": null
-                            }
-                        ]
-                    }
-                }
-            },
-            "gridPos": {
-                "h": 5,
-                "w": 4,
-                "x": 16,
-                "y": 1
-            },
-            "id": 4,
-            "title": "RAM Limite",
-            "type": "stat",
-            "targets": [
-                {
-                    "expr": "castle_rock_container_memory_limit_bytes{container_name=\"$container\"}",
-                    "instant": true
-                }
-            ],
-            "options": {
-                "colorMode": "background_solid",
-                "graphMode": "none",
-                "textMode": "value"
-            }
-        },
-        {
-            "datasource": {
-                "type": "prometheus"
-            },
-            "fieldConfig": {
-                "defaults": {
-                    "color": {
-                        "mode": "thresholds"
-                    },
-                    "unit": "decbytes",
-                    "thresholds": {
-                        "steps": [
-                            {
-                                "color": "#7C3AED",
-                                "value": null
-                            }
-                        ]
-                    }
-                }
-            },
-            "gridPos": {
-                "h": 5,
-                "w": 4,
-                "x": 20,
-                "y": 1
-            },
-            "id": 5,
-            "title": "Network Total",
-            "type": "stat",
-            "targets": [
-                {
-                    "expr": "castle_rock_container_network_rx_bytes{container_name=\"$container\"} + castle_rock_container_network_tx_bytes{container_name=\"$container\"}",
-                    "instant": true
-                }
-            ],
-            "options": {
-                "colorMode": "background_solid",
-                "graphMode": "area",
-                "textMode": "value"
-            }
-        },
-        {
-            "gridPos": {
-                "h": 1,
-                "w": 24,
-                "x": 0,
-                "y": 6
-            },
-            "id": 101,
-            "title": "📈 CPU — Histórico",
-            "type": "row"
-        },
-        {
-            "datasource": {
-                "type": "prometheus"
-            },
-            "fieldConfig": {
-                "defaults": {
-                    "color": {
-                        "fixedColor": "#7C3AED",
-                        "mode": "fixed"
-                    },
-                    "custom": {
-                        "axisLabel": "CPU %",
-                        "lineWidth": 2,
-                        "fillOpacity": 30,
-                        "gradientMode": "opacity",
-                        "showPoints": "never",
-                        "lineInterpolation": "smooth",
-                        "thresholdsStyle": {
-                            "mode": "line+area"
-                        }
-                    },
-                    "unit": "percent",
-                    "min": 0,
-                    "thresholds": {
-                        "mode": "absolute",
-                        "steps": [
-                            {
-                                "color": "transparent",
-                                "value": null
-                            },
-                            {
-                                "color": "rgba(234, 179, 8, 0.15)",
-                                "value": 50
-                            },
-                            {
-                                "color": "rgba(239, 68, 68, 0.15)",
-                                "value": 80
-                            }
-                        ]
-                    }
-                }
-            },
-            "gridPos": {
-                "h": 8,
-                "w": 24,
-                "x": 0,
-                "y": 7
-            },
-            "id": 10,
-            "title": "CPU % — $container",
-            "description": "Histórico de uso de CPU. Linhas horizontais mostram thresholds de warning (50%) e critical (80%).",
-            "type": "timeseries",
-            "targets": [
-                {
-                    "expr": "castle_rock_container_cpu_percent{container_name=\"$container\"}",
-                    "legendFormat": "CPU %"
-                }
-            ],
-            "options": {
-                "tooltip": {
-                    "mode": "single"
-                }
-            }
-        },
-        {
-            "gridPos": {
-                "h": 1,
-                "w": 24,
-                "x": 0,
-                "y": 15
-            },
-            "id": 102,
-            "title": "💾 Memória — Histórico",
-            "type": "row"
-        },
-        {
-            "datasource": {
-                "type": "prometheus"
-            },
-            "fieldConfig": {
-                "defaults": {
-                    "color": {
-                        "fixedColor": "#06B6D4",
-                        "mode": "fixed"
-                    },
-                    "custom": {
-                        "axisLabel": "Memory %",
-                        "lineWidth": 2,
-                        "fillOpacity": 30,
-                        "gradientMode": "opacity",
-                        "showPoints": "never",
-                        "lineInterpolation": "smooth",
-                        "thresholdsStyle": {
-                            "mode": "line+area"
-                        }
-                    },
-                    "unit": "percent",
-                    "min": 0,
-                    "max": 100,
-                    "thresholds": {
-                        "mode": "absolute",
-                        "steps": [
-                            {
-                                "color": "transparent",
-                                "value": null
-                            },
-                            {
-                                "color": "rgba(234, 179, 8, 0.15)",
-                                "value": 50
-                            },
-                            {
-                                "color": "rgba(239, 68, 68, 0.15)",
-                                "value": 85
-                            }
-                        ]
-                    }
-                }
-            },
-            "gridPos": {
-                "h": 8,
-                "w": 12,
-                "x": 0,
-                "y": 16
-            },
-            "id": 20,
-            "title": "Memória % — $container",
-            "type": "timeseries",
-            "targets": [
-                {
-                    "expr": "castle_rock_container_memory_percent{container_name=\"$container\"}",
-                    "legendFormat": "Memory %"
-                }
-            ]
-        },
-        {
-            "datasource": {
-                "type": "prometheus"
-            },
-            "fieldConfig": {
-                "defaults": {
-                    "color": {
-                        "mode": "palette-classic"
-                    },
-                    "custom": {
-                        "axisLabel": "Bytes",
-                        "lineWidth": 2,
-                        "fillOpacity": 15,
-                        "showPoints": "never",
-                        "lineInterpolation": "smooth"
-                    },
-                    "unit": "decbytes"
-                }
-            },
-            "gridPos": {
-                "h": 8,
-                "w": 12,
-                "x": 12,
-                "y": 16
-            },
-            "id": 21,
-            "title": "Memória — Uso vs Limite",
-            "type": "timeseries",
-            "targets": [
-                {
-                    "expr": "castle_rock_container_memory_usage_bytes{container_name=\"$container\"}",
-                    "legendFormat": "Usado"
-                },
-                {
-                    "expr": "castle_rock_container_memory_limit_bytes{container_name=\"$container\"}",
-                    "legendFormat": "Limite"
-                }
-            ]
-        },
-        {
-            "gridPos": {
-                "h": 1,
-                "w": 24,
-                "x": 0,
-                "y": 24
-            },
-            "id": 103,
-            "title": "🌐 Rede — Histórico",
-            "type": "row"
-        },
-        {
-            "datasource": {
-                "type": "prometheus"
-            },
-            "fieldConfig": {
-                "defaults": {
-                    "color": {
-                        "mode": "palette-classic"
-                    },
-                    "custom": {
-                        "lineWidth": 2,
-                        "fillOpacity": 20,
-                        "showPoints": "never",
-                        "lineInterpolation": "smooth"
-                    },
-                    "unit": "Bps"
-                }
-            },
-            "gridPos": {
-                "h": 8,
-                "w": 24,
-                "x": 0,
-                "y": 25
-            },
-            "id": 30,
-            "title": "Network I/O — $container",
-            "type": "timeseries",
-            "targets": [
-                {
-                    "expr": "rate(castle_rock_container_network_rx_bytes{container_name=\"$container\"}[5m])",
-                    "legendFormat": "↓ Download (RX)"
-                },
-                {
-                    "expr": "rate(castle_rock_container_network_tx_bytes{container_name=\"$container\"}[5m])",
-                    "legendFormat": "↑ Upload (TX)"
-                }
-            ]
-        },
-        {
-            "gridPos": {
-                "h": 1,
-                "w": 24,
-                "x": 0,
-                "y": 33
-            },
-            "id": 104,
-            "title": "💿 Disco — Histórico",
-            "type": "row"
-        },
-        {
-            "datasource": {
-                "type": "prometheus"
-            },
-            "fieldConfig": {
-                "defaults": {
-                    "color": {
-                        "mode": "palette-classic"
-                    },
-                    "custom": {
-                        "lineWidth": 2,
-                        "fillOpacity": 20,
-                        "showPoints": "never",
-                        "lineInterpolation": "smooth"
-                    },
-                    "unit": "Bps"
-                }
-            },
-            "gridPos": {
-                "h": 8,
-                "w": 24,
-                "x": 0,
-                "y": 34
-            },
-            "id": 40,
-            "title": "Disk I/O — $container",
-            "type": "timeseries",
-            "targets": [
-                {
-                    "expr": "rate(castle_rock_container_block_read_bytes{container_name=\"$container\"}[5m])",
-                    "legendFormat": "📖 Leitura"
-                },
-                {
-                    "expr": "rate(castle_rock_container_block_write_bytes{container_name=\"$container\"}[5m])",
-                    "legendFormat": "📝 Escrita"
-                }
-            ]
+
+    {
+      "type": "row",
+      "id": 103,
+      "title": "🌐 Rede & 💿 Disco",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 24 }
+    },
+    {
+      "type": "timeseries",
+      "id": 30,
+      "title": "Network I/O — $container",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 25 },
+      "datasource": { "type": "prometheus" },
+      "targets": [
+        { "expr": "castle_rock_container_network_rx_bytes{container_name=\"$container\"}", "legendFormat": "↓ Download (RX)" },
+        { "expr": "castle_rock_container_network_tx_bytes{container_name=\"$container\"}", "legendFormat": "↑ Upload (TX)" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "fillOpacity": 15, "lineInterpolation": "smooth", "lineWidth": 2, "showPoints": "never" },
+          "unit": "decbytes"
         }
-    ],
-    "schemaVersion": 39,
-    "tags": [
-        "docker",
-        "castle-rock",
-        "detail"
-    ],
-    "time": {
-        "from": "now-30m",
-        "to": "now"
+      }
     },
-    "refresh": "5s",
-    "title": "Castle Rock — Container Detail",
-    "uid": "castle-rock-detail",
-    "version": 1
+    {
+      "type": "timeseries",
+      "id": 40,
+      "title": "Disk I/O — $container",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 25 },
+      "datasource": { "type": "prometheus" },
+      "targets": [
+        { "expr": "castle_rock_container_block_read_bytes{container_name=\"$container\"}", "legendFormat": "Read" },
+        { "expr": "castle_rock_container_block_write_bytes{container_name=\"$container\"}", "legendFormat": "Write" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "fillOpacity": 15, "lineInterpolation": "smooth", "lineWidth": 2, "showPoints": "never" },
+          "unit": "decbytes"
+        }
+      }
+    }
+  ]
 }
