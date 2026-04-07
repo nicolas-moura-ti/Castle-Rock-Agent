@@ -4,7 +4,7 @@
 # Multi-stage build — best practice para containers Go:
 #   - Stage 1: compila com todas as ferramentas Go (~800MB)
 #   - Stage 2: copia apenas o binário para uma imagem mínima (~10MB)
-FROM golang:1.24-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 # Instala certificados CA para chamadas HTTPS
 RUN apk add --no-cache ca-certificates
