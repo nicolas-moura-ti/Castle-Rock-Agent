@@ -1,0 +1,309 @@
+{
+    "annotations": {
+        "list": []
+    },
+    "editable": true,
+    "graphTooltip": 2,
+    "panels": [
+        {
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 0
+            },
+            "id": 100,
+            "title": "⚡ Resumo de CPU",
+            "type": "row"
+        },
+        {
+            "datasource": {
+                "type": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "unit": "percent",
+                    "thresholds": {
+                        "steps": [
+                            {
+                                "color": "#22C55E",
+                                "value": null
+                            },
+                            {
+                                "color": "#EAB308",
+                                "value": 50
+                            },
+                            {
+                                "color": "#EF4444",
+                                "value": 80
+                            }
+                        ]
+                    }
+                }
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 8,
+                "x": 0,
+                "y": 1
+            },
+            "id": 1,
+            "title": "Média CPU %",
+            "type": "stat",
+            "targets": [
+                {
+                    "expr": "avg(castle_rock_container_cpu_percent)",
+                    "instant": true
+                }
+            ],
+            "options": {
+                "colorMode": "background_solid",
+                "graphMode": "area",
+                "textMode": "value"
+            }
+        },
+        {
+            "datasource": {
+                "type": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "unit": "percent",
+                    "thresholds": {
+                        "steps": [
+                            {
+                                "color": "#22C55E",
+                                "value": null
+                            },
+                            {
+                                "color": "#EAB308",
+                                "value": 70
+                            },
+                            {
+                                "color": "#EF4444",
+                                "value": 90
+                            }
+                        ]
+                    }
+                }
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 8,
+                "x": 8,
+                "y": 1
+            },
+            "id": 2,
+            "title": "Máxima CPU %",
+            "type": "stat",
+            "targets": [
+                {
+                    "expr": "max(castle_rock_container_cpu_percent)",
+                    "instant": true
+                }
+            ],
+            "options": {
+                "colorMode": "background_solid",
+                "graphMode": "area",
+                "textMode": "value"
+            }
+        },
+        {
+            "datasource": {
+                "type": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "unit": "short",
+                    "thresholds": {
+                        "steps": [
+                            {
+                                "color": "blue",
+                                "value": null
+                            }
+                        ]
+                    }
+                }
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 8,
+                "x": 16,
+                "y": 1
+            },
+            "id": 3,
+            "title": "Containers Ativos",
+            "type": "stat",
+            "targets": [
+                {
+                    "expr": "count(castle_rock_container_info)",
+                    "instant": true
+                }
+            ],
+            "options": {
+                "colorMode": "background_solid",
+                "graphMode": "none",
+                "textMode": "value"
+            }
+        },
+        {
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 5
+            },
+            "id": 101,
+            "title": "📈 Tendências de CPU",
+            "type": "row"
+        },
+        {
+            "datasource": {
+                "type": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "lineWidth": 2,
+                        "fillOpacity": 15,
+                        "showPoints": "never",
+                        "lineInterpolation": "smooth"
+                    },
+                    "unit": "percent",
+                    "min": 0
+                }
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 24,
+                "x": 0,
+                "y": 6
+            },
+            "id": 10,
+            "title": "CPU % por Container (Tempo Real)",
+            "type": "timeseries",
+            "targets": [
+                {
+                    "expr": "castle_rock_container_cpu_percent",
+                    "legendFormat": "{{container_name}}"
+                }
+            ],
+            "options": {
+                "tooltip": {
+                    "mode": "multi",
+                    "sort": "desc"
+                }
+            }
+        },
+        {
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 14
+            },
+            "id": 102,
+            "title": "📊 Comparação e Top Consumidores",
+            "type": "row"
+        },
+        {
+            "datasource": {
+                "type": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "continuous-GrYlRd"
+                    },
+                    "unit": "percent",
+                    "min": 0,
+                    "max": 100
+                }
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 15
+            },
+            "id": 20,
+            "title": "Top 10 Containers por CPU",
+            "type": "bargauge",
+            "targets": [
+                {
+                    "expr": "topk(10, sort_desc(castle_rock_container_cpu_percent))",
+                    "legendFormat": "{{container_name}}",
+                    "instant": true
+                }
+            ],
+            "options": {
+                "orientation": "horizontal",
+                "displayMode": "gradient"
+            }
+        },
+        {
+            "datasource": {
+                "type": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "unit": "percent"
+                }
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 15
+            },
+            "id": 21,
+            "title": "Distribuição de Carga",
+            "type": "piechart",
+            "targets": [
+                {
+                    "expr": "sum by (container_name) (castle_rock_container_cpu_percent)",
+                    "legendFormat": "{{container_name}}",
+                    "instant": true
+                }
+            ],
+            "options": {
+                "legend": {
+                    "displayMode": "list",
+                    "placement": "right"
+                },
+                "tooltip": {
+                    "mode": "single"
+                }
+            }
+        }
+    ],
+    "schemaVersion": 39,
+    "tags": [
+        "docker",
+        "castle-rock",
+        "cpu"
+    ],
+    "time": {
+        "from": "now-30m",
+        "to": "now"
+    },
+    "refresh": "5s",
+    "title": "Castle Rock — CPU Usage (Created by Gemini CLI)",
+    "uid": "castle-rock-cpu-cli",
+    "version": 1
+}

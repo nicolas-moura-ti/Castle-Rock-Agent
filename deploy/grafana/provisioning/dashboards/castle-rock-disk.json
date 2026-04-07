@@ -1,0 +1,272 @@
+{
+    "annotations": {
+        "list": []
+    },
+    "editable": true,
+    "graphTooltip": 2,
+    "panels": [
+        {
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 0
+            },
+            "id": 100,
+            "title": "💿 Resumo de I/O de Disco",
+            "type": "row"
+        },
+        {
+            "datasource": {
+                "type": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "unit": "Bps",
+                    "thresholds": {
+                        "steps": [
+                            {
+                                "color": "#06B6D4",
+                                "value": null
+                            }
+                        ]
+                    }
+                }
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 12,
+                "x": 0,
+                "y": 1
+            },
+            "id": 1,
+            "title": "Taxa Total de Leitura (Read)",
+            "type": "stat",
+            "targets": [
+                {
+                    "expr": "sum(rate(castle_rock_container_block_read_bytes[5m]))",
+                    "instant": true
+                }
+            ],
+            "options": {
+                "colorMode": "background_solid",
+                "graphMode": "area",
+                "textMode": "value"
+            }
+        },
+        {
+            "datasource": {
+                "type": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "unit": "Bps",
+                    "thresholds": {
+                        "steps": [
+                            {
+                                "color": "#7C3AED",
+                                "value": null
+                            }
+                        ]
+                    }
+                }
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 12,
+                "x": 12,
+                "y": 1
+            },
+            "id": 2,
+            "title": "Taxa Total de Escrita (Write)",
+            "type": "stat",
+            "targets": [
+                {
+                    "expr": "sum(rate(castle_rock_container_block_write_bytes[5m]))",
+                    "instant": true
+                }
+            ],
+            "options": {
+                "colorMode": "background_solid",
+                "graphMode": "area",
+                "textMode": "value"
+            }
+        },
+        {
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 5
+            },
+            "id": 101,
+            "title": "📈 Atividade de Disco por Container",
+            "type": "row"
+        },
+        {
+            "datasource": {
+                "type": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "lineWidth": 2,
+                        "fillOpacity": 15,
+                        "showPoints": "never",
+                        "lineInterpolation": "smooth"
+                    },
+                    "unit": "Bps"
+                }
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 6
+            },
+            "id": 10,
+            "title": "Leitura por Container (Read Rate)",
+            "type": "timeseries",
+            "targets": [
+                {
+                    "expr": "rate(castle_rock_container_block_read_bytes[5m])",
+                    "legendFormat": "{{container_name}}"
+                }
+            ]
+        },
+        {
+            "datasource": {
+                "type": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "lineWidth": 2,
+                        "fillOpacity": 15,
+                        "showPoints": "never",
+                        "lineInterpolation": "smooth"
+                    },
+                    "unit": "Bps"
+                }
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 6
+            },
+            "id": 11,
+            "title": "Escrita por Container (Write Rate)",
+            "type": "timeseries",
+            "targets": [
+                {
+                    "expr": "rate(castle_rock_container_block_write_bytes[5m])",
+                    "legendFormat": "{{container_name}}"
+                }
+            ]
+        },
+        {
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 14
+            },
+            "id": 102,
+            "title": "📊 Acumulado e Intensidade",
+            "type": "row"
+        },
+        {
+            "datasource": {
+                "type": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "unit": "decbytes"
+                }
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 15
+            },
+            "id": 20,
+            "title": "Total Lido desde o início do Container",
+            "type": "bargauge",
+            "targets": [
+                {
+                    "expr": "castle_rock_container_block_read_bytes",
+                    "legendFormat": "{{container_name}}",
+                    "instant": true
+                }
+            ],
+            "options": {
+                "orientation": "horizontal",
+                "displayMode": "gradient"
+            }
+        },
+        {
+            "datasource": {
+                "type": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "unit": "decbytes"
+                }
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 15
+            },
+            "id": 21,
+            "title": "Total Escrito desde o início do Container",
+            "type": "bargauge",
+            "targets": [
+                {
+                    "expr": "castle_rock_container_block_write_bytes",
+                    "legendFormat": "{{container_name}}",
+                    "instant": true
+                }
+            ],
+            "options": {
+                "orientation": "horizontal",
+                "displayMode": "gradient"
+            }
+        }
+    ],
+    "schemaVersion": 39,
+    "tags": [
+        "docker",
+        "castle-rock",
+        "disk"
+    ],
+    "time": {
+        "from": "now-30m",
+        "to": "now"
+    },
+    "refresh": "5s",
+    "title": "Castle Rock — Disk I/O (Created by Gemini CLI)",
+    "uid": "castle-rock-disk-cli",
+    "version": 1
+}

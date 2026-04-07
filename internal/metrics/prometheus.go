@@ -285,6 +285,9 @@ func (e *Exporter) collect(ctx context.Context) {
 		return
 	}
 
+	// Update self-monitoring metrics
+	MonitoredContainers.Set(float64(len(containers)))
+
 	// Reset old metrics (stopped containers)
 	e.cpuPercent.Reset()
 	e.memoryUsage.Reset()
