@@ -5,9 +5,13 @@
   "editable": true,
   "graphTooltip": 2,
   "schemaVersion": 39,
-  "time": { "from": "now-30m", "to": "now" },
+  "time": { "from": "now-1h", "to": "now" },
   "refresh": "5s",
   "annotations": { "list": [] },
+  "links": [
+    { "title": "← Voltar ao Overview", "url": "/d/castle-rock-dashboard", "type": "link", "icon": "arrow-left" },
+    { "title": "Agent Health", "url": "/d/castle-rock-agent-health", "type": "link", "icon": "heart" }
+  ],
   "templating": {
     "list": [
       {
@@ -26,16 +30,43 @@
   },
   "panels": [
     {
-      "type": "row",
-      "id": 100,
-      "title": "📊 $container — Resumo",
+      "type": "row", "id": 100,
+      "title": "🔍 $container — Status Atual",
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }
     },
     {
-      "type": "gauge",
-      "id": 1,
-      "title": "CPU Atual",
-      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 1 },
+      "type": "table", "id": 90,
+      "title": "📦 Container Info",
+      "description": "Metadados do container selecionado: imagem Docker, ID curto e host.",
+      "gridPos": { "h": 3, "w": 24, "x": 0, "y": 1 },
+      "datasource": { "type": "prometheus" },
+      "targets": [
+        { "expr": "castle_rock_container_info{container_name=\"$container\"}", "instant": true, "format": "table" }
+      ],
+      "transformations": [
+        { "id": "organize", "options": {
+          "excludeByName": { "Time": true, "Value": true, "__name__": true, "job": true, "instance": true, "env": true },
+          "indexByName": { "container_name": 0, "image": 1, "container_id": 2, "host_id": 3 },
+          "renameByName": {
+            "container_name": "Container",
+            "image": "Imagem Docker",
+            "container_id": "Container ID",
+            "host_id": "Host ID"
+          }
+        }}
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "align": "left" }
+        }
+      },
+      "options": { "showHeader": true, "footer": { "show": false } }
+    },
+    {
+      "type": "gauge", "id": 1,
+      "title": "CPU",
+      "description": "Uso instantâneo de CPU. Verde <50%, Amarelo 50-80%, Vermelho >80%.",
+      "gridPos": { "h": 5, "w": 4, "x": 0, "y": 4 },
       "datasource": { "type": "prometheus" },
       "targets": [
         { "expr": "castle_rock_container_cpu_percent{container_name=\"$container\"}", "instant": true }
@@ -53,10 +84,10 @@
       }
     },
     {
-      "type": "gauge",
-      "id": 2,
-      "title": "Memória Atual",
-      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 1 },
+      "type": "gauge", "id": 2,
+      "title": "Memória",
+      "description": "Percentual de uso da memória alocada. >85% = risco de OOM kill.",
+      "gridPos": { "h": 5, "w": 4, "x": 4, "y": 4 },
       "datasource": { "type": "prometheus" },
       "targets": [
         { "expr": "castle_rock_container_memory_percent{container_name=\"$container\"}", "instant": true }
@@ -74,10 +105,10 @@
       }
     },
     {
-      "type": "stat",
-      "id": 3,
+      "type": "stat", "id": 3,
       "title": "RAM Usada",
-      "gridPos": { "h": 5, "w": 4, "x": 12, "y": 1 },
+      "description": "Memória RAM efetivamente consumida pelo container.",
+      "gridPos": { "h": 5, "w": 4, "x": 8, "y": 4 },
       "datasource": { "type": "prometheus" },
       "targets": [
         { "expr": "castle_rock_container_memory_usage_bytes{container_name=\"$container\"}", "instant": true }
@@ -89,13 +120,13 @@
           "unit": "decbytes"
         }
       },
-      "options": { "colorMode": "background_solid", "graphMode": "none", "textMode": "value" }
+      "options": { "colorMode": "background_solid", "graphMode": "area", "textMode": "value" }
     },
     {
-      "type": "stat",
-      "id": 4,
+      "type": "stat", "id": 4,
       "title": "RAM Limite",
-      "gridPos": { "h": 5, "w": 4, "x": 16, "y": 1 },
+      "description": "Limite máximo de memória configurado para este container.",
+      "gridPos": { "h": 5, "w": 4, "x": 12, "y": 4 },
       "datasource": { "type": "prometheus" },
       "targets": [
         { "expr": "castle_rock_container_memory_limit_bytes{container_name=\"$container\"}", "instant": true }
@@ -110,36 +141,52 @@
       "options": { "colorMode": "background_solid", "graphMode": "none", "textMode": "value" }
     },
     {
-      "type": "stat",
-      "id": 5,
-      "title": "Network Total",
-      "gridPos": { "h": 5, "w": 4, "x": 20, "y": 1 },
+      "type": "stat", "id": 5,
+      "title": "↓ Download",
+      "description": "Total de bytes recebidos pela rede.",
+      "gridPos": { "h": 5, "w": 4, "x": 16, "y": 4 },
       "datasource": { "type": "prometheus" },
       "targets": [
-        { "expr": "castle_rock_container_network_rx_bytes{container_name=\"$container\"} + castle_rock_container_network_tx_bytes{container_name=\"$container\"}", "instant": true }
+        { "expr": "castle_rock_container_network_rx_bytes{container_name=\"$container\"}", "instant": true }
       ],
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "thresholds" },
-          "thresholds": { "steps": [{ "color": "#8B5CF6", "value": null }] },
+          "thresholds": { "steps": [{ "color": "#10B981", "value": null }] },
           "unit": "decbytes"
         }
       },
-      "options": { "colorMode": "background_solid", "graphMode": "none", "textMode": "value" }
+      "options": { "colorMode": "background_solid", "graphMode": "area", "textMode": "value" }
+    },
+    {
+      "type": "stat", "id": 6,
+      "title": "↑ Upload",
+      "description": "Total de bytes transmitidos pela rede.",
+      "gridPos": { "h": 5, "w": 4, "x": 20, "y": 4 },
+      "datasource": { "type": "prometheus" },
+      "targets": [
+        { "expr": "castle_rock_container_network_tx_bytes{container_name=\"$container\"}", "instant": true }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [{ "color": "#F59E0B", "value": null }] },
+          "unit": "decbytes"
+        }
+      },
+      "options": { "colorMode": "background_solid", "graphMode": "area", "textMode": "value" }
     },
 
     {
-      "type": "row",
-      "id": 101,
-      "title": "📈 CPU",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 6 }
+      "type": "row", "id": 101,
+      "title": "📈 CPU — Histórico",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 9 }
     },
     {
-      "type": "timeseries",
-      "id": 10,
+      "type": "timeseries", "id": 10,
       "title": "CPU % — $container",
-      "description": "Histórico de uso de CPU. Linhas horizontais: warning 50%, critical 80%.",
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 7 },
+      "description": "Histórico detalhado de uso de CPU. Linha vermelha tracejada = threshold 80%.",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 10 },
       "datasource": { "type": "prometheus" },
       "targets": [
         { "expr": "castle_rock_container_cpu_percent{container_name=\"$container\"}", "legendFormat": "CPU %" }
@@ -147,7 +194,9 @@
       "fieldConfig": {
         "defaults": {
           "color": { "fixedColor": "#3B82F6", "mode": "fixed" },
-          "custom": { "fillOpacity": 15, "lineInterpolation": "smooth", "lineWidth": 2, "showPoints": "never", "thresholdsStyle": { "mode": "dashed" } },
+          "custom": { "fillOpacity": 20, "lineInterpolation": "smooth", "lineWidth": 2, "showPoints": "never", "spanNulls": true,
+            "thresholdsStyle": { "mode": "dashed" }
+          },
           "unit": "percent", "min": 0,
           "thresholds": { "steps": [
             { "color": "transparent", "value": null },
@@ -159,16 +208,15 @@
     },
 
     {
-      "type": "row",
-      "id": 102,
-      "title": "💾 Memória",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 15 }
+      "type": "row", "id": 102,
+      "title": "💾 Memória — Histórico",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 18 }
     },
     {
-      "type": "timeseries",
-      "id": 20,
+      "type": "timeseries", "id": 20,
       "title": "Memória — Uso vs Limite",
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 },
+      "description": "Linha sólida = uso real. Linha tracejada vermelha = limite configurado. Quando se aproximam, risco de OOM.",
+      "gridPos": { "h": 8, "w": 16, "x": 0, "y": 19 },
       "datasource": { "type": "prometheus" },
       "targets": [
         { "expr": "castle_rock_container_memory_usage_bytes{container_name=\"$container\"}", "legendFormat": "Uso" },
@@ -177,7 +225,7 @@
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
-          "custom": { "fillOpacity": 10, "lineInterpolation": "smooth", "lineWidth": 2, "showPoints": "never" },
+          "custom": { "fillOpacity": 15, "lineInterpolation": "smooth", "lineWidth": 2, "showPoints": "never", "spanNulls": true },
           "unit": "decbytes"
         },
         "overrides": [
@@ -192,45 +240,109 @@
         ]
       }
     },
-
     {
-      "type": "row",
-      "id": 103,
-      "title": "🌐 Rede & 💿 Disco",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 24 }
-    },
-    {
-      "type": "timeseries",
-      "id": 30,
-      "title": "Network I/O — $container",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 25 },
+      "type": "timeseries", "id": 21,
+      "title": "Memória %",
+      "description": "Percentual de uso da memória ao longo do tempo. Linha tracejada em 85% indica zona de risco.",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 19 },
       "datasource": { "type": "prometheus" },
       "targets": [
-        { "expr": "castle_rock_container_network_rx_bytes{container_name=\"$container\"}", "legendFormat": "↓ Download (RX)" },
-        { "expr": "castle_rock_container_network_tx_bytes{container_name=\"$container\"}", "legendFormat": "↑ Upload (TX)" }
+        { "expr": "castle_rock_container_memory_percent{container_name=\"$container\"}", "legendFormat": "MEM %" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "fixedColor": "#8B5CF6", "mode": "fixed" },
+          "custom": { "fillOpacity": 20, "lineInterpolation": "smooth", "lineWidth": 2, "showPoints": "never", "spanNulls": true,
+            "thresholdsStyle": { "mode": "dashed" }
+          },
+          "unit": "percent", "min": 0, "max": 100,
+          "thresholds": { "steps": [
+            { "color": "transparent", "value": null },
+            { "color": "#EF4444", "value": 85 }
+          ]}
+        }
+      }
+    },
+
+    {
+      "type": "row", "id": 103,
+      "title": "🌐 Rede — Throughput",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 27 }
+    },
+    {
+      "type": "timeseries", "id": 30,
+      "title": "Network Throughput — $container",
+      "description": "Taxa real de download/upload em bytes/seg (derivada com rate). Muito mais útil que bytes acumulados.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
+      "datasource": { "type": "prometheus" },
+      "targets": [
+        { "expr": "rate(castle_rock_container_network_rx_bytes{container_name=\"$container\"}[5m])", "legendFormat": "↓ Download/s" },
+        { "expr": "rate(castle_rock_container_network_tx_bytes{container_name=\"$container\"}[5m])", "legendFormat": "↑ Upload/s" }
       ],
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
-          "custom": { "fillOpacity": 15, "lineInterpolation": "smooth", "lineWidth": 2, "showPoints": "never" },
-          "unit": "decbytes"
+          "custom": { "fillOpacity": 20, "lineInterpolation": "smooth", "lineWidth": 2, "showPoints": "never", "spanNulls": true },
+          "unit": "Bps"
         }
       }
     },
     {
-      "type": "timeseries",
-      "id": 40,
-      "title": "Disk I/O — $container",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 25 },
+      "type": "timeseries", "id": 31,
+      "title": "Network Acumulado — $container",
+      "description": "Total de bytes transferidos (RX + TX). Útil para ver o volume total desde o início.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
       "datasource": { "type": "prometheus" },
       "targets": [
-        { "expr": "castle_rock_container_block_read_bytes{container_name=\"$container\"}", "legendFormat": "Read" },
-        { "expr": "castle_rock_container_block_write_bytes{container_name=\"$container\"}", "legendFormat": "Write" }
+        { "expr": "castle_rock_container_network_rx_bytes{container_name=\"$container\"}", "legendFormat": "↓ Download Total" },
+        { "expr": "castle_rock_container_network_tx_bytes{container_name=\"$container\"}", "legendFormat": "↑ Upload Total" }
       ],
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
-          "custom": { "fillOpacity": 15, "lineInterpolation": "smooth", "lineWidth": 2, "showPoints": "never" },
+          "custom": { "fillOpacity": 10, "lineInterpolation": "smooth", "lineWidth": 2, "showPoints": "never", "spanNulls": true },
+          "unit": "decbytes"
+        }
+      }
+    },
+
+    {
+      "type": "row", "id": 104,
+      "title": "💿 Disco — I/O",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 36 }
+    },
+    {
+      "type": "timeseries", "id": 40,
+      "title": "Disk Throughput — $container",
+      "description": "Taxa de leitura/escrita em disco por segundo.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 37 },
+      "datasource": { "type": "prometheus" },
+      "targets": [
+        { "expr": "rate(castle_rock_container_block_read_bytes{container_name=\"$container\"}[5m])", "legendFormat": "Read/s" },
+        { "expr": "rate(castle_rock_container_block_write_bytes{container_name=\"$container\"}[5m])", "legendFormat": "Write/s" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "fillOpacity": 20, "lineInterpolation": "smooth", "lineWidth": 2, "showPoints": "never", "spanNulls": true },
+          "unit": "Bps"
+        }
+      }
+    },
+    {
+      "type": "timeseries", "id": 41,
+      "title": "Disk Acumulado — $container",
+      "description": "Total de bytes lidos/escritos em disco desde o início.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 37 },
+      "datasource": { "type": "prometheus" },
+      "targets": [
+        { "expr": "castle_rock_container_block_read_bytes{container_name=\"$container\"}", "legendFormat": "Read Total" },
+        { "expr": "castle_rock_container_block_write_bytes{container_name=\"$container\"}", "legendFormat": "Write Total" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "fillOpacity": 10, "lineInterpolation": "smooth", "lineWidth": 2, "showPoints": "never", "spanNulls": true },
           "unit": "decbytes"
         }
       }

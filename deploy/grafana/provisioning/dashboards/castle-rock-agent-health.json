@@ -1,328 +1,265 @@
 {
-    "annotations": {
-        "list": []
+  "uid": "castle-rock-agent-health",
+  "title": "Castle Rock — Agent Health",
+  "tags": ["castle-rock", "self-monitoring", "agent"],
+  "editable": true,
+  "graphTooltip": 2,
+  "schemaVersion": 39,
+  "time": { "from": "now-1h", "to": "now" },
+  "refresh": "10s",
+  "annotations": { "list": [] },
+  "links": [
+    { "title": "← Voltar ao Overview", "url": "/d/castle-rock-dashboard", "type": "link", "icon": "arrow-left" },
+    { "title": "Container Detail", "url": "/d/castle-rock-detail", "type": "link", "icon": "doc" }
+  ],
+  "panels": [
+    {
+      "type": "row", "id": 100,
+      "title": "🛡️ Status do Agente",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }
     },
-    "editable": true,
-    "graphTooltip": 2,
-    "panels": [
-        {
-            "gridPos": {
-                "h": 1,
-                "w": 24,
-                "x": 0,
-                "y": 0
-            },
-            "id": 100,
-            "title": "🛡️ Status do Agente",
-            "type": "row"
-        },
-        {
-            "datasource": {
-                "type": "prometheus"
-            },
-            "fieldConfig": {
-                "defaults": {
-                    "color": {
-                        "mode": "thresholds"
-                    },
-                    "unit": "short",
-                    "thresholds": {
-                        "steps": [
-                            {
-                                "color": "#22C55E",
-                                "value": null
-                            }
-                        ]
-                    }
-                }
-            },
-            "gridPos": {
-                "h": 4,
-                "w": 8,
-                "x": 0,
-                "y": 1
-            },
-            "id": 1,
-            "title": "Containers Monitorados",
-            "type": "stat",
-            "targets": [
-                {
-                    "expr": "castle_rock_monitored_containers_count or vector(0)",
-                    "instant": true
-                }
-            ],
-            "options": {
-                "colorMode": "background_solid",
-                "graphMode": "area",
-                "textMode": "value"
-            }
-        },
-        {
-            "datasource": {
-                "type": "prometheus"
-            },
-            "fieldConfig": {
-                "defaults": {
-                    "color": {
-                        "mode": "thresholds"
-                    },
-                    "unit": "percent",
-                    "thresholds": {
-                        "steps": [
-                            {
-                                "color": "#EF4444",
-                                "value": null
-                            },
-                            {
-                                "color": "#22C55E",
-                                "value": 80
-                            }
-                        ]
-                    }
-                }
-            },
-            "gridPos": {
-                "h": 4,
-                "w": 8,
-                "x": 8,
-                "y": 1
-            },
-            "id": 2,
-            "title": "Metadata Cache Hit Rate",
-            "type": "stat",
-            "targets": [
-                {
-                    "expr": "(rate(castle_rock_metadata_cache_hits_total[5m]) or vector(0)) / ((rate(castle_rock_metadata_cache_hits_total[5m]) or vector(0)) + (rate(castle_rock_metadata_cache_misses_total[5m]) or vector(0))) * 100",
-                    "instant": true
-                }
-            ],
-            "options": {
-                "colorMode": "background_solid",
-                "graphMode": "area",
-                "textMode": "value"
-            }
-        },
-        {
-            "datasource": {
-                "type": "prometheus"
-            },
-            "fieldConfig": {
-                "defaults": {
-                    "color": {
-                        "mode": "thresholds"
-                    },
-                    "unit": "short",
-                    "thresholds": {
-                        "steps": [
-                            {
-                                "color": "#22C55E",
-                                "value": null
-                            },
-                            {
-                                "color": "#EF4444",
-                                "value": 1
-                            }
-                        ]
-                    }
-                }
-            },
-            "gridPos": {
-                "h": 4,
-                "w": 8,
-                "x": 16,
-                "y": 1
-            },
-            "id": 3,
-            "title": "Falhas no Cluster Push (5m)",
-            "type": "stat",
-            "targets": [
-                {
-                    "expr": "increase(castle_rock_cluster_push_failures_total[5m]) or vector(0)",
-                    "instant": true
-                }
-            ],
-            "options": {
-                "colorMode": "background_solid",
-                "graphMode": "area",
-                "textMode": "value"
-            }
-        },
-        {
-            "gridPos": {
-                "h": 1,
-                "w": 24,
-                "x": 0,
-                "y": 5
-            },
-            "id": 101,
-            "title": "⚡ Performance Interna",
-            "type": "row"
-        },
-        {
-            "datasource": {
-                "type": "prometheus"
-            },
-            "fieldConfig": {
-                "defaults": {
-                    "color": {
-                        "mode": "palette-classic"
-                    },
-                    "custom": {
-                        "lineWidth": 2,
-                        "fillOpacity": 15,
-                        "showPoints": "never",
-                        "lineInterpolation": "smooth"
-                    },
-                    "unit": "s"
-                }
-            },
-            "gridPos": {
-                "h": 8,
-                "w": 12,
-                "x": 0,
-                "y": 6
-            },
-            "id": 10,
-            "title": "Latência Cluster Push (P99)",
-            "type": "timeseries",
-            "targets": [
-                {
-                    "expr": "histogram_quantile(0.99, sum by (le) (rate(castle_rock_cluster_push_duration_seconds_bucket[5m]))) or vector(0)",
-                    "legendFormat": "p99 latency"
-                }
-            ]
-        },
-        {
-            "datasource": {
-                "type": "prometheus"
-            },
-            "fieldConfig": {
-                "defaults": {
-                    "color": {
-                        "mode": "palette-classic"
-                    },
-                    "custom": {
-                        "lineWidth": 2,
-                        "fillOpacity": 15,
-                        "showPoints": "never",
-                        "lineInterpolation": "smooth"
-                    },
-                    "unit": "ops"
-                }
-            },
-            "gridPos": {
-                "h": 8,
-                "w": 12,
-                "x": 12,
-                "y": 6
-            },
-            "id": 11,
-            "title": "Metadata Cache Activity",
-            "type": "timeseries",
-            "targets": [
-                {
-                    "expr": "rate(castle_rock_metadata_cache_hits_total[5m]) or vector(0)",
-                    "legendFormat": "Hits"
-                },
-                {
-                    "expr": "rate(castle_rock_metadata_cache_misses_total[5m]) or vector(0)",
-                    "legendFormat": "Misses"
-                }
-            ]
-        },
-        {
-            "gridPos": {
-                "h": 1,
-                "w": 24,
-                "x": 0,
-                "y": 14
-            },
-            "id": 102,
-            "title": "🏗️ Recursos do Próprio Agente",
-            "type": "row"
-        },
-        {
-            "datasource": {
-                "type": "prometheus"
-            },
-            "fieldConfig": {
-                "defaults": {
-                    "color": {
-                        "mode": "palette-classic"
-                    },
-                    "custom": {
-                        "lineWidth": 2,
-                        "fillOpacity": 15,
-                        "showPoints": "never",
-                        "lineInterpolation": "smooth"
-                    },
-                    "unit": "percent",
-                    "min": 0
-                }
-            },
-            "gridPos": {
-                "h": 8,
-                "w": 12,
-                "x": 0,
-                "y": 15
-            },
-            "id": 20,
-            "title": "Agente — CPU %",
-            "type": "timeseries",
-            "targets": [
-                {
-                    "expr": "castle_rock_container_cpu_percent{container_name=~\"castle-rock-agent.*\"}",
-                    "legendFormat": "Agent CPU"
-                }
-            ]
-        },
-        {
-            "datasource": {
-                "type": "prometheus"
-            },
-            "fieldConfig": {
-                "defaults": {
-                    "color": {
-                        "mode": "palette-classic"
-                    },
-                    "custom": {
-                        "lineWidth": 2,
-                        "fillOpacity": 15,
-                        "showPoints": "never",
-                        "lineInterpolation": "smooth"
-                    },
-                    "unit": "decbytes"
-                }
-            },
-            "gridPos": {
-                "h": 8,
-                "w": 12,
-                "x": 12,
-                "y": 15
-            },
-            "id": 21,
-            "title": "Agente — Memória Uso",
-            "type": "timeseries",
-            "targets": [
-                {
-                    "expr": "castle_rock_container_memory_usage_bytes{container_name=~\"castle-rock-agent.*\"}",
-                    "legendFormat": "Agent RAM"
-                }
-            ]
+    {
+      "type": "stat", "id": 1,
+      "title": "Containers Monitorados",
+      "description": "Quantidade de containers Docker que o agente está acompanhando agora.",
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 1 },
+      "datasource": { "type": "prometheus" },
+      "targets": [
+        { "expr": "castle_rock_monitored_containers_count or vector(0)", "instant": true }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [
+            { "color": "#EF4444", "value": null },
+            { "color": "#22C55E", "value": 1 }
+          ]},
+          "unit": "short"
         }
-    ],
-    "schemaVersion": 39,
-    "tags": [
-        "castle-rock",
-        "self-monitoring",
-        "agent"
-    ],
-    "time": {
-        "from": "now-30m",
-        "to": "now"
+      },
+      "options": { "colorMode": "background_solid", "graphMode": "area", "textMode": "value" }
     },
-    "refresh": "5s",
-    "title": "Castle Rock — Agent Health (Created by Gemini CLI)",
-    "uid": "castle-rock-agent-health-cli",
-    "version": 1
+    {
+      "type": "gauge", "id": 2,
+      "title": "Cache Hit Rate",
+      "description": "Eficiência do cache de metadados Docker. >80% verde, <80% vermelho (muitos misses = queries desnecessárias ao Docker).",
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 1 },
+      "datasource": { "type": "prometheus" },
+      "targets": [
+        {
+          "expr": "((rate(castle_rock_metadata_cache_hits_total[5m])) / clamp_min(rate(castle_rock_metadata_cache_hits_total[5m]) + rate(castle_rock_metadata_cache_misses_total[5m]), 0.001)) * 100",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [
+            { "color": "#EF4444", "value": null },
+            { "color": "#F59E0B", "value": 50 },
+            { "color": "#22C55E", "value": 80 }
+          ]},
+          "unit": "percent", "min": 0, "max": 100, "noValue": "N/A"
+        }
+      }
+    },
+    {
+      "type": "stat", "id": 3,
+      "title": "Push Failures (5m)",
+      "description": "Falhas no push de métricas para o líder do cluster nos últimos 5 minutos. 0 = saudável.",
+      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 1 },
+      "datasource": { "type": "prometheus" },
+      "targets": [
+        { "expr": "increase(castle_rock_cluster_push_failures_total[5m]) or vector(0)", "instant": true }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [
+            { "color": "#22C55E", "value": null },
+            { "color": "#F59E0B", "value": 1 },
+            { "color": "#EF4444", "value": 5 }
+          ]},
+          "unit": "short", "decimals": 0
+        }
+      },
+      "options": { "colorMode": "background_solid", "graphMode": "area", "textMode": "value" }
+    },
+    {
+      "type": "stat", "id": 4,
+      "title": "Push Throughput",
+      "description": "Taxa de pushes de métricas por segundo para o cluster. Indica a frequência de envio.",
+      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 1 },
+      "datasource": { "type": "prometheus" },
+      "targets": [
+        { "expr": "rate(castle_rock_cluster_push_duration_seconds_count[5m]) or vector(0)", "instant": true }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [{ "color": "#3B82F6", "value": null }] },
+          "unit": "ops", "decimals": 2
+        }
+      },
+      "options": { "colorMode": "background_solid", "graphMode": "area", "textMode": "value" }
+    },
+
+    {
+      "type": "row", "id": 101,
+      "title": "⚡ Performance Interna",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 6 }
+    },
+    {
+      "type": "timeseries", "id": 10,
+      "title": "Latência Cluster Push",
+      "description": "Percentis de latência do push para o cluster. P50 = mediana, P95 = maioria, P99 = pior caso.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 7 },
+      "datasource": { "type": "prometheus" },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, sum by (le) (rate(castle_rock_cluster_push_duration_seconds_bucket[5m]))) or vector(0)", "legendFormat": "P50 (mediana)" },
+        { "expr": "histogram_quantile(0.95, sum by (le) (rate(castle_rock_cluster_push_duration_seconds_bucket[5m]))) or vector(0)", "legendFormat": "P95" },
+        { "expr": "histogram_quantile(0.99, sum by (le) (rate(castle_rock_cluster_push_duration_seconds_bucket[5m]))) or vector(0)", "legendFormat": "P99 (pior caso)" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2, "fillOpacity": 10, "showPoints": "never", "lineInterpolation": "smooth", "spanNulls": true },
+          "unit": "s"
+        }
+      }
+    },
+    {
+      "type": "timeseries", "id": 11,
+      "title": "Metadata Cache — Hits vs Misses",
+      "description": "Taxa de hits e misses no cache de metadados Docker. Missíssimos devem ser próximos de zero.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 7 },
+      "datasource": { "type": "prometheus" },
+      "targets": [
+        { "expr": "rate(castle_rock_metadata_cache_hits_total[5m]) or vector(0)", "legendFormat": "✅ Hits" },
+        { "expr": "rate(castle_rock_metadata_cache_misses_total[5m]) or vector(0)", "legendFormat": "❌ Misses" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2, "fillOpacity": 15, "showPoints": "never", "lineInterpolation": "smooth", "spanNulls": true },
+          "unit": "ops"
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "❌ Misses" },
+            "properties": [
+              { "id": "color", "value": { "fixedColor": "#EF4444", "mode": "fixed" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "✅ Hits" },
+            "properties": [
+              { "id": "color", "value": { "fixedColor": "#22C55E", "mode": "fixed" } }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "timeseries", "id": 12,
+      "title": "Push Failures — Histórico",
+      "description": "Taxa de falhas de push ao longo do tempo. Picos indicam problemas de conectividade com o líder.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 15 },
+      "datasource": { "type": "prometheus" },
+      "targets": [
+        { "expr": "rate(castle_rock_cluster_push_failures_total[5m]) or vector(0)", "legendFormat": "Falhas/s" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "fixedColor": "#EF4444", "mode": "fixed" },
+          "custom": { "lineWidth": 2, "fillOpacity": 20, "showPoints": "never", "lineInterpolation": "smooth", "spanNulls": true },
+          "unit": "ops", "min": 0
+        }
+      }
+    },
+    {
+      "type": "timeseries", "id": 13,
+      "title": "Cache Hit Rate — Histórico",
+      "description": "Evolução do hit rate ao longo do tempo. Queda repentina indica novos containers ou problemas.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 15 },
+      "datasource": { "type": "prometheus" },
+      "targets": [
+        {
+          "expr": "((rate(castle_rock_metadata_cache_hits_total[5m])) / clamp_min(rate(castle_rock_metadata_cache_hits_total[5m]) + rate(castle_rock_metadata_cache_misses_total[5m]), 0.001)) * 100",
+          "legendFormat": "Hit Rate %"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [
+            { "color": "#EF4444", "value": null },
+            { "color": "#F59E0B", "value": 50 },
+            { "color": "#22C55E", "value": 80 }
+          ]},
+          "custom": { "lineWidth": 2, "fillOpacity": 15, "showPoints": "never", "lineInterpolation": "smooth", "spanNulls": true,
+            "thresholdsStyle": { "mode": "dashed" }
+          },
+          "unit": "percent", "min": 0, "max": 100
+        }
+      }
+    },
+
+    {
+      "type": "row", "id": 102,
+      "title": "🏗️ Recursos do Próprio Agente",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 }
+    },
+    {
+      "type": "timeseries", "id": 20,
+      "title": "Agente — CPU %",
+      "description": "Uso de CPU do próprio container castle-rock-agent. Deve ser consistentemente baixo (<5%).",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "datasource": { "type": "prometheus" },
+      "targets": [
+        { "expr": "castle_rock_container_cpu_percent{container_name=~\"castle-rock-agent.*\"}", "legendFormat": "Agent CPU" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "fixedColor": "#22C55E", "mode": "fixed" },
+          "custom": { "lineWidth": 2, "fillOpacity": 15, "showPoints": "never", "lineInterpolation": "smooth", "spanNulls": true,
+            "thresholdsStyle": { "mode": "dashed" }
+          },
+          "unit": "percent", "min": 0,
+          "thresholds": { "steps": [
+            { "color": "transparent", "value": null },
+            { "color": "#EF4444", "value": 5 }
+          ]}
+        }
+      }
+    },
+    {
+      "type": "timeseries", "id": 21,
+      "title": "Agente — Memória",
+      "description": "Uso de RAM do próprio agente. Se crescer continuamente, pode indicar memory leak.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "datasource": { "type": "prometheus" },
+      "targets": [
+        { "expr": "castle_rock_container_memory_usage_bytes{container_name=~\"castle-rock-agent.*\"}", "legendFormat": "Agent RAM" },
+        { "expr": "castle_rock_container_memory_limit_bytes{container_name=~\"castle-rock-agent.*\"}", "legendFormat": "Agent Limite" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2, "fillOpacity": 15, "showPoints": "never", "lineInterpolation": "smooth", "spanNulls": true },
+          "unit": "decbytes"
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Agent Limite" },
+            "properties": [
+              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } },
+              { "id": "custom.fillOpacity", "value": 0 },
+              { "id": "color", "value": { "fixedColor": "#EF4444", "mode": "fixed" } }
+            ]
+          }
+        ]
+      }
+    }
+  ]
 }
