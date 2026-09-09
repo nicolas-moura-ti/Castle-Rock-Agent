@@ -31,7 +31,7 @@ type SQLiteStore struct {
 
 // NewSQLiteStore initializes or creates the database at the specified file path.
 func NewSQLiteStore(dbPath string) (*SQLiteStore, error) {
-	dsn := dbPath
+	var dsn string
 	if dbPath != ":memory:" {
 		dsn = fmt.Sprintf("%s?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)", dbPath)
 	} else {

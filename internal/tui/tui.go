@@ -1050,7 +1050,7 @@ func (m Model) appendSecurityAlerts(b *strings.Builder, containerID string, maxW
 			case "Sec: Host Networking Mode":
 				desc = m.msg.SecHostNetwork
 			}
-			wrappedStyle := style.Copy().Width(maxW - 4)
+			wrappedStyle := style.Width(maxW - 4)
 			b.WriteString(wrappedStyle.Render(fmt.Sprintf(" %s %s", icon, desc)) + "\n")
 		}
 	}

@@ -201,7 +201,7 @@ func NewExporter(dockerClient MetricsProvider, receiver ClusterProvider, hostID 
 //	1. HTTP server (blocks on configured port)
 //	2. Collection loop (periodic ticker)
 //
-//	Both are controlled by context — when cancelled, both terminate.
+//	Both are controlled by context — when canceled, both terminate.
 func (e *Exporter) Start(ctx context.Context) {
 	// Goroutine 1: HTTP server for /metrics
 	go func() {
@@ -300,7 +300,7 @@ func (e *Exporter) collect(ctx context.Context) {
 	e.containerInfo.Reset()
 
 	// Prepare the total metrics list (Local + Remote from Cluster)
-	var allStats []models.ContainerMetrics
+	allStats := make([]models.ContainerMetrics, 0, len(stats))
 
 	// Format local stats by adding the HostID
 	for _, s := range stats {

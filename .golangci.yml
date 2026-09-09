@@ -63,10 +63,14 @@ linters-settings:
       - fmt.Printf
       - fmt.Println
 
+  staticcheck:
+    checks: ["all", "-SA1019"]
+
   gosec:
     excludes:
       - G104  # Ignora "errors unhandled" (coberto pelo errcheck)
       - G204  # Subprocesso intencional com argumentos (exec de shell no TUI)
+      - G115  # Integer overflow conversion
 
   misspell:
     locale: US

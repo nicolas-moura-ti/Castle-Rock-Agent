@@ -394,7 +394,7 @@ func (c *Client) PruneVolumes(ctx context.Context) (uint64, error) {
 //
 // PATTERN — Context-based lifecycle:
 //
-//	The channel is automatically closed when the context is cancelled
+//	The channel is automatically closed when the context is canceled
 //	(Ctrl+C or SIGTERM). This guarantees the internal goroutine does
 //	not leak, even in error scenarios.
 func (c *Client) WatchEvents(ctx context.Context) (<-chan ContainerEvent, <-chan error) {
@@ -419,7 +419,7 @@ func (c *Client) WatchEvents(ctx context.Context) (<-chan ContainerEvent, <-chan
 	// GOROUTINE — Async event processing:
 	//   We launch a goroutine to read events from the Docker daemon
 	//   and forward them to the output channel. The goroutine terminates
-	//   when the context is cancelled (msgs channel is closed by the SDK).
+	//   when the context is canceled (msgs channel is closed by the SDK).
 	//
 	//   RULE: every goroutine must have a clear exit condition.
 	//   Here, exit is guaranteed by ctx.Done() which closes msgs.
@@ -796,7 +796,7 @@ func (c *Client) enrichConfigDetails(inspect *types.ContainerJSON, cd *logger.Co
 	}
 
 	// Redact sensitive environment variables
-	var redactedEnv []string
+	redactedEnv := make([]string, 0, len(inspect.Config.Env))
 	for _, env := range inspect.Config.Env {
 		redactedEnv = append(redactedEnv, logger.Redact(env))
 	}
