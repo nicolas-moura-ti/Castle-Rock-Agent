@@ -19,12 +19,7 @@ const (
 // HKDF is designed specifically for symmetric transport encryption, providing
 // cryptographic strength in sub-microsecond time without memory overhead.
 func deriveKey(secret string, salt []byte) ([]byte, error) {
-	kdf := hkdf.New(sha256.New, []byte(secret), salt, []byte("castle-rock-cluster-v1"))
-	key := make([]byte, keySize)
-	if _, err := io.ReadFull(kdf, key); err != nil {
-		return nil, err
-	}
-	return key, nil
+	return hkdf.Key(sha256.New, []byte(secret), salt, "castle-rock-cluster-v1", keySize)
 }
 
 // Encrypt payload using AES-GCM
