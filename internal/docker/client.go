@@ -659,7 +659,7 @@ func (c *Client) GetSystemInfo(ctx context.Context) (map[string]string, error) {
 //
 // PARAMETER ctx (context.Context):
 //   - Allows operation cancellation (e.g. Ctrl+C, timeout, deadline)
-//   - If the context is cancelled during the HTTP call to the Docker daemon,
+//   - If the context is canceled during the HTTP call to the Docker daemon,
 //     the operation is aborted immediately and returns ctx.Err()
 //   - GOLDEN RULE: every function that does I/O should accept a context
 //     as its first parameter

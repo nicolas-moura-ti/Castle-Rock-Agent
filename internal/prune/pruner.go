@@ -44,7 +44,7 @@ func NewAutoPruner(client docker.ContainerEngine, store *storage.SQLiteStore, tr
 }
 
 // Start launches the watchdog routine in background.
-// Only terminates when the Context is cancelled.
+// Only terminates when the Context is canceled.
 func (p *AutoPruner) Start(ctx context.Context) {
 	ticker := time.NewTicker(p.checkPeriod)
 	defer ticker.Stop()
