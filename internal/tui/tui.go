@@ -1405,16 +1405,24 @@ func (m Model) renderCleanupPanel() string {
 		volColor = lipgloss.Color("#BF616A")
 	}
 
+	imgReclaimable := uint64(0)
+	if m.diskUsage.ImagesReclaimable > 0 {
+		imgReclaimable = uint64(m.diskUsage.ImagesReclaimable)
+	}
 	b.WriteString("    📦 ")
 	b.WriteString(lipgloss.NewStyle().Bold(true).Render("Dangling Images: "))
-	b.WriteString(lipgloss.NewStyle().Foreground(imgColor).Render(formatBytes(uint64(m.diskUsage.ImagesReclaimable))))
+	b.WriteString(lipgloss.NewStyle().Foreground(imgColor).Render(formatBytes(imgReclaimable)))
 	b.WriteString("\n")
 	b.WriteString(lipgloss.NewStyle().Foreground(mutedColor).MarginLeft(7).Render("Untagged images not used by any container."))
 	b.WriteString("\n\n")
 
+	volReclaimable := uint64(0)
+	if m.diskUsage.VolumesReclaimable > 0 {
+		volReclaimable = uint64(m.diskUsage.VolumesReclaimable)
+	}
 	b.WriteString("    💾 ")
 	b.WriteString(lipgloss.NewStyle().Bold(true).Render("Volumes Locais Ociosos:   "))
-	b.WriteString(lipgloss.NewStyle().Foreground(volColor).Render(formatBytes(uint64(m.diskUsage.VolumesReclaimable))))
+	b.WriteString(lipgloss.NewStyle().Foreground(volColor).Render(formatBytes(volReclaimable)))
 	b.WriteString("\n")
 	b.WriteString(lipgloss.NewStyle().Foreground(mutedColor).MarginLeft(7).Render("Persistent volumes created by Docker not attached to any container."))
 	b.WriteString("\n\n\n")

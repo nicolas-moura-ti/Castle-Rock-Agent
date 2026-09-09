@@ -66,6 +66,7 @@ linters-settings:
   gosec:
     excludes:
       - G104  # Ignora "errors unhandled" (coberto pelo errcheck)
+      - G204  # Subprocesso intencional com argumentos (exec de shell no TUI)
 
   misspell:
     locale: US
@@ -79,3 +80,10 @@ issues:
 
   # Não ignora issues em código gerado
   exclude-generated: strict
+
+  exclude-rules:
+    # Arquivos de teste não exigem verificações estritas de gosec e errcheck
+    - path: _test\.go
+      linters:
+        - errcheck
+        - gosec
