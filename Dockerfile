@@ -32,7 +32,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
 # STAGE 2: Runtime
 # ============================================================================
 # Imagem mínima (~5MB) com apenas o binário + configs
-FROM alpine:3.19
+FROM alpine:3.24
 
 LABEL maintainer="nicolas-moura-ti"
 LABEL description="Castle Rock Agent — Docker Observability Agent"
