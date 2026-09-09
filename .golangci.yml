@@ -35,11 +35,9 @@ linters:
     # ── Bugs e Correção ──
     - govet          # Análise oficial do Go team (bugs comuns)
     - errcheck       # Verifica se erros são tratados
-    - staticcheck    # Análise estática avançada (substitui megacheck)
-    - typecheck      # Verificação de tipos
+    - staticcheck    # Análise estática avançada (substitui megacheck e gosimple)
 
     # ── Estilo e Qualidade ──
-    - gosimple       # Sugere simplificações de código
     - ineffassign    # Detecta atribuições ineficientes
     - unused         # Detecta código morto (variáveis, funções)
     - misspell       # Typos em comentários e strings
