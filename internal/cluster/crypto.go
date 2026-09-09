@@ -3,12 +3,11 @@ package cluster
 import (
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/hkdf"
 	"crypto/rand"
 	"crypto/sha256"
 	"errors"
 	"io"
-
-	"golang.org/x/crypto/hkdf"
 )
 
 const (
