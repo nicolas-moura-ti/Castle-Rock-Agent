@@ -1,0 +1,63 @@
+name: "🐛 Reportar um Bug"
+description: "Crie um relatório de bug para nos ajudar a identificar e corrigir o problema."
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Obrigado por dedicar seu tempo para relatar um problema! Por favor, preencha o formulário abaixo com o máximo de detalhes possível.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Descrição do Bug
+      description: Uma descrição clara e concisa do que aconteceu de errado.
+      placeholder: Ao iniciar o agente com a flag X, ocorre um panic...
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Passos para Reproduzir
+      description: Como reproduzir o problema passo a passo.
+      placeholder: |
+        1. Executar 'docker compose up -d'
+        2. Iniciar o agente com './bin/castle-rock-agent'
+        3. Observar o erro...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Comportamento Esperado
+      description: Uma descrição clara do que você esperava que acontecesse.
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs e Saídas de Erro
+      description: Cole aqui logs relevantes, stacktraces ou capturas de tela (se aplicável).
+      render: shell
+
+  - type: input
+    id: environment
+    attributes:
+      label: Ambiente / Sistema Operacional
+      description: "Ex: macOS 14.5, Ubuntu 22.04, Docker version 24.0.7, etc."
+      placeholder: Linux Ubuntu 22.04 LTS / Docker 25.0
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Versão do Castle Rock Agent
+      description: Qual versão do agente ou commit você está utilizando?
+      placeholder: v0.3.0 ou commit abc1234
+    validations:
+      required: false

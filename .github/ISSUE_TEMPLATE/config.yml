@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: "Documentação do Castle Rock Agent"
+    url: "https://github.com/nicolas-moura-ti/Castle-Rock-Agent#readme"
+    about: "Leia a documentação oficial e os guias de uso antes de abrir uma issue."
+  - name: "Perguntas e Discussões"
+    url: "https://github.com/nicolas-moura-ti/Castle-Rock-Agent/discussions"
+    about: "Tire dúvidas ou discuta ideias com a comunidade."

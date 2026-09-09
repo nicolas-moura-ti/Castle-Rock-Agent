@@ -1,0 +1,80 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build & Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+
+      - name: Extract Tag Name
+        id: tag
+        run: |
+          echo "VERSION=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and Package Binaries
+        run: |
+          VERSION="${{ steps.tag.outputs.VERSION }}"
+          mkdir -p dist artifacts
+
+          PLATFORMS=(
+            "linux/amd64"
+            "linux/arm64"
+            "darwin/amd64"
+            "darwin/arm64"
+            "windows/amd64"
+          )
+
+          for PLATFORM in "${PLATFORMS[@]}"; do
+            GOOS="${PLATFORM%/*}"
+            GOARCH="${PLATFORM#*/}"
+            BIN_NAME="castle-rock-agent"
+            EXT=""
+
+            if [ "$GOOS" = "windows" ]; then
+              EXT=".exe"
+            fi
+
+            OUTPUT_BIN="dist/${BIN_NAME}${EXT}"
+            echo "Compilando para ${GOOS}/${GOARCH}..."
+            CGO_ENABLED=0 GOOS="$GOOS" GOARCH="$GOARCH" go build -ldflags="-s -w -X main.Version=${VERSION}" -o "$OUTPUT_BIN" ./cmd/agent
+
+            PACKAGE_NAME="castle-rock-agent_${VERSION}_${GOOS}_${GOARCH}"
+            if [ "$GOOS" = "windows" ]; then
+              (cd dist && zip -9 "../artifacts/${PACKAGE_NAME}.zip" "${BIN_NAME}${EXT}")
+            else
+              tar -czvf "artifacts/${PACKAGE_NAME}.tar.gz" -C dist "${BIN_NAME}"
+            fi
+
+            rm -f "$OUTPUT_BIN"
+          done
+
+          echo "Gerando checksums SHA256..."
+          cd artifacts
+          sha256sum * > checksums.txt
+          cd ..
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          generate_release_notes: true
+          draft: false
+          prerelease: false

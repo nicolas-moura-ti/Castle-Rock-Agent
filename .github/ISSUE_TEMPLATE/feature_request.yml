@@ -1,0 +1,43 @@
+name: "💡 Sugestão de Funcionalidade"
+description: "Sugira uma nova funcionalidade ou melhoria para o Castle Rock Agent."
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Obrigado por sugerir uma ideia! Descreva sua proposta para que possamos avaliar e discutir juntos.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Qual problema essa funcionalidade resolve?
+      description: Uma descrição clara de qual é a dor ou necessidade atual.
+      placeholder: Atualmente é difícil monitorar contêineres que...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Solução Proposta
+      description: Como você imagina que essa funcionalidade deve se comportar?
+      placeholder: Adicionar um coletor de métricas para...
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternativas Consideradas
+      description: Descreva qualquer alternativa ou solução de contorno que você já avaliou.
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Contexto Adicional
+      description: Exemplos, referências de documentação, mockups ou qualquer informação extra.
+    validations:
+      required: false
