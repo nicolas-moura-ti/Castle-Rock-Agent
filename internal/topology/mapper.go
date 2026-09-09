@@ -71,9 +71,13 @@ func (m *Mapper) BuildMap(ctx context.Context) ([]NetworkEdge, error) {
 
 		// Only return networks with actively connected containers (skip empty ones)
 		if len(nodes) > 0 {
+			netID := n.ID
+			if len(netID) > 12 {
+				netID = netID[:12]
+			}
 			edges = append(edges, NetworkEdge{
 				NetworkName: n.Name,
-				NetworkID:   n.ID[:12],
+				NetworkID:   netID,
 				Driver:      n.Driver,
 				Nodes:       nodes,
 			})

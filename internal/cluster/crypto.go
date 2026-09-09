@@ -4,24 +4,28 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"crypto/sha256"
 	"errors"
 	"io"
 
-	"golang.org/x/crypto/argon2"
+	"golang.org/x/crypto/hkdf"
 )
 
 const (
-	saltSize   = 16
-	argonTime  = 3
-	argonMem   = 64 * 1024
-	argonThred = 4
-	keySize    = 32
+	saltSize = 16
+	keySize  = 32
 )
 
-// deriveKey takes a shared secret and a salt, returning a 32-byte key
-// for use with AES-256. Uses Argon2id for strong GPU resistance.
-func deriveKey(secret string, salt []byte) []byte {
-	return argon2.IDKey([]byte(secret), salt, argonTime, argonMem, argonThred, keySize)
+// deriveKey derives a 32-byte AES-256 key from a shared secret and salt using HKDF-SHA256.
+// HKDF is designed specifically for symmetric transport encryption, providing
+// cryptographic strength in sub-microsecond time without memory overhead.
+func deriveKey(secret string, salt []byte) ([]byte, error) {
+	kdf := hkdf.New(sha256.New, []byte(secret), salt, []byte("castle-rock-cluster-v1"))
+	key := make([]byte, keySize)
+	if _, err := io.ReadFull(kdf, key); err != nil {
+		return nil, err
+	}
+	return key, nil
 }
 
 // Encrypt payload using AES-GCM
@@ -32,7 +36,10 @@ func Encrypt(payload []byte, secret string) ([]byte, error) {
 		return nil, err
 	}
 
-	key := deriveKey(secret, salt)
+	key, err := deriveKey(secret, salt)
+	if err != nil {
+		return nil, err
+	}
 
 	block, err := aes.NewCipher(key)
 	if err != nil {
@@ -68,7 +75,10 @@ func Decrypt(ciphertext []byte, secret string) ([]byte, error) {
 	}
 
 	salt, ciphertext := ciphertext[:saltSize], ciphertext[saltSize:]
-	key := deriveKey(secret, salt)
+	key, err := deriveKey(secret, salt)
+	if err != nil {
+		return nil, err
+	}
 
 	block, err := aes.NewCipher(key)
 	if err != nil {

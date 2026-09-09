@@ -58,15 +58,14 @@ func (a *Auditor) registerDefaultRules() {
 
 // Audit scans the provided container list using registered rules.
 func (a *Auditor) Audit(ctx context.Context, containers []logger.ContainerDisplay) []alerts.Alert {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-
 	var activeAlerts []alerts.Alert
-	activeIDs := make(map[string]bool)
+	activeIDs := make(map[string]bool, len(containers))
 	now := time.Now()
 
 	toInspect := make([]logger.ContainerDisplay, 0, len(containers))
 
+	// 1. Check cache under read lock
+	a.mu.RLock()
 	for _, c := range containers {
 		activeIDs[c.ID] = true
 		if cached, exists := a.cache[c.ID]; exists {
@@ -78,11 +77,13 @@ func (a *Auditor) Audit(ctx context.Context, containers []logger.ContainerDispla
 		}
 		toInspect = append(toInspect, c)
 	}
+	a.mu.RUnlock()
 
+	// 2. Inspect uncached containers concurrently without holding auditor lock
 	if len(toInspect) > 0 {
 		var wg sync.WaitGroup
 		var newAlertsMu sync.Mutex
-		newAlerts := make(map[string][]alerts.Alert)
+		newAlerts := make(map[string][]alerts.Alert, len(toInspect))
 
 		for _, c := range toInspect {
 			wg.Add(1)
@@ -105,19 +106,31 @@ func (a *Auditor) Audit(ctx context.Context, containers []logger.ContainerDispla
 		}
 		wg.Wait()
 
+		// 3. Update cache under write lock
+		a.mu.Lock()
 		for _, c := range toInspect {
 			if secAlerts, ok := newAlerts[c.ID]; ok {
 				a.cache[c.ID] = secAlerts
 				activeAlerts = append(activeAlerts, secAlerts...)
 			}
 		}
+		for id := range a.cache {
+			if !activeIDs[id] {
+				delete(a.cache, id)
+			}
+		}
+		a.mu.Unlock()
+	} else {
+		// Evict inactive containers if none needed inspection
+		a.mu.Lock()
+		for id := range a.cache {
+			if !activeIDs[id] {
+				delete(a.cache, id)
+			}
+		}
+		a.mu.Unlock()
 	}
 
-	for id := range a.cache {
-		if !activeIDs[id] {
-			delete(a.cache, id)
-		}
-	}
 	return activeAlerts
 }
 

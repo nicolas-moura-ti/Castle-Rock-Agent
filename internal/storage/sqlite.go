@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"sync"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -20,9 +21,12 @@ type EventRecord struct {
 	Message   string
 }
 
-// SQLiteStore wraps the relational database client.
+// SQLiteStore wraps the relational database client with an asynchronous write queue.
 type SQLiteStore struct {
-	db *sql.DB
+	db        *sql.DB
+	saveCh    chan saveOptions
+	done      chan struct{}
+	closeOnce sync.Once
 }
 
 // NewSQLiteStore initializes or creates the database at the specified file path.
@@ -41,7 +45,11 @@ func NewSQLiteStore(dbPath string) (*SQLiteStore, error) {
 		return nil, fmt.Errorf("storage: failed to open sqlite: %w", err)
 	}
 
+	// Single writer connection avoids 'database is locked' errors in SQLite
+	db.SetMaxOpenConns(1)
+
 	if err := db.Ping(); err != nil {
+		_ = db.Close()
 		return nil, fmt.Errorf("storage: failed to connect to database: %w", err)
 	}
 
@@ -58,10 +66,18 @@ func NewSQLiteStore(dbPath string) (*SQLiteStore, error) {
 	`
 	_, err = db.Exec(query)
 	if err != nil {
+		_ = db.Close()
 		return nil, fmt.Errorf("storage: failed to initialize tables: %w", err)
 	}
 
-	return &SQLiteStore{db: db}, nil
+	store := &SQLiteStore{
+		db:     db,
+		saveCh: make(chan saveOptions, 500),
+		done:   make(chan struct{}),
+	}
+	go store.writeWorker()
+
+	return store, nil
 }
 
 // saveOptions holds the parameters for the save function.
@@ -72,14 +88,11 @@ type saveOptions struct {
 	Message          string
 }
 
-// save persists an event or alert in the database asynchronously.
-// We use context.WithoutCancel to ensure the record is saved even if
-// the caller's context (e.g., an HTTP request or TUI action) is canceled.
-func (s *SQLiteStore) save(ctx context.Context, opts saveOptions) {
-	go func() {
-		query := `INSERT INTO events (timestamp, type, action, container, message) VALUES (?, ?, ?, ?, ?)`
-		s.db.ExecContext(
-			context.WithoutCancel(ctx),
+// writeWorker sequentially persists queued records into SQLite, eliminating lock contention.
+func (s *SQLiteStore) writeWorker() {
+	query := `INSERT INTO events (timestamp, type, action, container, message) VALUES (?, ?, ?, ?, ?)`
+	for opts := range s.saveCh {
+		_, _ = s.db.Exec(
 			query,
 			time.Now().UTC(),
 			opts.RecordType,
@@ -87,7 +100,17 @@ func (s *SQLiteStore) save(ctx context.Context, opts saveOptions) {
 			opts.Container,
 			opts.Message,
 		)
-	}()
+	}
+	close(s.done)
+}
+
+// save queues an event or alert to be saved asynchronously by the write worker.
+func (s *SQLiteStore) save(ctx context.Context, opts saveOptions) {
+	select {
+	case s.saveCh <- opts:
+	default:
+		// Queue saturated: avoid blocking caller
+	}
 }
 
 // SaveEvent persists a Docker event (start, stop, etc.) in the local history.
@@ -128,7 +151,13 @@ func (s *SQLiteStore) GetRecent(limit int) ([]EventRecord, error) {
 	return results, nil
 }
 
-// Close ensures the proper closing of the database and the WAL file.
+// Close gracefully closes the save queue, waits for pending writes to flush, and closes the database.
 func (s *SQLiteStore) Close() error {
-	return s.db.Close()
+	var err error
+	s.closeOnce.Do(func() {
+		close(s.saveCh)
+		<-s.done
+		err = s.db.Close()
+	})
+	return err
 }
