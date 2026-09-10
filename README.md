@@ -2,9 +2,10 @@
 
 # 🏰 Castle Rock Agent
 
+[![CI](https://github.com/nicolas-moura-ti/Castle-Rock-Agent/actions/workflows/ci.yml/badge.svg)](https://github.com/nicolas-moura-ti/Castle-Rock-Agent/actions/workflows/ci.yml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/nicolas-moura-ti/castle-rock-agent?style=flat-square)](https://goreportcard.com/report/github.com/nicolas-moura-ti/castle-rock-agent)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
-[![Go Version](https://img.shields.io/badge/Go-v1.24.2-blue?style=flat-square&logo=go)](https://github.com/nicolas-moura-ti/castle-rock-agent)
+[![Go Version](https://img.shields.io/badge/Go-v1.25.0-blue?style=flat-square&logo=go)](https://github.com/nicolas-moura-ti/castle-rock-agent)
 
 \
 *Read this in other languages: [English](README.md) · [Português](README.pt-BR.md)*
@@ -95,7 +96,7 @@ Docker Containers → Castle Rock Agent → Prometheus → Grafana
 
 | Dependency | Min Version | 
 |---|---|
-| **Go** | 1.24+ | 
+| **Go** | 1.25+ | 
 | **Docker** | 20.10+ | 
 | **Make** | Any | 
 

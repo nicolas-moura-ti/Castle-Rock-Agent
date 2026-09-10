@@ -51,7 +51,17 @@ This means you don't even need a `config.yaml` if you inject everything through 
 | `CASTLE_ROCK_CLUSTER_HOST_ID` | Identifier shown in TUI/Grafana | Host OS hostname |
 | `CASTLE_ROCK_CLUSTER_LEADER_URL` | Target URL to push stats to (worker mode) | `http://127.0.0.1:9110` |
 | `CASTLE_ROCK_CLUSTER_AUTH_TOKEN` | Bearer Token for API Authentication | `""` |
-| `CASTLE_ROCK_CLUSTER_SHARED_SECRET` | Secret Key for AES-GCM (Argon2id) encryption | `""` |
+| `CASTLE_ROCK_CLUSTER_SHARED_SECRET` | Secret Key for AES-256-GCM (HKDF-SHA256) encryption | `""` |
+
+---
+
+## ⚡ Performance Optimization: Static Metadata Cache
+
+To minimize CPU usage and Docker daemon overhead, the agent implements a **Static Metadata Cache**.
+
+- **How it works:** Heavy and rarely changing container data—such as `Entrypoint`, `Env`, `Mounts`, and `Image`—is retrieved only once when a container is first detected.
+- **Benefits:** Drastically reduces JSON unmarshaling and I/O chatter with the Docker daemon, especially in environments with dozens or hundreds of containers.
+- **Note:** If you modify environment variables on an existing container, restart the container for the agent to pick up refreshed metadata.
 
 ---
 

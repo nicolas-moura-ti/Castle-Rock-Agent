@@ -2,14 +2,15 @@
 
 # 🏰 Castle Rock Agent
 
+[![CI](https://github.com/nicolas-moura-ti/Castle-Rock-Agent/actions/workflows/ci.yml/badge.svg)](https://github.com/nicolas-moura-ti/Castle-Rock-Agent/actions/workflows/ci.yml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/nicolas-moura-ti/castle-rock-agent?style=flat-square)](https://goreportcard.com/report/github.com/nicolas-moura-ti/castle-rock-agent)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
-[![Go Version](https://img.shields.io/badge/Go-v1.24.2-blue?style=flat-square&logo=go)](https://github.com/nicolas-moura-ti/castle-rock-agent)
+[![Go Version](https://img.shields.io/badge/Go-v1.25.0-blue?style=flat-square&logo=go)](https://github.com/nicolas-moura-ti/castle-rock-agent)
 
 \
 *Leia em outros idiomas: [English](README.md) · [Português](README.pt-BR.md)*
 
-> Agente de observabilidade nativo em Go para monitoramento de containers Docker com dashboard interativo, métricas Prometheus e alertas configuráveis.
+> Agente de observabilidade nativo em Go para monitoramento de containers Docker com dashboard interativo (TUI), métricas Prometheus e alertas configuráveis.
 
 </div>
 
@@ -22,47 +23,47 @@ Inspirado nas torres de vigia medievais erguidas sobre rochedos (Castle Rocks), 
 
 ## 📖 Documentação Completa por Módulos
 
-Para mergulhar em detalhes técnicos e funcionalidades específicas, por favor consulte nossa pasta de documentações oficias:
+Para mergulhar em detalhes técnicos e funcionalidades específicas, consulte nossos guias dedicados:
 
-- 🖥️ **[Painel Interativo TUI & Referência de Operação](docs/TUI.pt-BR.md)** 
+- 🖥️ **[Painel Interativo TUI & Referência de Operações](docs/TUI.pt-BR.md)** 
   *(Stress Test, Acesso a Shell `exec`, Limpeza Docker Prune, Live Tail & Grep, Diagnóstico Integrado)*
 - 📈 **[Observabilidade (Prometheus & Grafana) & Motores de Alerta](docs/OBSERVABILITY.pt-BR.md)** 
-  *(Lista das Enumerações de Métricas, Detalhe dos 5 Dashboards Grafana, Modo Multi-Cloud/Cluster, Conexão e Regras de Alerta Prom)*
-- ⚙️ **[Configuração e Variáveis do Kernel](docs/CONFIGURATION.pt-BR.md)**
-  *(Especificação do `config.yaml`, Sobrescrita e Regras Hierárquicas 12-Factor, Precedências de Ambientes Injetáveis)*
+  *(Lista de Métricas, Detalhes dos 5 Dashboards Grafana, Modo Cluster Leader/Worker, Regras de Alerta)*
+- ⚙️ **[Configuração & Variáveis de Ambiente](docs/CONFIGURATION.pt-BR.md)**
+  *(Especificação do `config.yaml`, Sobrescrita 12-Factor, Precedência de Configuração e Cache de Metadados)*
 
 ---
 
 ## 🧠 Como Funciona — Explicação Rápida
 
-O monitoramento do agente depende da integração com outras três chaves de observadores:
+O fluxo de observabilidade opera através da integração de três componentes principais:
 
-1. **Castle Rock Agent (este pacote Binário):** Extrai a alma performática do sistema conectando aos arquivos de Soquete do Docker e agindo como Coletor nativo, em repasse ao interpretador.
-2. **Prometheus:** Exerce trabalho escravo como o seu **Bando de Dados em Tempo Real e Histórico**. Acorda de 5s em 5s e intercepta o repassado do endpoint HTTP (`http://127.0.0.1:9110/metrics`), guardando isso sob sua própria carimbagem do tempo.
-3. **Grafana:** O Painel Interativo de Relatores a Visitação do usuário onde extrairá o prometheus e transformará em **Desenhos Gráficos Visuais.**
+1. **Castle Rock Agent (este projeto):** Conecta-se diretamente ao Docker Socket via SDK oficial, calcula os consumos de CPU, Memória, Disco e Rede em tempo real e atua como o **coletor e exportador** nativo.
+2. **Prometheus:** Atua como o **banco de dados de séries temporais (TSDB)**. A cada 5 segundos realiza scraping do endpoint HTTP (`http://agent:9110/metrics`) e armazena o histórico das métricas.
+3. **Grafana:** A camada de **visualização**. Consulta o Prometheus e renderiza painéis visuais com gráficos de desempenho, tendências e alertas.
 
 ```
-Containers Nativos →  Castle Rock Agent  →   Prometheus DB Base  →  Dashboards Grafana WEB 
-(Geram os danos)      (Coleta e formata)     (Armazena no tempo)    (Plástico visual a você)
+Containers Docker → Castle Rock Agent → Prometheus → Grafana
+ (geram métricas)    (coleta e exporta)   (armazena)     (visualização)
 ```
 
 ---
 
-## ✨ Principais Diferenciais (Features)
+## ✨ Principais Funcionalidades (Features)
 
-| Funcionalidade | Descrição Curta |
+| Funcionalidade | Descrição |
 |---|---|
-| **TUI Dinâmica** | Console em Shell Extensa (Fullscreen) preenchedora com Live Tables integradas. |
-| **Ponto Exato em Tempo Efetivo** | Porcentuais instantâneos base de Leitura de Disco I/O e Placas de Rede acopladas limitadas. |
-| **Templates Nativos Grafana** | Cinco layouts previamente escritos de Painéis analíticos e tabelas interligadas do ecossistema Grafana. |
-| **Dispensador de Alertas Dual** | Notificações Operacionais que piscam cores críticas locais além dos gatilhos Webhooks externos do Prometheus integráveis. |
-| **Central de Nodos em Cluster 🌐** | Capacidade Distributiva Multi-Server ligando Agentes Escravos por Polling repassando para um Painel Único de Matriz.|
-| **Auditoria Tática Anti-Válvula 🛡️** | Rastreador Real-Time Shift-Left expondo "Vistas Prontas" críticas em containers como permissão de Roots não mascarada ou falta cênica em limitações preventivas. |
-| **Lavador Ocioso Nativo 🧹** | Expurgo preventivo automático atrelado por Garbage Collector que deleta as lamas digitais do Docker para salvar a partição raiz. |
+| **TUI Dinâmica** | Dashboard em tela cheia no terminal com tabelas em tempo real, métricas, eventos e logs ao vivo |
+| **Métricas em Tempo Real** | CPU%, Memória%, I/O de Rede e I/O de Disco exportados continuamente |
+| **Dashboards Grafana Nativos** | 5 painéis pré-configurados prontos para uso (Visão Geral, Detalhes de Container, Rede, Memória e Alertas) |
+| **Camada Dupla de Alertas** | Notificações visuais imediatas no TUI e integração externa via Alertmanager no Prometheus |
+| **Modo Cluster 🌐** | Arquitetura remota Leader/Worker para monitorar múltiplos servidores simultaneamente com criptografia segura (HKDF + AES-GCM) |
+| **Auditoria de Segurança 🛡️** | Identificação em tempo real de vulnerabilidades e más práticas (modo privilegiado, usuário root e portas expostas) |
+| **Auto Prune 🧹** | Limpeza inteligente e nativa de imagens órfãs e volumes não utilizados para preservar espaço em disco |
 
 ---
 
-## Topologia de Rede e Arquitetura do Serviço Base
+## 🏗️ Topologia e Arquitetura
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
@@ -79,82 +80,82 @@ Containers Nativos →  Castle Rock Agent  →   Prometheus DB Base  →  Dashbo
 │         └─────────┬───────┴──────────┼───────────┘             │
 │                   ▼                  │ (HTTP POST)             │
 │         ┌──────────────────┐         │  ┌───────────────────┐  │
-│         │   Motor SDK API  │         └──┤ Nó Excedente (Op) │  │
-│         │  (Coleta Docker) │            └───────────────────┘  │
+│         │   Docker Client  │         └──┤ Worker Node (Ag.) │  │
+│         │  (Official SDK)  │            └───────────────────┘  │
 │         └─────────┬────────┘                                   │
 │                   │                                            │
 └───────────────────┼────────────────────────────────────────────┘
                     ▼
-            Sistema Físico Docker Interno Root
-      (unix:///var/run/docker.sock)
+            Docker Engine API
+       (unix:///var/run/docker.sock)
 ```
 
 ---
 
-## O Que É Necessário Antes (Prerequisitos)
+## 📋 Pré-requisitos
 
-| Binários ou Serviços Básicos | Suporte Minimo | 
+| Dependência | Versão Mínima | 
 |---|---|
-| **Go** | 1.24+ | 
+| **Go** | 1.25+ | 
 | **Docker** | 20.10+ | 
-| **Make** | Qualquer lib clássica | 
+| **Make** | Qualquer versão padrão | 
 
-*(Aos amigos adeptos da Maçã - Em Mac OS atente ao consentimento silencioso de terminal da devida C tools Xcode com: `sudo xcodebuild -license accept`)*
+*(Observação para macOS: se for compilar localmente, garanta que a licença das Command Line Tools esteja aceita via `sudo xcodebuild -license accept`)*
 
 ---
 
-## Primeiros Passos e Rodando: Quick Boot
+## 🚀 Como Executar (Quick Start)
 
-### Formato #1: Modo Local Console Gráfico TUI (Simples Teste/Dev)
+### Modo 1: TUI Local (Desenvolvimento & Diagnóstico Rápido)
 
-Acopla instantaneamente o motor visual da Castle na linha de comando nativa. Operação limpa onde só fará sentido para o olho local testando.
+Executa diretamente no seu terminal conectado ao Docker daemon local através de uma interface interativa rica:
 
 ```bash
-# Baixando
+# Clonar o repositório
 git clone https://github.com/nicolas-moura-ti/castle-rock-agent.git
 cd castle-rock-agent
 
-# Aciona Interface (Entrando Tela TUI Visão Master)
+# Executar (abre o dashboard interativo)
 make run
 ```
 
-### Formato #2: O Modo Definitivo Docker Compose (Central de Monitoria Mestra)
+### Modo 2: Docker Compose (Stack Completa de Observabilidade)
 
-Eleva de forma isolada do HD três pilares atrelados para atuar 24/7 horas sobre a sua Nuvem sem fechar, usando apenas portas expostas (**O Castle entra no modo sombra (Headless) recolhendo silenciosamente dados ao Prome**).
+Sobe o **Castle Rock Agent em modo Headless**, o **Prometheus** e o **Grafana** em containers isolados. Ideal para monitoramento contínuo 24/7.
 
 ```bash
-# Copie o arquivo de exemplo e defina sua senha
+# Copiar arquivo de exemplo de variáveis de ambiente
 cp .env.example .env
 
+# Subir a stack completa
 docker compose up -d
 
-# Visualização no Navegador:
-# - A sua Central Grafana em Geral: http://127.0.0.1:3000
-# - O Banco Analítico Primitivo Prom:  http://127.0.0.1:9090
-# - Ver Endpoint de saída Castle Crua  http://127.0.0.1:9110/metrics
+# Endereços de acesso:
+# - Grafana:    http://localhost:3000 (login: admin / castlerock)
+# - Prometheus: http://localhost:9090
+# - Métricas:   http://localhost:9110/metrics
 ```
 
-> 💡 **USO CONJUNTO E SÁBIO DO SISTEMA:** Nunca mate o `docker compose up -d` da máquina! Deixe as duas instâncias conviverem em paralelo! 
-Sua grade Web do grafana ficará recolhendo infinitamente histórico métrico analítico 24/7/365 enquanto você de sossego abre seu TUI esporádico `make run` local com o chefe num fim de expediente unicamente pontual para rastrear vazamentos de Memória local.
+> 💡 **USO CONJUNTO RECOMENDADO:** Você pode manter a stack do `docker compose up -d` rodando em segundo plano coletando métricas continuamente para o Grafana e, quando desejar inspecionar detalhes a fundo ou realizar testes de carga (*Stress Test*), basta abrir um terminal e rodar `make run`. As duas instâncias operam em paralelo sem interferência.
 
 ---
 
-## 🧪 Base Coberta Analítica (Desenvolvimento e Setup)
+## 🧪 Desenvolvimento e Testes
 
 ```bash
-make test          # Cobertura contra corrida de Race Condicional (-race)
-make lint          # Análise profunda Go contra code smell GoVet (Static Analysis vet)
-make build         # Cria o tijolo empacotado Binário super pequeno (Optimized Binary)
-make docker-build  # Compila uma imagem Alpine com seu Castle dentro pronta.
+make test          # Executa testes com detector de race conditions (-race) e cobertura
+make lint          # Análise estática de código com golangci-lint
+make build         # Compila binário otimizado para produção
+make docker-build  # Constrói imagem Docker baseada em Alpine
 ```
 
-### Resposta e Cobertura Base a Nível Go Module
-- `internal/tui`: Alojamento visual sobre transformações lógicas numéricas dos bytes capturados do Socket Host Docker no formato gráfico via LipGloss.
-- `internal/alerts`: Análise de validações assíncronas no contexto background (Goroutines).
-- `internal/config`: Precessadores limpos priorizando Injeções Ambientais contra o Root e Arquivo Serializado YAML em memória.
+### Cobertura de Testes (Módulos Principais):
+- `internal/tui`: Formatação de métricas e lógica de renderização
+- `internal/alerts`: Avaliação do motor de alertas e limites temporais
+- `internal/config`: Definição de padrões, carga de YAML e precedência de variáveis de ambiente
 
 ---
 
-## Licença Base
+## 📄 Licença
 
-Aprovado via MIT. Produzido ao povo em aberto.
+Distribuído sob a licença [MIT](LICENSE).

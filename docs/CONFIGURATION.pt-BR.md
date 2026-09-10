@@ -50,7 +50,7 @@ O ambiente, dessa forma, pode governar inteiramente como o script subirá dispen
 | `CASTLE_ROCK_CLUSTER_MODE` | Papel Master/Worker: `standalone`, `leader`, `worker` | `standalone` |
 | `CASTLE_ROCK_CLUSTER_HOST_ID` | Identificador a aparecer nas abas locais ou Mestra | Host OS Name |
 | `CASTLE_ROCK_CLUSTER_LEADER_URL` | Se worker, IP ou endpoint a entregar dados HTTP | `http://127.0.0.1:9110` |
-| `CASTLE_ROCK_CLUSTER_SHARED_SECRET` | Chave p/ Criptografia de Payload (**AES-256-GCM**) | `""` |
+| `CASTLE_ROCK_CLUSTER_SHARED_SECRET` | Chave secreta para criptografia de payload (**AES-256-GCM com HKDF-SHA256**) | `""` |
 | `CASTLE_ROCK_CLUSTER_AUTH_TOKEN` | Token na Autenticação tipo Bearer (API) | `""` |
 
 ---

@@ -10,10 +10,10 @@ First off, thank you for considering contributing to Castle Rock Agent! It's peo
 ## Development Process
 
 1. Fork the repository and create your branch from `main`.
-2. Ensure you have Go 1.22+ installed.
+2. Ensure you have Go 1.25+ installed.
 3. If you've added code that should be tested, please add some tests.
-4. Ensure the test suite passes (`go test ./...`).
-5. Make sure your code follows standard Go formatting (`go fmt ./...`).
+4. Ensure the test suite passes (`make test` or `go test -race ./...`).
+5. Make sure your code passes formatting and linting (`make lint` or `golangci-lint run`).
 
 ## Pull Request Guidelines
 
