@@ -1,6 +1,6 @@
 module github.com/nicolas-moura-ti/castle-rock-agent
 
-go 1.25.0
+go 1.26.0
 
 require (
 	github.com/charmbracelet/bubbletea v1.3.10
@@ -8,9 +8,9 @@ require (
 	github.com/docker/docker v27.5.1+incompatible
 	github.com/docker/go-connections v0.5.0
 	github.com/hashicorp/mdns v1.0.6
-	github.com/prometheus/client_golang v1.23.2
+	github.com/prometheus/client_golang v1.25.0
 	github.com/shirou/gopsutil/v3 v3.24.5
-	github.com/stretchr/testify v1.11.1
+	github.com/stretchr/testify v1.12.1
 	gopkg.in/yaml.v3 v3.0.1
 	modernc.org/sqlite v1.46.1
 )
@@ -28,7 +28,6 @@ require (
 	github.com/clipperhouse/stringish v0.1.1 // indirect
 	github.com/clipperhouse/uax29/v2 v2.5.0 // indirect
 	github.com/containerd/log v0.1.0 // indirect
-	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/distribution/reference v0.6.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
@@ -56,11 +55,10 @@ require (
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
-	github.com/prometheus/client_model v0.6.2 // indirect
-	github.com/prometheus/common v0.66.1 // indirect
-	github.com/prometheus/procfs v0.16.1 // indirect
+	github.com/prometheus/client_model v0.6.3 // indirect
+	github.com/prometheus/common v0.72.0 // indirect
+	github.com/prometheus/procfs v0.22.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/shoenig/go-m1cpu v0.1.6 // indirect
@@ -75,16 +73,16 @@ require (
 	go.opentelemetry.io/otel/metric v1.33.0 // indirect
 	go.opentelemetry.io/otel/sdk v1.33.0 // indirect
 	go.opentelemetry.io/otel/trace v1.33.0 // indirect
-	go.yaml.in/yaml/v2 v2.4.2 // indirect
+	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/exp v0.0.0-20251023183803-a4bb9ffd2546 // indirect
-	golang.org/x/mod v0.33.0 // indirect
-	golang.org/x/net v0.51.0 // indirect
-	golang.org/x/sync v0.20.0 // indirect
-	golang.org/x/sys v0.42.0 // indirect
-	golang.org/x/text v0.35.0 // indirect
+	golang.org/x/mod v0.41.0 // indirect
+	golang.org/x/net v0.59.0 // indirect
+	golang.org/x/sync v0.23.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
+	golang.org/x/text v0.42.0 // indirect
 	golang.org/x/time v0.9.0 // indirect
-	golang.org/x/tools v0.42.0 // indirect
-	google.golang.org/protobuf v1.36.8 // indirect
+	golang.org/x/tools v0.49.0 // indirect
+	google.golang.org/protobuf v1.36.12 // indirect
 	gotest.tools/v3 v3.5.2 // indirect
 	modernc.org/libc v1.67.6 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
